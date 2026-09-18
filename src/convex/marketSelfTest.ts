@@ -10,7 +10,7 @@
 
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { createSquadForClub } from "./context";
+import { seedSquadForClub } from "./context";
 import { DEFAULT_RULES, groupOf, type Position } from "./rulesEngine";
 import { tryExecute, validateOfferExecution } from "./market";
 
@@ -152,13 +152,13 @@ export const run = internalMutation({
       joinedAt: now,
     });
 
-    const squadA = await createSquadForClub(ctx, {
+    const squadA = await seedSquadForClub(ctx, {
       tournamentId,
       clubId: clubA.clubId,
       presidentId: presidentA,
       clubName: "Selftest A",
     });
-    const squadB = await createSquadForClub(ctx, {
+    const squadB = await seedSquadForClub(ctx, {
       tournamentId,
       clubId: clubB.clubId,
       presidentId: presidentB,
@@ -179,8 +179,8 @@ export const run = internalMutation({
       return rows.find((row) => row.tournamentId === tournamentId) ?? null;
     };
 
-    check("Squad A created", squadA.size === 20, `size=${squadA.size}`);
-    check("Squad B created", squadB.size === 20, `size=${squadB.size}`);
+    check("Squad A filled for the trade scenario", squadA.size === 20, `size=${squadA.size}`);
+    check("Squad B filled for the trade scenario", squadB.size === 20, `size=${squadB.size}`);
 
     /* ---------------- 1. Free-agent signing executes immediately ----------- */
     const freeAgent = freeAgentIds[0];

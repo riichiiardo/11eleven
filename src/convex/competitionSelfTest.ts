@@ -17,7 +17,7 @@ import {
   type ScoredFixture,
 } from "./competitionEngine";
 import { playMatchday, seedFixtures } from "./competition";
-import { createSquadForClub } from "./context";
+import { seedSquadForClub } from "./context";
 import { FORMATIONS, DEFAULT_FORMATION, groupOf, type Position } from "./rulesEngine";
 
 const SHAPE: Position[] = [
@@ -243,7 +243,7 @@ export const run = internalMutation({
         budget: 350_000_000,
         joinedAt: now,
       });
-      const { squadId } = await createSquadForClub(ctx, {
+      const { squadId } = await seedSquadForClub(ctx, {
         tournamentId,
         clubId: club.clubId,
         presidentId,

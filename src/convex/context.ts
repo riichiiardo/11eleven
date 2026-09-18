@@ -158,6 +158,7 @@ export async function seedTournament(
   }
 
   const freeAgentVersion = await seedFreeAgents(ctx, tournamentId);
+  const importedCount = (await ctx.db.query("players").collect()).length;
 
   await ctx.db.insert("auditLog", {
     tournamentId,
@@ -165,7 +166,7 @@ export async function seedTournament(
     action: "Torneo creado",
     entity: "tournament",
     entityId: tournamentId,
-    detail: `${TOURNAMENT_SEED.name} · ${CLUBS.length} clubes · ${CLUBS.length * 20} jugadores · ${freeAgentVersion} agentes libres · ${FC_VERSION}`,
+    detail: `${TOURNAMENT_SEED.name} · ${CLUBS.length} clubes · catálogo de ${importedCount} jugadores ${FC_VERSION} · ${freeAgentVersion} agentes libres · plantillas nacen vacías y se construyen en el draft`,
     createdAt: now,
   });
 
@@ -292,7 +293,44 @@ export async function loadPresident(
 }
 
 /** Ownership chain: PLAYER -> SQUAD_OWNERSHIP -> PRESIDENT -> TOURNAMENT */
+/**
+ * Every squad is born EMPTY. The catalogue (imported from the SoFIFA/FC 27
+ * snapshot) is the player universe; ownership starts at zero and the squad is
+ * built by the President through the draft and the market. The former behaviour
+ * of pre-filling a squad with the real-world club roster is kept only as the
+ * self-test helper `seedSquadForClub` below.
+ */
 export async function createSquadForClub(
+  ctx: MutationCtx,
+  params: {
+    tournamentId: Id<"tournaments">;
+    clubId: Id<"clubs">;
+    presidentId: Id<"presidents">;
+    clubName: string;
+  },
+): Promise<{ squadId: Id<"squads">; size: number }> {
+  const { tournamentId, clubId, presidentId } = params;
+  const now = Date.now();
+
+  const squadId = await ctx.db.insert("squads", {
+    tournamentId,
+    clubId,
+    presidentId,
+    formation: DEFAULT_FORMATION,
+    lineup: [],
+    lineupUpdatedAt: now,
+    createdAt: now,
+  });
+
+  return { squadId, size: 0 };
+}
+
+/**
+ * Self-test helper: fills a squad with the club's catalogue players exactly as
+ * `createSquadForClub` did before the "empty squads, draft fills them" change.
+ * Production flows must never call this.
+ */
+export async function seedSquadForClub(
   ctx: MutationCtx,
   params: {
     tournamentId: Id<"tournaments">;
@@ -898,7 +936,18 @@ export function buildActions(params: {
   }
 
   const slotsFree = rules.squadSize - squadSize;
-  if (market.open && slotsFree > 0) {
+  if (squadSize === 0) {
+    actions.push({
+      id: "squad-empty",
+      tone: draft.status === "en_curso" ? "positive" : "warning",
+      title: "Tu plantilla está vacía · todo se decide en el primer draft",
+      description:
+        draft.status === "en_curso"
+          ? "Es el momento de construir tu equipo: cada ficha se valida contra presupuesto, cupos por posición y sub-21 antes de confirmarse."
+          : "Ningún club arranca con jugadores. Administración abrirá el draft y cada Presidente construirá su equipo fichando del catálogo FC 27 con su presupuesto.",
+      action: { label: "Ir al draft", to: "/dashboard/draft" },
+    });
+  } else if (market.open && slotsFree > 0) {
     actions.push({
       id: "market-open",
       tone: "info",

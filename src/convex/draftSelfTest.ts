@@ -10,7 +10,7 @@
 
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { createSquadForClub } from "./context";
+import { seedSquadForClub } from "./context";
 import { DEFAULT_RULES, groupOf, type Position } from "./rulesEngine";
 import { draftAcceptsPicks, indexFor } from "./draftEngine";
 
@@ -131,13 +131,13 @@ export const run = internalMutation({
       joinedAt: now,
     });
 
-    await createSquadForClub(ctx, {
+    await seedSquadForClub(ctx, {
       tournamentId,
       clubId: clubA.clubId,
       presidentId: presidentA,
       clubName: "Selftest A",
     });
-    await createSquadForClub(ctx, {
+    await seedSquadForClub(ctx, {
       tournamentId,
       clubId: clubB.clubId,
       presidentId: presidentB,

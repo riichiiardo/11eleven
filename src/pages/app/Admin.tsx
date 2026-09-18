@@ -10,11 +10,11 @@ import {
 } from "@/convex/rulesEngine";
 import { errorMessage, relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { useNavigate, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";
-import { Countdown } from "@/components/eleven/SectionCard";
+import { Countdown, StatTile } from "@/components/eleven/SectionCard";
 import { Crest } from "@/components/eleven/Crest";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
 import {
   AlertTriangle,
   Crown,
+  Database,
   Gauge,
   Handshake,
   Hourglass,
@@ -169,6 +170,10 @@ export default function Admin() {
             <ScrollText className="size-4" aria-hidden="true" />
             Auditoría
           </TabsTrigger>
+          <TabsTrigger value="catalogo" className="min-h-10">
+            <Database className="size-4" aria-hidden="true" />
+            Catálogo
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="torneo" className="flex flex-col gap-5">
@@ -204,8 +209,126 @@ export default function Admin() {
             <AuditList entries={overview.activity} />
           </SectionCard>
         </TabsContent>
+
+        <TabsContent value="catalogo" className="flex flex-col gap-5">
+          <CatalogPanel />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/**
+ * Catálogo de jugadores: estado de la sincronización SoFIFA + botón de
+ * sincronización. Administración define la base de datos con la que juega el
+ * torneo; las plantillas y la propiedad de jugadores nunca se tocan aquí.
+ */
+function CatalogPanel() {
+  const catalog = useQuery(api.footballSync.catalogState);
+  const syncAction = useAction(api.footballApi.syncCatalog);
+  const [busy, setBusy] = useState(false);
+
+  const handleSync = async () => {
+    setBusy(true);
+    try {
+      const result = await syncAction({});
+      if (result.fallback) {
+        toast.warning("SoFIFA no accesible", {
+          description: result.note ?? undefined,
+        });
+      } else {
+        toast.success("Catálogo sincronizado desde SoFIFA", {
+          description: `${result.inserted} nuevos · ${result.updated} actualizados · ${result.unchanged} sin cambios`,
+        });
+      }
+    } catch (cause) {
+      toast.error("No se pudo sincronizar el catálogo", {
+        description: errorMessage(cause),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SectionCard
+      title="Catálogo de jugadores (SoFIFA)"
+      icon={Database}
+      accent="gold"
+      bodyClassName="flex flex-col gap-5"
+    >
+      <p className="text-sm text-muted-foreground">
+        El catálogo es la base de jugadores de la que beben el draft y el mercado. Al sincronizar,
+        se importan los ratings actualizados desde la API pública de SoFIFA (FC 27). Si SoFIFA no
+        responde, se aplica el snapshot local versionado como respaldo: el torneo siempre queda
+        jugable. Las plantillas y la propiedad de jugadores nunca se modifican.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          icon={Database}
+          label="Jugadores en catálogo"
+          value={catalog === undefined ? "…" : String(catalog?.total ?? 0)}
+        />
+        <StatTile
+          icon={Zap}
+          label="Agentes libres"
+          value={catalog === undefined ? "…" : String(catalog?.freeAgents ?? 0)}
+          tone="pitch"
+        />
+        <StatTile
+          icon={Users}
+          label="En plantillas"
+          value={catalog === undefined ? "…" : String(catalog?.owned ?? 0)}
+          tone="slate"
+        />
+        <StatTile
+          icon={Trophy}
+          label="Versión"
+          value={catalog?.version ?? "—"}
+          tone="gold"
+        />
+      </div>
+
+      {catalog?.lastSync && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <RefreshCw className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span className="text-muted-foreground">Última sincronización:</span>
+          <span className="font-medium">{relativeTime(catalog.lastSync.at)}</span>
+          <Badge variant="outline">{catalog.lastSync.source}</Badge>
+          <span className="text-muted-foreground">
+            {catalog.lastSync.inserted} nuevos · {catalog.lastSync.updated} actualizados ·{" "}
+            {catalog.lastSync.unchanged} sin cambios
+          </span>
+        </div>
+      )}
+
+      {catalog?.lastError && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+          <div className="flex flex-col gap-0.5">
+            <span className="font-medium">Último intento con SoFIFA falló</span>
+            <span className="text-muted-foreground">
+              {catalog.lastError.message} · {relativeTime(catalog.lastError.at)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div>
+        <Button onClick={handleSync} disabled={busy} className="min-h-11">
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <RefreshCw className="size-4" aria-hidden="true" />
+          )}
+          {busy ? "Sincronizando con SoFIFA…" : "Sincronizar desde SoFIFA"}
+        </Button>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Puede tardar unos segundos. El resultado queda registrado en la auditoría con tu nombre.
+        </p>
+      </div>
+    </SectionCard>
   );
 }
 

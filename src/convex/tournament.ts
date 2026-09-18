@@ -541,7 +541,7 @@ export const chooseClub = mutation({
       action: "Presidencia asumida",
       entity: "club",
       entityId: clubId,
-      detail: `${displayName} (${nickname}) asume la presidencia de ${club.name} · plantilla inicial de ${size} jugadores · presupuesto ${formatMoney(rules.budget)}`,
+      detail: `${displayName} (${nickname}) asume la presidencia de ${club.name} · plantilla vacía: se construye en el primer draft · presupuesto ${formatMoney(rules.budget)}`,
     });
 
     return { clubId, squadSize: size };
