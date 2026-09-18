@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { OfferDialog } from "@/components/eleven/OfferDialog";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
 import { DraftStatusPill } from "@/components/eleven/DraftBits";
+import { MatchCard } from "@/components/eleven/MatchBits";
 import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
@@ -64,6 +65,10 @@ export default function Home() {
 
   const statusMeta = TOURNAMENT_STATUS_META[tournament.status];
   const nextEvent = state.nextEvent;
+  const competition = state.competition;
+  const myPositionRow = competition.standings.find(
+    (row) => row.clubId === club.id,
+  );
   const limits = {
     GK: { min: rules.gkMin, max: rules.gkMax },
     DEF: { min: rules.defMin, max: rules.defMax },
@@ -375,6 +380,94 @@ export default function Home() {
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               {statusMeta.hint}
             </p>
+          </SectionCard>
+
+          <SectionCard
+            title="Competición"
+            icon={Trophy}
+            action={{ label: "Ver resultados", to: "/dashboard/competicion" }}
+          >
+            {!competition.available ? (
+              <p className="text-sm text-muted-foreground">
+                El calendario todavía no se ha generado. Aquí verás la tabla, tu
+                último resultado y tu próximo partido en cuanto arranque la
+                competición.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  {competition.leader ? (
+                    <span className="flex items-center gap-1.5">
+                      <Crown
+                        className="size-3.5 text-amber-500"
+                        aria-hidden="true"
+                      />
+                      <span className="font-semibold">
+                        {competition.leader.clubName}
+                      </span>
+                      <span className="num text-muted-foreground">
+                        {competition.leader.points} pts
+                      </span>
+                    </span>
+                  ) : null}
+                  {myPositionRow ? (
+                    <span className="flex items-center gap-1.5">
+                      <TrendingUp
+                        className="size-3.5 text-primary"
+                        aria-hidden="true"
+                      />
+                      Tu posición:{" "}
+                      <span className="num font-semibold">
+                        {myPositionRow.position}º de {competition.standings.length}
+                      </span>
+                      <span className="num text-muted-foreground">
+                        con {myPositionRow.points} pts
+                      </span>
+                    </span>
+                  ) : null}
+                </div>
+                {competition.previousMatch ? (
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Último resultado · J{competition.previousMatch.matchday}
+                    </p>
+                    <MatchCard
+                      fixture={competition.previousMatch.fixture}
+                      highlightClubId={club.id}
+                      showMatchday={false}
+                    />
+                  </div>
+                ) : null}
+                {competition.myMatch ? (
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {competition.myMatch.status === "jugada"
+                        ? `Tu partido · J${competition.myMatch.matchday}`
+                        : `Próximo partido · J${competition.myMatch.matchday}`}
+                    </p>
+                    <MatchCard
+                      fixture={competition.myMatch.fixture}
+                      highlightClubId={club.id}
+                      showMatchday={false}
+                    />
+                  </div>
+                ) : null}
+                {competition.previousMatch === null && competition.myMatch === null ? (
+                  <p className="text-sm text-muted-foreground">
+                    Tu club todavía no tiene partidos resueltos que mostrar.
+                  </p>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => navigate("/dashboard/competicion")}
+                >
+                  <Trophy className="size-4" aria-hidden="true" />
+                  Abrir resultados y tabla
+                </Button>
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard

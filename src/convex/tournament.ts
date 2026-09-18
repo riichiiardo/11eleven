@@ -5,14 +5,11 @@ import { PERMISSIONS, adminRoleValidator, tournamentStatusValidator } from "./sc
 import type {
   AdminOverviewView,
   AppStateView,
-  CompetitionSummaryView,
   MarketSummaryView,
 } from "./appTypes";
 import {
   buildCompetitionSummary,
-  loadSquadByClub,
   seedFixtures,
-  startersOf,
 } from "./competition";
 import { loadDraftAdmin, loadDraftSummary } from "./draft";
 import {

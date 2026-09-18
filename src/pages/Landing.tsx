@@ -50,14 +50,14 @@ const PILLARS = [
     title: "Mercado",
     description:
       "Jugadores libres, ofertas, trades y acuerdos reservados que se ejecutan al abrirse el draft.",
-    status: "Siguiente fase",
+    status: "Disponible",
   },
   {
     icon: Trophy,
     title: "Competición",
     description:
-      "Jornadas, resultados, tabla y estadísticas del torneo, con cierre de alineación automático.",
-    status: "Siguiente fase",
+      "Calendario ida y vuelta, jornadas, resultados, tabla y Match Center con los puntos fantasy de tu once.",
+    status: "Disponible",
   },
 ];
 
@@ -454,8 +454,9 @@ export default function Landing() {
                 Club → Plantilla → Mercado → Competición
               </h2>
               <p className="mt-4 text-sm leading-relaxed text-white/70">
-                La versión 1 construye los dos primeros pilares con profundidad real. Mercado y
-                competición se apoyan sobre esta misma base de datos, sin reconstruir nada.
+                Los cuatro pilares ya están vivos sobre el mismo Tournament Engine: cada uno
+                consulta el mismo motor de reglas, la misma base de jugadores y el mismo registro
+                de auditoría.
               </p>
             </div>
           </Reveal>
@@ -576,8 +577,8 @@ export default function Landing() {
                 ))}
               </ul>
               <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
-                La versión 1 incluye Administración de torneo con reglas, presidentes, roles y
-                auditoría operativa sobre clubes y plantillas.
+                La Administración incluye torneo, reglas, presidentes, roles, mercado, draft,
+                jornadas y auditoría operativa sobre clubes y plantillas.
               </div>
             </div>
           </Reveal>
