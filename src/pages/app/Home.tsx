@@ -12,8 +12,10 @@ import { PitchView } from "@/components/eleven/PitchView";
 import { GroupMeter, RuleCheckList } from "@/components/eleven/RuleCheckList";
 import { AvailabilityBadge, OvrBadge, PlayerAvatar } from "@/components/eleven/PlayerBits";
 import { MarketPlayerCard } from "@/components/eleven/MarketPlayerCard";
+import { Badge } from "@/components/ui/badge";
 import { OfferDialog } from "@/components/eleven/OfferDialog";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
+import { DraftStatusPill } from "@/components/eleven/DraftBits";
 import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
@@ -23,6 +25,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Crown,
+  Gavel,
   Handshake,
   Info,
   ShieldAlert,
@@ -372,6 +375,61 @@ export default function Home() {
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               {statusMeta.hint}
             </p>
+          </SectionCard>
+
+          <SectionCard
+            title="Draft"
+            icon={Gavel}
+            action={{ label: "Ir al draft", to: "/dashboard/draft" }}
+          >
+            {state.draft === undefined ? null : state.draft === null ? (
+              <p className="text-sm text-muted-foreground">
+                El draft aún no se ha preparado. Administración abrirá la ventana
+                y aquí verás el turno, el reloj y el pool disponible.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DraftStatusPill status={state.draft.status} />
+                  <Badge variant="outline">
+                    Ronda {state.draft.round}/{state.draft.totalRounds}
+                  </Badge>
+                </div>
+                {state.draft.isMyTurn ? (
+                  <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/[0.07] p-3">
+                    <p className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                      <Gavel className="size-4" aria-hidden="true" />
+                      ¡Es tu turno!
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Elige tu fichaje antes de que expire el reloj.
+                    </p>
+                  </div>
+                ) : state.draft.currentNickname ? (
+                  <p className="text-sm">
+                    Turno de{" "}
+                    <span className="font-bold">{state.draft.currentNickname}</span>
+                    {state.draft.currentClubName
+                      ? ` · ${state.draft.currentClubName}`
+                      : null}
+                  </p>
+                ) : null}
+                <p className="num text-xs text-muted-foreground">
+                  {state.draft.myPicks} fichaje(s) tuyos · plantilla{" "}
+                  {state.draft.squadSize}/{state.draft.squadSizeLimit} · pool{" "}
+                  {state.draft.poolSize}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => navigate("/dashboard/draft")}
+                >
+                  <Gavel className="size-4" aria-hidden="true" />
+                  Abrir el centro de control del draft
+                </Button>
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard

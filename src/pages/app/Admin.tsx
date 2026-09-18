@@ -14,6 +14,7 @@ import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { useNavigate, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";
+import { Countdown } from "@/components/eleven/SectionCard";
 import { Crest } from "@/components/eleven/Crest";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,16 +43,23 @@ import {
   Crown,
   Gauge,
   Handshake,
+  Hourglass,
   Loader2,
+  PauseCircle,
   PlayCircle,
   ScrollText,
   ShieldCheck,
+  SkipForward,
+  StopCircle,
   UserPlus,
   Users,
+  Zap,
 } from "lucide-react";
 import { useMarketActions } from "@/hooks/use-market-actions";
+import { useDraftActions } from "@/hooks/use-draft-actions";
 import { OfferCard } from "@/components/eleven/OfferCard";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
+import { TurnStrip, DraftStatusPill } from "@/components/eleven/DraftBits";
 
 const PERMISSION_LABELS: Record<string, string> = {
   configuracion: "Configuración",
@@ -142,6 +150,10 @@ export default function Admin() {
             <Handshake className="size-4" aria-hidden="true" />
             Mercado
           </TabsTrigger>
+          <TabsTrigger value="draft" className="min-h-10">
+            <Zap className="size-4" aria-hidden="true" />
+            Draft
+          </TabsTrigger>
           <TabsTrigger value="auditoria" className="min-h-10">
             <ScrollText className="size-4" aria-hidden="true" />
             Auditoría
@@ -166,6 +178,10 @@ export default function Admin() {
 
         <TabsContent value="mercado" className="flex flex-col gap-5">
           <MarketPanel overview={overview} />
+        </TabsContent>
+
+        <TabsContent value="draft" className="flex flex-col gap-5">
+          <DraftPanel overview={overview} />
         </TabsContent>
 
         <TabsContent value="auditoria">
@@ -414,6 +430,325 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
                 </span>
               </li>
             ))}
+          </ul>
+        )}
+      </SectionCard>
+    </>
+  );
+}
+
+/**
+ * Draft tab — the "modo árbitro" control centre (prompt §40). Prepare the
+ * order, open the window (which executes reserved agreements), pause/resume
+ * the clock, skip a stuck turn and close the draft.
+ */
+function DraftPanel({ overview }: { overview: AdminOverviewView }) {
+  const { prepare, open, pause, resume, skipTurn, close, busyKey } =
+    useDraftActions();
+  const { draft } = overview;
+  const busy = busyKey !== null;
+  const [form, setForm] = useState({
+    totalRounds: 4,
+    pickSeconds: 300,
+    snake: true,
+    orderMode: "inscripcion" as "inscripcion" | "sorteo",
+  });
+
+  const status = draft.status;
+  const canPrepare = status === null || status === "borrador";
+  const canOpen = status === "borrador";
+  const canPause = status === "en_curso";
+  const canResume = status === "pausado";
+  const canSkip = status === "en_curso" || status === "pausado";
+  const canClose = status === "en_curso" || status === "pausado";
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Estado del draft"
+          value={draft.statusLabel ?? "Sin preparar"}
+          hint={draft.statusHint ?? "Todavía no se ha preparado un orden de turnos"}
+        />
+        <MetricCard
+          label="Turno actual"
+          value={draft.currentNickname ?? "—"}
+          hint={
+            draft.currentClubName
+              ? `Preside ${draft.currentClubName}`
+              : "Nadie tiene el turno"
+          }
+        />
+        <MetricCard
+          label="Adquisiciones"
+          value={`${draft.totalPicks}`}
+          hint={`Ronda ${draft.round} de ${draft.totalRounds} · orden de ${draft.orderSize}`}
+        />
+        <MetricCard
+          label="Acuerdos reservados"
+          value={`${draft.reservedPending}`}
+          hint={
+            draft.reservedPending > 0
+              ? "Se validarán al abrir el draft"
+              : "Nada pendiente de ejecución"
+          }
+        />
+      </div>
+
+      <SectionCard title="Control del draft" icon={Zap}>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <DraftStatusPill status={draft.status} />
+          </div>
+          <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            Abrir el draft cierra la ventana de mercado y ejecuta los acuerdos
+            reservados con validación final. Cada turno tiene reloj; pausar lo
+            detiene para todos. Cerrar el draft fija las plantillas y devuelve
+            el torneo a la fase previa a la competición.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {canOpen ? (
+              <Button
+                type="button"
+                className="min-h-11"
+                disabled={busy}
+                onClick={() => open()}
+              >
+                <PlayCircle className="size-4" aria-hidden="true" />
+                Abrir draft
+              </Button>
+            ) : null}
+            {canPause ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                disabled={busy}
+                onClick={() => pause()}
+              >
+                <PauseCircle className="size-4" aria-hidden="true" />
+                Pausar
+              </Button>
+            ) : null}
+            {canResume ? (
+              <Button
+                type="button"
+                className="min-h-11"
+                disabled={busy}
+                onClick={() => resume()}
+              >
+                <PlayCircle className="size-4" aria-hidden="true" />
+                Reanudar
+              </Button>
+            ) : null}
+            {canSkip ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                disabled={busy}
+                onClick={() => skipTurn()}
+              >
+                <SkipForward className="size-4" aria-hidden="true" />
+                Saltar turno
+              </Button>
+            ) : null}
+            {canClose ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 border-rose-500/40 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300"
+                disabled={busy}
+                onClick={() => close()}
+              >
+                <StopCircle className="size-4" aria-hidden="true" />
+                Cerrar draft
+              </Button>
+            ) : null}
+          </div>
+
+          {draft.currentDeadline !== null && draft.status === "en_curso" ? (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Hourglass className="size-3.5" aria-hidden="true" />
+              Turno de {draft.currentNickname}: cierra en{" "}
+              <Countdown target={draft.currentDeadline} label="" compact />
+            </p>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Orden de turnos" icon={Users}>
+        <TurnStrip order={draft.turnOrder} />
+        {draft.unsignedPresidents.length > 0 ? (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/[0.06] p-3 text-xs text-amber-800 dark:text-amber-200">
+            <AlertTriangle
+              className="mt-0.5 size-3.5 shrink-0"
+              aria-hidden="true"
+            />
+            {draft.unsignedPresidents.length} Presidente(s) se unieron después de
+            preparar el orden: {draft.unsignedPresidents.join(", ")}. Vuelve a
+            preparar el draft para incluirlos.
+          </p>
+        ) : null}
+      </SectionCard>
+
+      {canPrepare ? (
+        <SectionCard title="Preparar draft" icon={Zap}>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Configura rondas, reloj por turno y el orden antes de abrir. Puedes
+            volver a preparar el draft mientras siga cerrado.
+          </p>
+          <form
+            className="grid gap-4 sm:grid-cols-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void prepare(form);
+            }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="draftRounds" className="text-xs">
+                Rondas
+              </Label>
+              <Input
+                id="draftRounds"
+                type="number"
+                min={1}
+                max={30}
+                className="h-11"
+                value={form.totalRounds}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    totalRounds: Math.max(1, Number(event.target.value) || 1),
+                  }))
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Con {draft.orderSize} Presidente(s) serán{" "}
+                {draft.orderSize * form.totalRounds} turnos en total.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="draftSeconds" className="text-xs">
+                Segundos por turno
+              </Label>
+              <Input
+                id="draftSeconds"
+                type="number"
+                min={30}
+                step={30}
+                className="h-11"
+                value={form.pickSeconds}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    pickSeconds: Math.max(30, Number(event.target.value) || 30),
+                  }))
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Si el reloj llega a cero, Administración puede saltar el turno.
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+              <div>
+                <Label htmlFor="draftSnake" className="text-xs font-semibold">
+                  Orden serpiente
+                </Label>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  Las rondas pares invierten el orden, como en un draft real.
+                </p>
+              </div>
+              <Switch
+                id="draftSnake"
+                checked={form.snake}
+                onCheckedChange={(checked) =>
+                  setForm((prev) => ({ ...prev, snake: checked }))
+                }
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="draftOrder" className="text-xs">
+                Orden de turnos
+              </Label>
+              <Select
+                value={form.orderMode}
+                onValueChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    orderMode: value as "inscripcion" | "sorteo",
+                  }))
+                }
+              >
+                <SelectTrigger id="draftOrder" className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inscripcion">
+                    Por orden de inscripción
+                  </SelectItem>
+                  <SelectItem value="sorteo">Sorteo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" className="min-h-11" disabled={busy}>
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Zap className="size-4" aria-hidden="true" />
+                )}
+                {status === "borrador" ? "Repreparar draft" : "Preparar draft"}
+              </Button>
+            </div>
+          </form>
+        </SectionCard>
+      ) : null}
+
+      <SectionCard
+        title="Historial de adquisiciones"
+        icon={ScrollText}
+        bodyClassName={draft.picks.length === 0 ? undefined : "p-0"}
+      >
+        {draft.picks.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">
+            Cada adquisición del draft quedará registrada aquí con su Presidente,
+            su precio y su ronda.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {draft.picks
+              .slice()
+              .reverse()
+              .slice(0, 20)
+              .map((pickRow) => (
+                <li
+                  key={pickRow.id}
+                  className="flex flex-wrap items-center gap-3 px-4 py-3"
+                >
+                  <span className="num flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
+                    {pickRow.pickNumber}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {pickRow.playerName}{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {pickRow.position} · {pickRow.realClub}
+                      </span>
+                    </p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      Ronda {pickRow.round} · {pickRow.nickname} ({pickRow.clubName})
+                      {pickRow.mode === "reserva"
+                        ? " · acuerdo reservado"
+                        : ""}
+                    </p>
+                  </div>
+                  <span className="num text-sm font-bold">
+                    {formatMoney(pickRow.price)}
+                  </span>
+                </li>
+              ))}
           </ul>
         )}
       </SectionCard>

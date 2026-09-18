@@ -37,6 +37,7 @@ import {
   ShoppingBag,
   User,
   Users,
+  Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -66,7 +67,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
     ],
   },
   {
-    title: "Mercado",
+    title: "Mercado y Draft",
     items: [
       { label: "Mercado", to: "/dashboard/mercado", icon: ShoppingBag, end: true },
       {
@@ -74,6 +75,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
         to: "/dashboard/mercado/negociaciones",
         icon: Handshake,
       },
+      { label: "Draft", to: "/dashboard/draft", icon: Zap },
     ],
   },
   {
@@ -90,7 +92,7 @@ const MOBILE_NAV: NavItem[] = [
   { label: "Inicio", to: "/dashboard", icon: LayoutDashboard, end: true },
   { label: "Club", to: "/dashboard/club", icon: Shield, end: true },
   { label: "Mercado", to: "/dashboard/mercado", icon: ShoppingBag, end: true },
-  { label: "Once", to: "/dashboard/formacion", icon: Shirt },
+  { label: "Draft", to: "/dashboard/draft", icon: Zap },
 ];
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
