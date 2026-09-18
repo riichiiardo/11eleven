@@ -5,8 +5,15 @@ import { PERMISSIONS, adminRoleValidator, tournamentStatusValidator } from "./sc
 import type {
   AdminOverviewView,
   AppStateView,
+  CompetitionSummaryView,
   MarketSummaryView,
 } from "./appTypes";
+import {
+  buildCompetitionSummary,
+  loadSquadByClub,
+  seedFixtures,
+  startersOf,
+} from "./competition";
 import { loadDraftAdmin, loadDraftSummary } from "./draft";
 import {
   buildActions,
@@ -139,6 +146,7 @@ export const ensureSetup = mutation({
     // already seeded deployment without touching any squad.
     await seedFreeAgents(ctx, tournament._id);
     await migrateSeededRules(ctx, tournament._id, userId, displayName!);
+    await seedFixtures(ctx, tournament);
 
     if (admins.length === 0) {
       await ctx.db.insert("tournamentAdmins", {
@@ -260,6 +268,7 @@ export const state = query({
         adminRole: admin?.role ?? null,
         market: emptyMarket(tournament.marketOpen),
         draft: null,
+        competition: await buildCompetitionSummary(ctx, tournament._id, null),
         actions: [],
         activity: [],
       };
@@ -322,6 +331,12 @@ export const state = query({
       rules,
       presidentId: president._id,
     });
+
+    const competition = await buildCompetitionSummary(
+      ctx,
+      tournament._id,
+      president.clubId,
+    );
 
     const activity = await buildActivity(ctx, tournament._id, 10);
 
@@ -409,6 +424,7 @@ export const state = query({
       adminRole: admin?.role ?? null,
       market,
       draft,
+      competition,
       actions: buildActions({
         isAdmin: Boolean(admin),
         market: {
@@ -436,6 +452,23 @@ export const state = query({
         lineupComplete: lineupEvaluation.starters.length === 11,
         lockAt: nextEvent?.lockAt ?? null,
         rules,
+        competition: {
+          myFixture: competition.myMatch
+            ? {
+                rivalName:
+                  competition.myMatch.fixture.home.clubId === president.clubId
+                    ? competition.myMatch.fixture.away.name
+                    : competition.myMatch.fixture.home.name,
+                kickoffAt: competition.myMatch.fixture.kickoffAt,
+              }
+            : null,
+          previousResult: competition.previousMatch
+            ? {
+                myPoints: competition.previousMatch.myPoints ?? 0,
+                rivalPoints: competition.previousMatch.rivalPoints ?? 0,
+              }
+            : null,
+        },
       }),
       activity,
     };
@@ -650,6 +683,11 @@ export const adminOverview = query({
         tournamentId: tournament._id,
         rules,
       }),
+      competition: await buildCompetitionSummary(
+        ctx,
+        tournament._id,
+        null,
+      ),
       totals: {
         squads: squads.length,
         players: squadPlayers.length,

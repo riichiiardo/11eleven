@@ -100,6 +100,13 @@ export const draftPickModeValidator = v.union(
   v.literal("reserva"),
 );
 
+/** Fixture lifecycle (prompt §24: jornada anterior / actual / próxima). */
+export const fixtureStatusValidator = v.union(
+  v.literal("programado"),
+  v.literal("en_curso"),
+  v.literal("jugado"),
+);
+
 /** Permission keys a co-administrator can be granted. */
 export const PERMISSIONS = [
   "configuracion",
@@ -319,6 +326,34 @@ const schema = defineSchema(
       createdAt: v.number(),
       updatedAt: v.number(),
     }).index("by_tournament", ["tournamentId"]),
+
+    /* ----------------------------------------------------------------
+     * Competition: calendar, results and standings source of truth
+     * ---------------------------------------------------------------- */
+
+    /**
+     * The XI is snapshotted into the fixture at lock time, so a later transfer
+     * never rewrites history: results stay auditable.
+     */
+    fixtures: defineTable({
+      tournamentId: v.id("tournaments"),
+      matchday: v.number(),
+      homeClubId: v.id("clubs"),
+      awayClubId: v.id("clubs"),
+      status: fixtureStatusValidator,
+      kickoffAt: v.number(),
+      homeGoals: v.optional(v.number()),
+      awayGoals: v.optional(v.number()),
+      homePoints: v.optional(v.number()),
+      awayPoints: v.optional(v.number()),
+      homeXiOvr: v.optional(v.number()),
+      awayXiOvr: v.optional(v.number()),
+      playedAt: v.optional(v.number()),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_tournament_matchday", ["tournamentId", "matchday"])
+      .index("by_home_club", ["homeClubId"])
+      .index("by_away_club", ["awayClubId"]),
 
     draftPicks: defineTable({
       tournamentId: v.id("tournaments"),

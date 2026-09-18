@@ -21,6 +21,7 @@ const FormationPage = lazy(() => import("./pages/app/Formation.tsx"));
 const MarketPage = lazy(() => import("./pages/app/Market.tsx"));
 const NegotiationsPage = lazy(() => import("./pages/app/Negotiations.tsx"));
 const DraftPage = lazy(() => import("./pages/app/Draft.tsx"));
+const CompetitionPage = lazy(() => import("./pages/app/Competition.tsx"));
 const RulesPage = lazy(() => import("./pages/app/Rules.tsx"));
 const ProfilePage = lazy(() => import("./pages/app/Profile.tsx"));
 const AdminPage = lazy(() => import("./pages/app/Admin.tsx"));
@@ -156,6 +157,7 @@ createRoot(document.getElementById("root")!).render(
                   element={<NegotiationsPage />}
                 />
                 <Route path="draft" element={<DraftPage />} />
+                <Route path="competicion" element={<CompetitionPage />} />
                 <Route path="reglas" element={<RulesPage />} />
                 <Route path="perfil" element={<ProfilePage />} />
                 <Route path="admin" element={<AdminPage />} />

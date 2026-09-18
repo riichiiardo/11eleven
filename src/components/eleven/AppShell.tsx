@@ -35,6 +35,7 @@ import {
   Shield,
   Shirt,
   ShoppingBag,
+  Swords,
   User,
   Users,
   Zap,
@@ -81,6 +82,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
   {
     title: "Torneo",
     items: [
+      { label: "Resultados", to: "/dashboard/competicion", icon: Swords },
       { label: "Reglas del torneo", to: "/dashboard/reglas", icon: BookOpen },
       { label: "Administración", to: "/dashboard/admin", icon: Gauge, adminOnly: true },
       { label: "Perfil", to: "/dashboard/perfil", icon: User },
@@ -93,6 +95,7 @@ const MOBILE_NAV: NavItem[] = [
   { label: "Club", to: "/dashboard/club", icon: Shield, end: true },
   { label: "Mercado", to: "/dashboard/mercado", icon: ShoppingBag, end: true },
   { label: "Draft", to: "/dashboard/draft", icon: Zap },
+  { label: "Resultados", to: "/dashboard/competicion", icon: Swords },
 ];
 
 function navLinkClass({ isActive }: { isActive: boolean }) {

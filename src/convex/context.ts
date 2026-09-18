@@ -786,6 +786,10 @@ export function buildActions(params: {
   lockAt: number | null;
   rules: TournamentRules;
   market: { received: number; reserved: number; open: boolean };
+  competition: {
+    myFixture: { rivalName: string; kickoffAt: number } | null;
+    previousResult: { myPoints: number; rivalPoints: number } | null;
+  };
   draft: {
     status: "borrador" | "en_curso" | "pausado" | "cerrado" | null;
     isMyTurn: boolean;
@@ -808,8 +812,21 @@ export function buildActions(params: {
     lockAt,
     rules,
     market,
+    competition,
     draft,
   } = params;
+
+  if (competition.myFixture) {
+    actions.push({
+      id: "matchday",
+      tone: "info",
+      title: `Jornada en curso · vs ${competition.myFixture.rivalName}`,
+      description: competition.previousResult
+        ? `El cierre de jornada confirma los resultados. Tu última cita sumó ${competition.previousResult.myPoints}–${competition.previousResult.rivalPoints} puntos fantasy frente al rival.`
+        : "Cuando Administración cierre la jornada, tus 11 titulares puntúan y la tabla se actualiza.",
+      action: { label: "Ir a resultados", to: "/dashboard/competicion" },
+    });
+  }
 
   if (draft.isMyTurn) {
     actions.push({

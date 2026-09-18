@@ -57,9 +57,16 @@ import {
 } from "lucide-react";
 import { useMarketActions } from "@/hooks/use-market-actions";
 import { useDraftActions } from "@/hooks/use-draft-actions";
+import { useCompetitionActions } from "@/hooks/use-competition-actions";
 import { OfferCard } from "@/components/eleven/OfferCard";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
 import { TurnStrip, DraftStatusPill } from "@/components/eleven/DraftBits";
+import { MatchCard, StandingsTable } from "@/components/eleven/MatchBits";
+import {
+  RefreshCw,
+  Swords,
+  Trophy,
+} from "lucide-react";
 
 const PERMISSION_LABELS: Record<string, string> = {
   configuracion: "Configuración",
@@ -154,6 +161,10 @@ export default function Admin() {
             <Zap className="size-4" aria-hidden="true" />
             Draft
           </TabsTrigger>
+          <TabsTrigger value="jornadas" className="min-h-10">
+            <Swords className="size-4" aria-hidden="true" />
+            Jornadas
+          </TabsTrigger>
           <TabsTrigger value="auditoria" className="min-h-10">
             <ScrollText className="size-4" aria-hidden="true" />
             Auditoría
@@ -182,6 +193,10 @@ export default function Admin() {
 
         <TabsContent value="draft" className="flex flex-col gap-5">
           <DraftPanel overview={overview} />
+        </TabsContent>
+
+        <TabsContent value="jornadas" className="flex flex-col gap-5">
+          <CompetitionPanel overview={overview} />
         </TabsContent>
 
         <TabsContent value="auditoria">
@@ -773,6 +788,122 @@ function MetricCard({
       <p className="num display mt-1 text-xl">{value}</p>
       {hint ? <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p> : null}
     </div>
+  );
+}
+
+/**
+ * Competition control: the "modo árbitro" for the calendar. The admin sees
+ * the current matchday, its fixtures and closes it — the engine resolves
+ * every match from the saved lineups and advances the tournament.
+ */
+function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
+  const { sync, closeMatchday, busy } = useCompetitionActions();
+  const competition = overview.competition;
+  const current = competition.matchdays.find(
+    (group) => group.status === "en_curso",
+  );
+  const leader = competition.leader;
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Jornada en curso"
+          value={competition.available ? `J${competition.currentMatchday}` : "—"}
+          hint={
+            competition.available
+              ? `${competition.calendarMatchdays} jornadas en el calendario`
+              : "Calendario sin generar"
+          }
+        />
+        <MetricCard
+          label="Partidos jugados"
+          value={`${competition.playedCount}/${competition.totalCount}`}
+          hint={`${competition.playedCount} resueltos de ${competition.totalCount} programados`}
+        />
+        <MetricCard
+          label="Líder"
+          value={leader ? leader.clubShortName : "—"}
+          hint={
+            leader
+              ? `${leader.points} pts · ${leader.won}V ${leader.drawn}E ${leader.lost}D`
+              : "Sin partidos jugados todavía"
+          }
+        />
+        <MetricCard
+          label="Temporada"
+          value={`${competition.currentMatchday}/${competition.totalMatchdays}`}
+          hint={`${overview.tournament?.season ?? "—"} · cierre de jornada manual`}
+        />
+      </div>
+
+      <SectionCard
+        title={`Cerrar jornada ${competition.currentMatchday}`}
+        icon={Swords}
+        accent="gold"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            Al cerrar la jornada, cada partido se resuelve con los 11 titulares
+            guardados en la Formación de cada club (snapshot auditable: los
+            fichajes posteriores no reescriben resultados). La tabla se
+            recalcula y la siguiente jornada pasa a estar en curso.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void sync()}
+              disabled={busy}
+              className="min-h-10"
+            >
+              <RefreshCw className="size-4" aria-hidden="true" />
+              Sincronizar calendario
+            </Button>
+            <Button
+              onClick={() => void closeMatchday(competition.currentMatchday)}
+              disabled={busy || !competition.available}
+              className="min-h-10"
+            >
+              {busy ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Swords className="size-4" aria-hidden="true" />
+              )}
+              Cerrar jornada {competition.currentMatchday}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {current
+              ? `${current.playedCount}/${current.fixtures.length} partido(s) ya resueltos en esta jornada; el resto se resuelve al cerrar.`
+              : "No hay jornada en curso: cierra una para activar la siguiente."}
+          </p>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Partido destacado de la jornada" icon={Swords}>
+        {current && current.fixtures.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {current.fixtures.map((fixture) => (
+              <MatchCard key={fixture.id} fixture={fixture} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Sin partidos programados en la jornada en curso.
+          </p>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Tabla del torneo" icon={Trophy}>
+        {competition.available ? (
+          <StandingsTable rows={competition.standings} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            La tabla aparece en cuanto exista el calendario.
+          </p>
+        )}
+      </SectionCard>
+    </>
   );
 }
 

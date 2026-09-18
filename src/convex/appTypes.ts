@@ -1,5 +1,6 @@
 import type { Id } from "./_generated/dataModel";
 import type { OfferStatus, OfferType } from "./marketEngine";
+import type { StandingRow } from "./competitionEngine";
 import type {
   Lineup,
   LineupEvaluation,
@@ -110,6 +111,7 @@ export type AdminOverviewView = {
     open: boolean;
   };
   draft: DraftAdminView;
+  competition: CompetitionSummaryView;
   totals: {
     squads: number;
     players: number;
@@ -342,6 +344,76 @@ export type MyAction = {
   action: { label: string; to: string };
 };
 
+/* ------------------------------------------------------------------ *
+ * Competition (calendar, results, standings)
+ * ------------------------------------------------------------------ */
+
+export type FixtureSideView = {
+  clubId: Id<"clubs">;
+  name: string;
+  shortName: string;
+  colors: [string, string];
+};
+
+export type FixtureView = {
+  id: Id<"fixtures">;
+  matchday: number;
+  status: "programado" | "en_curso" | "jugado";
+  kickoffAt: number;
+  home: FixtureSideView;
+  away: FixtureSideView;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  homePoints: number | null;
+  awayPoints: number | null;
+  homeXiOvr: number | null;
+  awayXiOvr: number | null;
+};
+
+export type MatchdayGroupView = {
+  matchday: number;
+  status: "futura" | "en_curso" | "jugada";
+  statusLabel: string;
+  kickoffAt: number | null;
+  playedCount: number;
+  fixtures: FixtureView[];
+};
+
+export type MyMatchView = {
+  matchday: number;
+  status: "futura" | "en_curso" | "jugada";
+  fixture: FixtureView;
+  mySide: "home" | "away";
+  myPoints: number | null;
+  rivalPoints: number | null;
+  myXiOvr: number | null;
+  rivalNickname: string | null;
+};
+
+export type StandingRowView = StandingRow & { position: number };
+
+export type CompetitionSummaryView = {
+  /** False when the calendar has not been generated yet. */
+  available: boolean;
+  currentMatchday: number;
+  totalMatchdays: number;
+  calendarMatchdays: number;
+  playedCount: number;
+  totalCount: number;
+  standings: StandingRowView[];
+  matchdays: MatchdayGroupView[];
+  /** My fixture in the current (or next) matchday. */
+  myMatch: MyMatchView | null;
+  /** My most recent played fixture. */
+  previousMatch: MyMatchView | null;
+  leader: StandingRowView | null;
+};
+
+export type CompetitionCalendarView = {
+  tournament: TournamentView;
+  summary: CompetitionSummaryView;
+};
+
 export type AppStateView = {
   needsClub: boolean;
   user: { id: Id<"users">; name: string; email: string; nickname: string };
@@ -362,6 +434,7 @@ export type AppStateView = {
   adminRole: "principal" | "coAdmin" | null;
   market: MarketSummaryView;
   draft: DraftSummaryView | null;
+  competition: CompetitionSummaryView;
   actions: MyAction[];
   activity: AuditEntryView[];
 };
