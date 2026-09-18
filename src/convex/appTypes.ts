@@ -336,6 +336,33 @@ export type DraftControlView = {
   reservedPending: number;
 };
 
+/* ------------------------------------------------------------------ *
+ * Equipos (club directory → squad → compare)
+ * ------------------------------------------------------------------ */
+
+export type TeamXISlot = {
+  slotId: string;
+  playerId: Id<"players">;
+  name: string;
+  position: Position;
+  group: PositionGroup;
+  ovr: number;
+  flag: string;
+};
+
+/** Public squad view of any club, used by the Equipos section. */
+export type TeamSquadView = {
+  clubId: Id<"clubs">;
+  clubName: string;
+  clubShortName: string;
+  clubColors: [string, string];
+  squad: SquadPlayerView[];
+  stats: SquadStats;
+  formation: string;
+  xiOvr: number;
+  xi: TeamXISlot[];
+};
+
 export type MyAction = {
   id: string;
   tone: "warning" | "info" | "positive" | "danger";
