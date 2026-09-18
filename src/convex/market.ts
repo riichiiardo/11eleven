@@ -1178,6 +1178,85 @@ export async function validateOfferExecution(
   return result;
 }
 
+/**
+ * The "draft moment": every reserved agreement is validated one last time
+ * against the live state and either applied or invalidated with a reason.
+ * Shared by the admin Market panel and by opening the draft.
+ */
+export async function runReservedExecutions(
+  ctx: MutationCtx,
+  params: {
+    tournamentId: Id<"tournaments">;
+    actorUserId: Id<"users">;
+    actorName: string;
+    offerId?: Id<"offers">;
+  },
+): Promise<{ executed: number; invalidated: number; details: string[] }> {
+  const { tournamentId, actorUserId, actorName, offerId } = params;
+  const all = await loadTournamentOffers(ctx, tournamentId);
+  const pending = offerId
+    ? all.filter((offer) => offer._id === offerId)
+    : all.filter(
+        (offer) => offer.status === "reservada" || offer.status === "aceptada",
+      );
+
+  if (pending.length === 0) {
+    return { executed: 0, invalidated: 0, details: [] as string[] };
+  }
+
+  const details: string[] = [];
+  let executed = 0;
+  let invalidated = 0;
+
+  for (const offer of pending) {
+    const validation = await validateOfferExecution(ctx, offer);
+    if (!validation.passed) {
+      invalidated += 1;
+      const reason =
+        validation.reasons[0] ?? "La operación no superó la validación final.";
+      await ctx.db.patch(offer._id, {
+        status: "invalidada",
+        updatedAt: Date.now(),
+        invalidReason: reason,
+        lastValidation: "Validación final fallida",
+      });
+      await logAudit(ctx, {
+        tournamentId,
+        clubId: offer.bidderClubId,
+        actorUserId,
+        actorName,
+        action: "Operación invalidada en la validación final",
+        entity: "offer",
+        entityId: offer._id,
+        detail: `Operación ${await shortId(offer._id)}: ${reason}`,
+      });
+      details.push(`⚠ Operación ${await shortId(offer._id)} no ejecutada · ${reason}`);
+      continue;
+    }
+
+    await applyExecution(ctx, offer, { tournamentId, actorUserId, actorName });
+    await ctx.db.patch(offer._id, {
+      lastValidation: "Validación final superada",
+    });
+    executed += 1;
+    details.push(`✔ Operación ${await shortId(offer._id)} ejecutada`);
+  }
+
+  if (executed > 0 || invalidated > 0) {
+    await logAudit(ctx, {
+      tournamentId,
+      actorUserId,
+      actorName,
+      action: "Validación final ejecutada",
+      entity: "tournament",
+      entityId: tournamentId,
+      detail: `${executed} operación(es) ejecutadas · ${invalidated} invalidadas`,
+    });
+  }
+
+  return { executed, invalidated, details };
+}
+
 /** Admin control: opens the "draft moment" and executes every reserved deal. */
 export const executeReserved = mutation({
   args: { offerId: v.optional(v.id("offers")) },
@@ -1202,70 +1281,12 @@ export const executeReserved = mutation({
     const user = await ctx.db.get(userId);
     const actorName = user?.name ?? "Administración";
 
-    const all = await loadTournamentOffers(ctx, tournament._id);
-    const pending = offerId
-      ? all.filter((offer) => offer._id === offerId)
-      : all.filter((offer) => offer.status === "reservada" || offer.status === "aceptada");
-
-    if (pending.length === 0) {
-      return { executed: 0, invalidated: 0, details: [] as string[] };
-    }
-
-    const details: string[] = [];
-    let executed = 0;
-    let invalidated = 0;
-
-    for (const offer of pending) {
-      const validation = await validateOfferExecution(ctx, offer);
-      if (!validation.passed) {
-        invalidated += 1;
-        const reason =
-          validation.reasons[0] ?? "La operación no superó la validación final.";
-        await ctx.db.patch(offer._id, {
-          status: "invalidada",
-          updatedAt: Date.now(),
-          invalidReason: reason,
-          lastValidation: "Validación final fallida",
-        });
-        await logAudit(ctx, {
-          tournamentId: tournament._id,
-          clubId: offer.bidderClubId,
-          actorUserId: userId,
-          actorName,
-          action: "Operación invalidada en la validación final",
-          entity: "offer",
-          entityId: offer._id,
-          detail: `Operación ${await shortId(offer._id)}: ${reason}`,
-        });
-        details.push(`⚠ Operación ${await shortId(offer._id)} no ejecutada · ${reason}`);
-        continue;
-      }
-
-      await applyExecution(ctx, offer, {
-        tournamentId: tournament._id,
-        actorUserId: userId,
-        actorName,
-      });
-      await ctx.db.patch(offer._id, {
-        lastValidation: "Validación final superada",
-      });
-      executed += 1;
-      details.push(`✔ Operación ${await shortId(offer._id)} ejecutada`);
-    }
-
-    if (executed > 0 || invalidated > 0) {
-      await logAudit(ctx, {
-        tournamentId: tournament._id,
-        actorUserId: userId,
-        actorName,
-        action: "Validación final ejecutada",
-        entity: "tournament",
-        entityId: tournament._id,
-        detail: `${executed} operación(es) ejecutadas · ${invalidated} invalidadas`,
-      });
-    }
-
-    return { executed, invalidated, details };
+    return runReservedExecutions(ctx, {
+      tournamentId: tournament._id,
+      actorUserId: userId,
+      actorName,
+      offerId,
+    });
   },
 });
 

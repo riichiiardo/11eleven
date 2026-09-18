@@ -7,6 +7,7 @@ import type {
   AppStateView,
   MarketSummaryView,
 } from "./appTypes";
+import { loadDraftAdmin, loadDraftSummary } from "./draft";
 import {
   buildActions,
   buildActivity,
@@ -258,6 +259,7 @@ export const state = query({
         isAdmin: Boolean(admin),
         adminRole: admin?.role ?? null,
         market: emptyMarket(tournament.marketOpen),
+        draft: null,
         actions: [],
         activity: [],
       };
@@ -314,6 +316,12 @@ export const state = query({
       president.clubId,
       rules,
     );
+
+    const draft = await loadDraftSummary(ctx, {
+      tournamentId: tournament._id,
+      rules,
+      presidentId: president._id,
+    });
 
     const activity = await buildActivity(ctx, tournament._id, 10);
 
@@ -400,12 +408,23 @@ export const state = query({
       isAdmin: Boolean(admin),
       adminRole: admin?.role ?? null,
       market,
+      draft,
       actions: buildActions({
         isAdmin: Boolean(admin),
         market: {
           received: market.received,
           reserved: market.reserved,
           open: market.open,
+        },
+        draft: {
+          status: draft.status,
+          isMyTurn: draft.isMyTurn,
+          myPicks: draft.myPicks,
+          poolSize: draft.poolSize,
+          currentNickname: draft.currentNickname,
+          myPosition: draft.myPosition,
+          round: draft.round,
+          totalRounds: draft.totalRounds,
         },
         squadSize: squad.length,
         availability,
@@ -627,6 +646,10 @@ export const adminOverview = query({
           (offer) => offer.status === "enviada" || offer.status === "negociacion",
         ).length,
       },
+      draft: await loadDraftAdmin(ctx, {
+        tournamentId: tournament._id,
+        rules,
+      }),
       totals: {
         squads: squads.length,
         players: squadPlayers.length,

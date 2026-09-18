@@ -109,6 +109,7 @@ export type AdminOverviewView = {
     pending: number;
     open: boolean;
   };
+  draft: DraftAdminView;
   totals: {
     squads: number;
     players: number;
@@ -213,6 +214,126 @@ export type MarketOverviewView = {
   history: OfferView[];
 };
 
+/* ------------------------------------------------------------------ *
+ * Draft
+ * ------------------------------------------------------------------ */
+
+export type DraftPoolPlayerView = {
+  playerId: Id<"players">;
+  name: string;
+  position: Position;
+  group: PositionGroup;
+  ovr: number;
+  age: number;
+  value: number;
+  nationality: string;
+  flag: string;
+  realClub: string;
+  realLeague: string;
+  fcVersion: string;
+  /** What the pick costs: the snapshot valuation. */
+  price: number;
+  offerable: boolean;
+  blockedReason: string | null;
+};
+
+export type DraftTurnView = {
+  presidentId: Id<"presidents">;
+  nickname: string;
+  clubName: string;
+  clubShortName: string;
+  clubColors: [string, string];
+  isMe: boolean;
+  isCurrent: boolean;
+  picks: number;
+  spent: number;
+  squadSize: number;
+  budget: number;
+};
+
+export type DraftPickView = {
+  id: Id<"draftPicks">;
+  pickNumber: number;
+  round: number;
+  playerId: Id<"players">;
+  playerName: string;
+  position: Position;
+  group: PositionGroup;
+  ovr: number;
+  age: number;
+  flag: string;
+  realClub: string;
+  price: number;
+  presidentId: Id<"presidents">;
+  nickname: string;
+  clubName: string;
+  clubShortName: string;
+  clubColors: [string, string];
+  mode: "turno" | "reserva";
+  pickedAt: number;
+};
+
+export type DraftSummaryView = {
+  id: Id<"drafts"> | null;
+  status: "borrador" | "en_curso" | "pausado" | "cerrado" | null;
+  statusLabel: string;
+  statusHint: string;
+  round: number;
+  totalRounds: number;
+  pickSeconds: number;
+  currentDeadline: number | null;
+  /** Whose turn it is right now. */
+  currentPresidentId: Id<"presidents"> | null;
+  currentNickname: string | null;
+  currentClubName: string | null;
+  currentClubColors: [string, string] | null;
+  isMyTurn: boolean;
+  /** My seat in the turn order (1-based), 0 when I am not in it. */
+  myPosition: number;
+  orderSize: number;
+  poolSize: number;
+  myPicks: number;
+  totalPicks: number;
+  myBudget: number;
+  squadSize: number;
+  squadSizeLimit: number;
+  executedReserved: number;
+  invalidatedReserved: number;
+};
+
+export type DraftAdminView = {
+  status: "borrador" | "en_curso" | "pausado" | "cerrado" | null;
+  statusLabel: string;
+  statusHint: string;
+  round: number;
+  totalRounds: number;
+  pickSeconds: number;
+  snake: boolean;
+  currentDeadline: number | null;
+  currentPresidentId: Id<"presidents"> | null;
+  currentNickname: string | null;
+  currentClubName: string | null;
+  orderSize: number;
+  totalSteps: number;
+  totalPicks: number;
+  poolSize: number;
+  reservedPending: number;
+  executedReserved: number;
+  invalidatedReserved: number;
+  turnOrder: DraftTurnView[];
+  picks: DraftPickView[];
+  /** Presidents who joined after the order was drawn. */
+  unsignedPresidents: string[];
+};
+
+export type DraftControlView = {
+  summary: DraftSummaryView;
+  turnOrder: DraftTurnView[];
+  picks: DraftPickView[];
+  /** Reserved agreements still waiting for the draft window. */
+  reservedPending: number;
+};
+
 export type MyAction = {
   id: string;
   tone: "warning" | "info" | "positive" | "danger";
@@ -240,6 +361,7 @@ export type AppStateView = {
   isAdmin: boolean;
   adminRole: "principal" | "coAdmin" | null;
   market: MarketSummaryView;
+  draft: DraftSummaryView | null;
   actions: MyAction[];
   activity: AuditEntryView[];
 };

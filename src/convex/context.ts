@@ -786,6 +786,16 @@ export function buildActions(params: {
   lockAt: number | null;
   rules: TournamentRules;
   market: { received: number; reserved: number; open: boolean };
+  draft: {
+    status: "borrador" | "en_curso" | "pausado" | "cerrado" | null;
+    isMyTurn: boolean;
+    myPicks: number;
+    poolSize: number;
+    currentNickname: string | null;
+    myPosition: number;
+    round: number;
+    totalRounds: number;
+  };
 }): MyAction[] {
   const actions: MyAction[] = [];
   const {
@@ -798,7 +808,49 @@ export function buildActions(params: {
     lockAt,
     rules,
     market,
+    draft,
   } = params;
+
+  if (draft.isMyTurn) {
+    actions.push({
+      id: "draft-my-turn",
+      tone: "positive",
+      title: "¡Es tu turno en el draft!",
+      description: `Ronda ${draft.round} de ${draft.totalRounds}. Tienes ${
+        draft.poolSize
+      } jugadores disponibles y el turno avanza solo cuando fichas o se agota el tiempo.`,
+      action: { label: "Fichar ahora", to: "/dashboard/draft" },
+    });
+  } else if (draft.status === "en_curso" && draft.currentNickname) {
+    actions.push({
+      id: "draft-waiting",
+      tone: "info",
+      title: `El draft está en curso · turno de ${draft.currentNickname}`,
+      description: `Ronda ${draft.round} de ${draft.totalRounds}. Tu turno es el ${
+        draft.myPosition || "—"
+      } del orden. Puedes dejar tu plantilla lista mientras esperas.`,
+      action: { label: "Ver el draft", to: "/dashboard/draft" },
+    });
+  } else if (draft.status === "borrador") {
+    actions.push({
+      id: "draft-prepared",
+      tone: "info",
+      title: "El draft está preparado",
+      description: `${
+        draft.totalRounds
+      } rondas previstas y ${draft.poolSize} jugadores sin dueño en el torneo. En cuanto Administración lo abra, las operaciones acordadas se ejecutan y empiezan los turnos.`,
+      action: { label: "Ver el draft", to: "/dashboard/draft" },
+    });
+  } else if (draft.status === "pausado") {
+    actions.push({
+      id: "draft-paused",
+      tone: "warning",
+      title: "El draft está en pausa",
+      description:
+        "Administración detuvo el reloj. Puedes seguir preparando ofertas: se reservan y se validan al reanudar.",
+      action: { label: "Ver el draft", to: "/dashboard/draft" },
+    });
+  }
 
   if (market.received > 0) {
     actions.push({

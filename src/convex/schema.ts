@@ -86,6 +86,20 @@ export const offerStatusValidator = v.union(
 
 export const offerTypeValidator = v.union(v.literal("cash"), v.literal("trade"));
 
+/** Draft lifecycle. The draft is the window where agreed operations execute. */
+export const draftStatusValidator = v.union(
+  v.literal("borrador"),
+  v.literal("en_curso"),
+  v.literal("pausado"),
+  v.literal("cerrado"),
+);
+
+/** How a player entered a squad during the draft window. */
+export const draftPickModeValidator = v.union(
+  v.literal("turno"),
+  v.literal("reserva"),
+);
+
 /** Permission keys a co-administrator can be granted. */
 export const PERMISSIONS = [
   "configuracion",
@@ -279,6 +293,49 @@ const schema = defineSchema(
       .index("by_tournament", ["tournamentId"])
       .index("by_bidder", ["bidderPresidentId"])
       .index("by_seller", ["sellerPresidentId"]),
+
+    /* ----------------------------------------------------------------
+     * Draft: turn order, per-turn clock and the picks themselves
+     * ---------------------------------------------------------------- */
+
+    drafts: defineTable({
+      tournamentId: v.id("tournaments"),
+      status: draftStatusValidator,
+      /** Turn order: President ids, in the sequence they pick. */
+      order: v.array(v.id("presidents")),
+      currentIndex: v.number(),
+      round: v.number(),
+      totalRounds: v.number(),
+      /** Seconds each President has per turn. 0 disables the automatic clock. */
+      pickSeconds: v.number(),
+      currentDeadline: v.optional(v.number()),
+      /** Whether each round runs in the same order or reversed (snake draft). */
+      snake: v.boolean(),
+      /** Reserved agreements executed when the draft opened. */
+      executedReserved: v.optional(v.number()),
+      invalidatedReserved: v.optional(v.number()),
+      startedAt: v.optional(v.number()),
+      closedAt: v.optional(v.number()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    }).index("by_tournament", ["tournamentId"]),
+
+    draftPicks: defineTable({
+      tournamentId: v.id("tournaments"),
+      draftId: v.id("drafts"),
+      presidentId: v.id("presidents"),
+      clubId: v.id("clubs"),
+      playerId: v.id("players"),
+      price: v.number(),
+      round: v.number(),
+      pickNumber: v.number(),
+      mode: draftPickModeValidator,
+      pickedAt: v.number(),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_draft", ["draftId"])
+      .index("by_player", ["playerId"])
+      .index("by_president", ["presidentId"]),
 
     /* ----------------------------------------------------------------
      * Audit trail — every critical operation leaves a trace
