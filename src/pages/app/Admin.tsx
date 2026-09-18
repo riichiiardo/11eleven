@@ -1,0 +1,783 @@
+import { useMemo, useState } from "react";
+import type { AdminOverviewView, AppStateView } from "@/convex/appTypes";
+import { api } from "@/convex/_generated/api";
+import {
+  RULE_DESCRIPTORS,
+  TOURNAMENT_STATUSES,
+  TOURNAMENT_STATUS_META,
+  formatMoney,
+  type TournamentRules,
+} from "@/convex/rulesEngine";
+import { errorMessage, relativeTime } from "@/lib/errors";
+import { useNow } from "@/hooks/use-tournament";
+import { useMutation, useQuery } from "convex/react";
+import { toast } from "sonner";
+import { useNavigate, useOutletContext } from "react-router";
+import { SectionCard } from "@/components/eleven/SectionCard";
+import { Crest } from "@/components/eleven/Crest";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertTriangle,
+  Crown,
+  Gauge,
+  Loader2,
+  ScrollText,
+  ShieldCheck,
+  UserPlus,
+  Users,
+} from "lucide-react";
+
+const PERMISSION_LABELS: Record<string, string> = {
+  configuracion: "Configuración",
+  presidentes: "Presidentes",
+  jugadores: "Jugadores",
+  mercado: "Mercado",
+  draft: "Draft",
+  calendario: "Calendario",
+  noticias: "Noticias",
+  ia: "IA / publicaciones",
+  auditoria: "Auditoría",
+};
+
+type RuleFormState = TournamentRules;
+
+export default function Admin() {
+  const state = useOutletContext<AppStateView>();
+  const navigate = useNavigate();
+  const overview = useQuery(api.tournament.adminOverview);
+
+  if (!state.isAdmin) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-xl flex-col items-center justify-center gap-3 text-center">
+        <ShieldCheck aria-hidden="true" className="size-8 text-muted-foreground" />
+        <h1 className="display text-xl">Solo para Administradores</h1>
+        <p className="text-sm text-muted-foreground">
+          Administrar el torneo es un rol, no una cuenta distinta. Si necesitas acceso, pide al
+          Administrador principal que asigne tu correo con los permisos correspondientes.
+        </p>
+        <Button onClick={() => navigate("/dashboard")} className="min-h-11">
+          Volver al inicio
+        </Button>
+      </div>
+    );
+  }
+
+  if (overview === undefined) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" aria-hidden="true" />
+        <span className="sr-only">Cargando administración</span>
+      </div>
+    );
+  }
+
+  if (overview === null || !overview.tournament || !overview.rules) {
+    return (
+      <p className="p-6 text-sm text-muted-foreground">
+        No se pudo cargar la información administrativa del torneo.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      <header className="flex flex-col gap-2">
+        <h1 className="display text-2xl">Administración del torneo</h1>
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Control de reglas, presidentes y trazabilidad. Cada cambio que hagas aquí se aplica de
+          inmediato al motor de reglas y queda registrado con tu nombre en la auditoría.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="border-gold/40 bg-gold/15 text-amber-700 dark:text-amber-300">
+            <Crown className="size-3" aria-hidden="true" />
+            {state.adminRole === "principal" ? "Administrador principal" : "Co-Administrador"}
+          </Badge>
+          <Badge variant="outline">
+            {overview.tournament.name} · {overview.tournament.season}
+          </Badge>
+        </div>
+      </header>
+
+      <Tabs defaultValue="torneo" className="flex flex-col gap-4">
+        <TabsList className="self-start">
+          <TabsTrigger value="torneo" className="min-h-10">
+            <Gauge className="size-4" aria-hidden="true" />
+            Torneo
+          </TabsTrigger>
+          <TabsTrigger value="reglas" className="min-h-10">
+            <ScrollText className="size-4" aria-hidden="true" />
+            Reglas
+          </TabsTrigger>
+          <TabsTrigger value="presidentes" className="min-h-10">
+            <Users className="size-4" aria-hidden="true" />
+            Presidentes
+          </TabsTrigger>
+          <TabsTrigger value="auditoria" className="min-h-10">
+            <ScrollText className="size-4" aria-hidden="true" />
+            Auditoría
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="torneo" className="flex flex-col gap-5">
+          <TournamentPanel overview={overview} />
+        </TabsContent>
+
+        <TabsContent value="reglas" className="flex flex-col gap-5">
+          <RulesPanel
+            rules={overview.rules}
+            presidents={overview.presidents}
+            clubCount={overview.clubs.length}
+          />
+        </TabsContent>
+
+        <TabsContent value="presidentes" className="flex flex-col gap-5">
+          <PresidentsPanel overview={overview} />
+        </TabsContent>
+
+        <TabsContent value="auditoria">
+          <SectionCard title="Registro de auditoría" icon={ScrollText} bodyClassName="p-0">
+            <AuditList entries={overview.activity} />
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
+  const setStatus = useMutation(api.tournament.setTournamentStatus);
+  const [busy, setBusy] = useState(false);
+  const tournament = overview.tournament!;
+
+  const update = async (status: string, marketOpen?: boolean) => {
+    setBusy(true);
+    try {
+      await setStatus({
+        status: status as (typeof TOURNAMENT_STATUSES)[number],
+        marketOpen,
+      });
+      toast.success("Estado del torneo actualizado", {
+        description: `Ahora el torneo está en fase «${TOURNAMENT_STATUS_META[status as (typeof TOURNAMENT_STATUSES)[number]].label}».`,
+      });
+    } catch (cause) {
+      toast.error("No se pudo cambiar el estado", { description: errorMessage(cause) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Clubes del torneo" value={`${overview.clubs.length}`} hint={`${overview.totals.freeClubs} sin presidente`} />
+        <MetricCard label="Plantillas registradas" value={`${overview.totals.squads}`} hint={`${overview.totals.players} jugadores asignados`} />
+        <MetricCard label="Presupuesto asignado" value={formatMoney(overview.totals.committedBudget)} hint={`${overview.presidents.length} presidentes`} />
+        <MetricCard label="Jornada actual" value={`${tournament.currentMatchday} / ${tournament.totalMatchdays}`} hint={tournament.statusLabel} />
+      </div>
+
+      <SectionCard title="Máquina de estados del torneo" icon={Gauge}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex flex-1 flex-col gap-2">
+            <Label htmlFor="tournamentStatus">Fase actual</Label>
+            <Select
+              value={tournament.status}
+              disabled={busy}
+              onValueChange={(value) => update(value)}
+            >
+              <SelectTrigger id="tournamentStatus" className="min-h-11">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TOURNAMENT_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status} className="min-h-11">
+                    {TOURNAMENT_STATUS_META[status].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {TOURNAMENT_STATUS_META[tournament.status].hint}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg border p-3">
+            <Switch
+              id="marketOpen"
+              checked={tournament.marketOpen}
+              disabled={busy}
+              onCheckedChange={(checked) => update(tournament.status, checked)}
+            />
+            <Label htmlFor="marketOpen" className="text-sm">
+              Ventana de mercado {tournament.marketOpen ? "abierta" : "cerrada"}
+            </Label>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Clubes y presidencias" icon={Users} bodyClassName="p-0">
+        <div className="overflow-x-auto scroll-thin">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead>Club</TableHead>
+                <TableHead>Liga</TableHead>
+                <TableHead className="text-center">Plantilla base</TableHead>
+                <TableHead className="text-center">OVR medio</TableHead>
+                <TableHead>Presidente</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {overview.clubs.map((club) => (
+                <TableRow key={club.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <Crest
+                        name={club.name}
+                        shortName={club.shortName}
+                        colors={[club.colorPrimary, club.colorSecondary]}
+                        size="sm"
+                      />
+                      <span className="text-sm font-semibold">{club.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{club.league}</TableCell>
+                  <TableCell className="num text-center">{club.rosterSize}</TableCell>
+                  <TableCell className="num text-center">{club.averageOvr}</TableCell>
+                  <TableCell>
+                    {club.presidentNickname ? (
+                      <span className="text-sm font-semibold">{club.presidentNickname}</span>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        Disponible
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </SectionCard>
+    </>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="card-soft p-4">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="num display mt-1 text-xl">{value}</p>
+      {hint ? <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function RulesPanel({
+  rules,
+  presidents,
+  clubCount,
+}: {
+  rules: TournamentRules;
+  presidents: Array<{ id: string; clubName: string; squadSize: number }>;
+  clubCount: number;
+}) {
+  const updateRules = useMutation(api.tournament.updateRules);
+  const [form, setForm] = useState<RuleFormState>(rules);
+  const [busy, setBusy] = useState(false);
+
+  // Re-sync the editor when the server rules change (react.dev: adjusting state
+  // when a prop changes) without an extra render from an effect.
+  const serverKey = JSON.stringify(rules);
+  const [draftKey, setDraftKey] = useState(serverKey);
+  if (draftKey !== serverKey) {
+    setDraftKey(serverKey);
+    setForm(rules);
+  }
+
+  const errors = useMemo(() => {
+    const list: string[] = [];
+    const groups: Array<[string, number, number]> = [
+      ["porteros", form.gkMin, form.gkMax],
+      ["defensas", form.defMin, form.defMax],
+      ["medios", form.midMin, form.midMax],
+      ["delanteros", form.fwdMin, form.fwdMax],
+    ];
+    for (const [label, min, max] of groups) {
+      if (min > max) list.push(`En ${label} el mínimo no puede superar al máximo.`);
+    }
+    if (form.squadSize < 11 || form.squadSize > 40) {
+      list.push("El tamaño de plantilla debe estar entre 11 y 40 jugadores.");
+    }
+    const minTotal = form.gkMin + form.defMin + form.midMin + form.fwdMin;
+    if (minTotal > form.squadSize) {
+      list.push(
+        `Los mínimos por posición suman ${minTotal} jugadores y no caben en una plantilla de ${form.squadSize}.`,
+      );
+    }
+    if (form.maxU21 < 0 || form.maxU21 > 15) {
+      list.push("El límite de jugadores sub-21 debe estar entre 0 y 15.");
+    }
+    if (form.budget < 0) list.push("El presupuesto no puede ser negativo.");
+    return list;
+  }, [form]);
+
+  const impacted = presidents.filter(
+    (president) => president.squadSize > form.squadSize,
+  );
+
+  const dirty = JSON.stringify(form) !== JSON.stringify(rules);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (errors.length > 0) return;
+    setBusy(true);
+    try {
+      const result = await updateRules(form);
+      toast.success("Reglas del torneo actualizadas", {
+        description:
+          result.changed > 0
+            ? `${result.changed} regla(s) modificadas. El motor de reglas ya las aplica.`
+            : "No había cambios que registrar.",
+      });
+    } catch (cause) {
+      toast.error("No se pudieron guardar las reglas", {
+        description: errorMessage(cause),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const numberField = (
+    key: keyof RuleFormState,
+    label: string,
+    options?: { hint?: string; step?: number },
+  ) => (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={key} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={key}
+        type="number"
+        className="h-11"
+        value={form[key] as number}
+        step={options?.step ?? 1}
+        onChange={(event) =>
+          setForm((previous) => ({
+            ...previous,
+            [key]: Number(event.target.value),
+          }))
+        }
+      />
+      {options?.hint ? (
+        <p className="text-[11px] text-muted-foreground">{options.hint}</p>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-5">
+      <SectionCard title="Reglas del torneo" icon={ScrollText}>
+        <div className="grid gap-4">
+          <fieldset className="grid gap-4 sm:grid-cols-3">
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Presupuesto y plantilla
+            </legend>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="budgetMillions" className="text-xs">
+                Presupuesto (millones €)
+              </Label>
+              <Input
+                id="budgetMillions"
+                type="number"
+                className="h-11"
+                step={5}
+                value={Math.round(form.budget / 1_000_000)}
+                onChange={(event) =>
+                  setForm((previous) => ({
+                    ...previous,
+                    budget: Number(event.target.value) * 1_000_000,
+                  }))
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Se asigna a cada Presidente nuevo: {formatMoney(form.budget)}
+              </p>
+            </div>
+            {numberField("squadSize", "Tamaño máximo de plantilla", {
+              hint: "Entre 11 y 40 jugadores",
+            })}
+            {numberField("maxU21", "Máximo de jugadores sub-21")}
+            {numberField("maxPerRealClub", "Máximo por club real", {
+              hint: "Evita concentrar la plantilla",
+            })}
+            {numberField("minOvr", "OVR mínimo para fichar")}
+            {numberField("lineupLockHours", "Cierre de alineación (horas antes)", {
+              hint: "Aplica a cada jornada",
+            })}
+          </fieldset>
+
+          <fieldset className="grid gap-4 sm:grid-cols-4">
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Cupos por posición
+            </legend>
+            {numberField("gkMin", "Porteros mín.")}
+            {numberField("gkMax", "Porteros máx.")}
+            {numberField("defMin", "Defensas mín.")}
+            {numberField("defMax", "Defensas máx.")}
+            {numberField("midMin", "Medios mín.")}
+            {numberField("midMax", "Medios máx.")}
+            {numberField("fwdMin", "Delanteros mín.")}
+            {numberField("fwdMax", "Delanteros máx.")}
+          </fieldset>
+        </div>
+      </SectionCard>
+
+      {errors.length > 0 ? (
+        <div className="rounded-xl border border-rose-500/35 bg-rose-500/[0.06] p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-300">
+            <AlertTriangle aria-hidden="true" className="size-4" />
+            Revisa estas reglas antes de guardar
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+            {errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {impacted.length > 0 ? (
+        <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.07] p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
+            <AlertTriangle aria-hidden="true" className="size-4" />
+            Impacto en presidencias actuales
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {impacted.length} club(es) superarían el nuevo máximo de{" "}
+            {form.squadSize} jugadores:{" "}
+            {impacted
+              .slice(0, 4)
+              .map((president) => `${president.clubName} (${president.squadSize})`)
+              .join(", ")}
+            {impacted.length > 4 ? ` y ${impacted.length - 4} más` : ""}. El motor marcará sus
+            plantillas como incumplidas hasta que se ajusten.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" className="min-h-11" disabled={busy || errors.length > 0 || !dirty}>
+          {busy ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Guardando…
+            </>
+          ) : (
+            "Guardar reglas"
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11"
+          disabled={!dirty || busy}
+          onClick={() => setForm(rules)}
+        >
+          Descartar cambios
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {clubCount} clubes · {presidents.length} presidentes afectados por estas reglas.
+        </p>
+      </div>
+
+      <SectionCard title="Referencia de reglas" icon={ScrollText} bodyClassName="p-0">
+        <ul className="divide-y">
+          {RULE_DESCRIPTORS.map((descriptor) => (
+            <li key={descriptor.code} className="flex items-start gap-3 p-3">
+              <span className="display mt-0.5 rounded-md bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                {descriptor.code}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{descriptor.title}</p>
+                <p className="text-xs text-muted-foreground">{descriptor.description}</p>
+              </div>
+              <span className="num ml-auto shrink-0 text-sm font-semibold text-primary">
+                {descriptor.value(form)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    </form>
+  );
+}
+
+function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
+  const grantAdmin = useMutation(api.tournament.grantAdmin);
+  const revokeAdmin = useMutation(api.tournament.revokeAdmin);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"principal" | "coAdmin">("coAdmin");
+  const [permissions, setPermissions] = useState<string[]>(["mercado", "jugadores"]);
+  const [busy, setBusy] = useState(false);
+  const now = useNow(60000);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const result = await grantAdmin({ email, role, permissions });
+      toast.success("Rol administrativo asignado", {
+        description: `${email} ahora tiene ${result.granted} permiso(s) en el torneo.`,
+      });
+      setEmail("");
+    } catch (cause) {
+      toast.error("No se pudo asignar el rol", { description: errorMessage(cause) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <SectionCard title="Presidentes del torneo" icon={Users} bodyClassName="p-0">
+        <div className="overflow-x-auto scroll-thin">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead>Presidente</TableHead>
+                <TableHead>Club</TableHead>
+                <TableHead className="text-center">Plantilla</TableHead>
+                <TableHead className="text-right">Presupuesto</TableHead>
+                <TableHead>Rol administrativo</TableHead>
+                <TableHead>Se unió</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {overview.presidents.map((president) => (
+                <TableRow key={president.id}>
+                  <TableCell>
+                    <p className="text-sm font-semibold">{president.displayName}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {president.nickname} · {president.email}
+                    </p>
+                  </TableCell>
+                  <TableCell className="text-sm">{president.clubName}</TableCell>
+                  <TableCell className="num text-center">{president.squadSize}</TableCell>
+                  <TableCell className="num text-right">
+                    {formatMoney(president.budget)}
+                  </TableCell>
+                  <TableCell>
+                    {president.adminRole ? (
+                      <span className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="border-gold/40 bg-gold/15 text-amber-700 dark:text-amber-300"
+                        >
+                          {president.adminRole === "principal"
+                            ? "Administrador principal"
+                            : "Co-Administrador"}
+                        </Badge>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="min-h-9"
+                          onClick={() => revokeAdmin({ userId: president.userId })}
+                        >
+                          Retirar
+                        </Button>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Presidencia</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {relativeTime(president.joinedAt, now)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {overview.presidents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-sm text-muted-foreground">
+                    Todavía no hay Presidentes registrados en el torneo.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Invitar a un Administrador" icon={UserPlus}>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            El rol administrativo se asigna a una cuenta existente: la persona debe registrarse
+            primero con ese correo. Puede seguir siendo Presidente de su club.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="adminEmail" className="text-xs">
+                Correo de la cuenta
+              </Label>
+              <Input
+                id="adminEmail"
+                type="email"
+                className="h-11"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="presidente@correo.com"
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="adminRole" className="text-xs">
+                Rol
+              </Label>
+              <Select
+                value={role}
+                onValueChange={(value) => setRole(value as "principal" | "coAdmin")}
+              >
+                <SelectTrigger id="adminRole" className="min-h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="coAdmin" className="min-h-11">
+                    Co-Administrador (permisos configurables)
+                  </SelectItem>
+                  <SelectItem value="principal" className="min-h-11">
+                    Administrador principal (todos los permisos)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {role === "coAdmin" ? (
+            <fieldset>
+              <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Permisos del torneo
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {Object.entries(PERMISSION_LABELS).map(([key, label]) => {
+                  const checked = permissions.includes(key);
+                  return (
+                    <label
+                      key={key}
+                      className="flex min-h-11 items-center gap-2 rounded-lg border p-2.5 text-sm"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) =>
+                          setPermissions((previous) =>
+                            value
+                              ? [...previous, key]
+                              : previous.filter((item) => item !== key),
+                          )
+                        }
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
+
+          <Button type="submit" className="min-h-11 self-start" disabled={busy}>
+            {busy ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Asignando…
+              </>
+            ) : (
+              "Asignar rol"
+            )}
+          </Button>
+        </form>
+      </SectionCard>
+
+      <SectionCard title="Administradores actuales" icon={ShieldCheck} bodyClassName="p-0">
+        <ul className="divide-y">
+          {overview.admins.map((admin) => (
+            <li key={admin.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{admin.displayName}</p>
+                <p className="text-[11px] text-muted-foreground">{admin.email}</p>
+              </div>
+              <Badge variant="outline">
+                {admin.role === "principal" ? "Administrador principal" : "Co-Administrador"}
+              </Badge>
+              <p className="text-[11px] text-muted-foreground">
+                {admin.permissions.length} permiso(s)
+              </p>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    </>
+  );
+}
+
+function AuditList({ entries }: { entries: AdminOverviewView["activity"] }) {
+  const now = useNow(60000);
+  return (
+    <ul className="divide-y">
+      {entries.map((entry) => (
+        <li key={entry.id} className="flex flex-col gap-1 p-3 sm:flex-row sm:gap-4">
+          <span className="num shrink-0 text-[11px] text-muted-foreground sm:w-32">
+            {new Date(entry.createdAt).toLocaleString("es-ES", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{entry.action}</p>
+            <p className="text-xs leading-snug text-muted-foreground">{entry.detail}</p>
+          </div>
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            {entry.actorName} · {relativeTime(entry.createdAt, now)}
+          </span>
+        </li>
+      ))}
+      {entries.length === 0 ? (
+        <li className="p-4 text-sm text-muted-foreground">
+          Todavía no hay operaciones registradas.
+        </li>
+      ) : null}
+    </ul>
+  );
+}

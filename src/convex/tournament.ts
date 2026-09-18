@@ -1,0 +1,744 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { ConvexError, v } from "convex/values";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { PERMISSIONS, adminRoleValidator, tournamentStatusValidator } from "./schema";
+import type { AdminOverviewView, AppStateView } from "./appTypes";
+import {
+  buildActions,
+  buildActivity,
+  buildAdmins,
+  buildClubViews,
+  buildNextEvent,
+  buildPresidents,
+  createSquadForClub,
+  getTournament,
+  loadAdmin,
+  loadPresident,
+  loadRules,
+  loadSquadPlayers,
+  logAudit,
+  seedTournament,
+  toTournamentView,
+} from "./context";
+import {
+  DEFAULT_FORMATION,
+  computeSquadStats,
+  evaluateLineup,
+  evaluateSquadRules,
+  formatMoney,
+  isFormationCode,
+  emptyLineup,
+  type FormationCode,
+  type Lineup,
+  type PlayerAvailability,
+} from "./rulesEngine";
+import type { Id } from "./_generated/dataModel";
+
+/* ------------------------------------------------------------------ *
+ * Helpers
+ * ------------------------------------------------------------------ */
+
+function nicknameFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "presidente";
+  const clean = local.replace(/[^a-zA-Z0-9._-]/g, "");
+  return `@${clean || "presidente"}`;
+}
+
+function requireAuth(userId: Id<"users"> | null): Id<"users"> {
+  if (!userId) {
+    throw new ConvexError(
+      "Necesitas iniciar sesión para operar en el torneo.",
+    );
+  }
+  return userId;
+}
+
+async function requireAdmin(
+  ctx: QueryCtx | MutationCtx,
+  tournamentId: Id<"tournaments">,
+  userId: Id<"users">,
+  permission: string,
+): Promise<void> {
+  const admin = await loadAdmin(ctx, tournamentId, userId);
+  if (!admin) {
+    throw new ConvexError(
+      "Esta acción requiere permisos de Administrador del torneo.",
+    );
+  }
+  if (admin.role === "principal") return;
+  if (!admin.permissions.includes(permission)) {
+    throw new ConvexError(
+      `Tu rol de Co-Administrador no incluye el permiso de ${permission}. Solicítalo al Administrador principal.`,
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Bootstrap
+ * ------------------------------------------------------------------ */
+
+/**
+ * Idempotent bootstrap: creates the tournament + versioned player catalogue on
+ * first run, and grants the first account the Administrador principal role.
+ */
+export const ensureSetup = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const user = await ctx.db.get(userId);
+    if (!user) throw new ConvexError("No se encontró tu cuenta.");
+
+    let tournament = await getTournament(ctx);
+    if (!tournament) {
+      const tournamentId = await seedTournament(ctx);
+      tournament = await ctx.db.get(tournamentId);
+    }
+    if (!tournament) {
+      throw new ConvexError("No se pudo inicializar el torneo. Inténtalo de nuevo.");
+    }
+
+    const displayName =
+      user.name?.trim() ||
+      nicknameFromEmail(user.email ?? "").replace("@", "") ||
+      "Presidente";
+
+    if (!user.name) {
+      await ctx.db.patch(userId, { name: displayName });
+    }
+
+    const admins = await ctx.db
+      .query("tournamentAdmins")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament!._id))
+      .collect();
+
+    if (admins.length === 0) {
+      await ctx.db.insert("tournamentAdmins", {
+        tournamentId: tournament._id,
+        userId,
+        role: "principal",
+        permissions: [...PERMISSIONS],
+        createdAt: Date.now(),
+      });
+      await logAudit(ctx, {
+        tournamentId: tournament._id,
+        actorUserId: userId,
+        actorName: displayName,
+        action: "Administrador principal asignado",
+        entity: "tournament",
+        entityId: tournament._id,
+        detail: `${displayName} abre el torneo como Administrador principal y Presidente.`,
+      });
+    }
+
+    return { tournamentId: tournament._id };
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Main control-room query
+ * ------------------------------------------------------------------ */
+
+export const state = query({
+  args: {},
+  handler: async (ctx): Promise<AppStateView | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const tournament = await getTournament(ctx);
+    if (!tournament) return null;
+
+    const rules = await loadRules(ctx, tournament._id);
+    const admin = await loadAdmin(ctx, tournament._id, userId);
+    const clubs = await buildClubViews(ctx, tournament._id);
+    const tournamentView = toTournamentView(tournament);
+    const email = user.email ?? "";
+    const baseNickname = nicknameFromEmail(email);
+    const knownUser = {
+      id: userId,
+      name: user.name?.trim() || baseNickname.replace("@", ""),
+      email,
+      nickname: baseNickname,
+    };
+
+    const president = await loadPresident(ctx, tournament._id, userId);
+
+    if (!president) {
+      return {
+        needsClub: true,
+        user: knownUser,
+        tournament: tournamentView,
+        rules,
+        president: null,
+        club: null,
+        clubs,
+        squad: [],
+        stats: null,
+        evaluation: null,
+        lineup: null,
+        lineupEvaluation: null,
+        budget: { initial: rules.budget, committed: 0, available: rules.budget },
+        availability: {
+          transferible: 0,
+          negociacion: 0,
+          neutro: 0,
+          intransferible: 0,
+        },
+        nextEvent: null,
+        isAdmin: Boolean(admin),
+        adminRole: admin?.role ?? null,
+        actions: [],
+        activity: [],
+      };
+    }
+
+    const club = clubs.find((c) => c.id === president.clubId) ?? null;
+    const squadDoc = await ctx.db
+      .query("squads")
+      .withIndex("by_club", (q) => q.eq("clubId", president.clubId))
+      .first();
+    const squad = squadDoc ? await loadSquadPlayers(ctx, squadDoc._id) : [];
+    const stats = computeSquadStats(squad);
+
+    const availability: Record<PlayerAvailability, number> = {
+      transferible: 0,
+      negociacion: 0,
+      neutro: 0,
+      intransferible: 0,
+    };
+    for (const player of squad) availability[player.availability] += 1;
+
+    const budget = {
+      initial: rules.budget,
+      committed: Math.max(0, rules.budget - president.budget),
+      available: president.budget,
+    };
+
+    const evaluation = evaluateSquadRules(
+      rules,
+      squad,
+      budget.available,
+      club?.name,
+    );
+
+    const formation: FormationCode =
+      squadDoc && isFormationCode(squadDoc.formation)
+        ? squadDoc.formation
+        : DEFAULT_FORMATION;
+    const lineup: Lineup =
+      squadDoc && squadDoc.lineup.length > 0
+        ? {
+            formation,
+            slots: squadDoc.lineup.map((slot) => ({
+              slotId: slot.slotId,
+              playerId: slot.playerId ?? null,
+            })),
+          }
+        : emptyLineup(formation);
+
+    const lineupEvaluation = evaluateLineup(rules, squad, lineup, evaluation);
+    const nextEvent = buildNextEvent(
+      tournament,
+      clubs,
+      president.clubId,
+      rules,
+    );
+
+    const activity = await buildActivity(ctx, tournament._id, 10);
+
+    return {
+      needsClub: false,
+      user: knownUser,
+      tournament: tournamentView,
+      rules,
+      president: {
+        id: president._id,
+        userId: president.userId,
+        nickname: president.nickname,
+        displayName: president.displayName,
+        email,
+        clubId: president.clubId,
+        clubName: club?.name ?? "—",
+        clubShortName: club?.shortName ?? "—",
+        clubColors: [
+          club?.colorPrimary ?? "#1d4ed8",
+          club?.colorSecondary ?? "#0b1a30",
+        ],
+        budget: president.budget,
+        joinedAt: president.joinedAt,
+        isAdmin: Boolean(admin),
+        adminRole: admin?.role ?? null,
+        squadSize: squad.length,
+      },
+      club,
+      clubs,
+      squad,
+      stats,
+      evaluation,
+      lineup,
+      lineupEvaluation,
+      budget,
+      availability,
+      nextEvent,
+      isAdmin: Boolean(admin),
+      adminRole: admin?.role ?? null,
+      actions: buildActions({
+        isAdmin: Boolean(admin),
+        squadSize: squad.length,
+        availability,
+        violations: evaluation.violations.map((violation) => ({
+          id: violation.id,
+          detail: violation.detail,
+        })),
+        lineupValid: lineupEvaluation.valid,
+        lineupComplete: lineupEvaluation.starters.length === 11,
+        lockAt: nextEvent?.lockAt ?? null,
+        rules,
+      }),
+      activity,
+    };
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Club selection
+ * ------------------------------------------------------------------ */
+
+/** A President belongs to a tournament and owns ONE club inside it. */
+export const chooseClub = mutation({
+  args: { clubId: v.id("clubs") },
+  handler: async (ctx, { clubId }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const user = await ctx.db.get(userId);
+    const tournament = await getTournament(ctx);
+    if (!tournament) {
+      throw new ConvexError(
+        "El torneo todavía no está inicializado. Recarga la página e inténtalo de nuevo.",
+      );
+    }
+
+    const club = await ctx.db.get(clubId);
+    if (!club || club.tournamentId !== tournament._id) {
+      throw new ConvexError("El club seleccionado no pertenece a este torneo.");
+    }
+
+    const existing = await loadPresident(ctx, tournament._id, userId);
+    if (existing) {
+      throw new ConvexError(
+        "Ya presides un club en este torneo. Un cambio de club requiere autorización de Administración.",
+      );
+    }
+
+    const taken = await ctx.db
+      .query("presidents")
+      .withIndex("by_club", (q) => q.eq("clubId", clubId))
+      .first();
+    if (taken) {
+      throw new ConvexError(
+        `${club.name} ya tiene Presidente en este torneo. Elige otro club disponible.`,
+      );
+    }
+
+    const rules = await loadRules(ctx, tournament._id);
+    const nickname = nicknameFromEmail(user?.email ?? "");
+    const displayName = user?.name?.trim() || nickname.replace("@", "");
+    const now = Date.now();
+
+    const presidentId = await ctx.db.insert("presidents", {
+      tournamentId: tournament._id,
+      userId,
+      nickname,
+      displayName,
+      clubId,
+      budget: rules.budget,
+      joinedAt: now,
+    });
+
+    const { size } = await createSquadForClub(ctx, {
+      tournamentId: tournament._id,
+      clubId,
+      presidentId,
+      clubName: club.name,
+    });
+
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      clubId,
+      actorUserId: userId,
+      actorName: displayName,
+      action: "Presidencia asumida",
+      entity: "club",
+      entityId: clubId,
+      detail: `${displayName} (${nickname}) asume la presidencia de ${club.name} · plantilla inicial de ${size} jugadores · presupuesto ${formatMoney(rules.budget)}`,
+    });
+
+    return { clubId, squadSize: size };
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Profile
+ * ------------------------------------------------------------------ */
+
+export const updateProfile = mutation({
+  args: {
+    nickname: v.string(),
+    displayName: v.optional(v.string()),
+  },
+  handler: async (ctx, { nickname, displayName }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const tournament = await getTournament(ctx);
+    if (!tournament) throw new ConvexError("El torneo no está disponible.");
+
+    const cleanNickname = nickname.trim().replace(/^@+/, "");
+    if (cleanNickname.length < 3 || cleanNickname.length > 20) {
+      throw new ConvexError(
+        "El nickname debe tener entre 3 y 20 caracteres para identificarte ante los demás Presidentes.",
+      );
+    }
+    if (!/^[a-zA-Z0-9._-]+$/.test(cleanNickname)) {
+      throw new ConvexError(
+        "El nickname solo admite letras, números, puntos, guiones y guiones bajos.",
+      );
+    }
+
+    const taken = await ctx.db
+      .query("presidents")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    if (
+      taken.some(
+        (president) =>
+          president.userId !== userId &&
+          president.nickname.toLowerCase() === `@${cleanNickname.toLowerCase()}`,
+      )
+    ) {
+      throw new ConvexError(
+        `El nickname @${cleanNickname} ya está en uso en este torneo. Prueba con otro.`,
+      );
+    }
+
+    const president = await loadPresident(ctx, tournament._id, userId);
+    const resolvedName = displayName?.trim();
+    if (resolvedName) {
+      await ctx.db.patch(userId, { name: resolvedName });
+    }
+
+    if (!president) {
+      return { nickname: `@${cleanNickname}` };
+    }
+
+    await ctx.db.patch(president._id, {
+      nickname: `@${cleanNickname}`,
+      displayName: resolvedName || president.displayName,
+    });
+
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      clubId: president.clubId,
+      actorUserId: userId,
+      actorName: resolvedName || president.displayName,
+      action: "Perfil actualizado",
+      entity: "president",
+      entityId: president._id,
+      detail: `Nuevo nickname público: @${cleanNickname}`,
+    });
+
+    return { nickname: `@${cleanNickname}` };
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Administration
+ * ------------------------------------------------------------------ */
+
+export const adminOverview = query({
+  args: {},
+  handler: async (ctx): Promise<AdminOverviewView | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const tournament = await getTournament(ctx);
+    if (!tournament) return null;
+    const admin = await loadAdmin(ctx, tournament._id, userId);
+    if (!admin) return null;
+
+    const rules = await loadRules(ctx, tournament._id);
+    const presidents = await buildPresidents(ctx, tournament._id);
+    const admins = await buildAdmins(ctx, tournament._id);
+    const clubs = await buildClubViews(ctx, tournament._id);
+    const activity = await buildActivity(ctx, tournament._id, 40);
+
+    const squads = await ctx.db
+      .query("squads")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    const squadPlayers = await ctx.db
+      .query("squadPlayers")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+
+    return {
+      tournament: toTournamentView(tournament),
+      rules,
+      presidents,
+      admins,
+      clubs,
+      activity,
+      totals: {
+        squads: squads.length,
+        players: squadPlayers.length,
+        committedBudget: presidents.reduce(
+          (sum, president) => sum + president.budget,
+          0,
+        ),
+        freeClubs: clubs.filter((club) => !club.presidentNickname).length,
+      },
+    };
+  },
+});
+
+/** Only the rule engine enforces rules — Administration only tunes its inputs. */
+export const updateRules = mutation({
+  args: {
+    budget: v.number(),
+    squadSize: v.number(),
+    gkMin: v.number(),
+    gkMax: v.number(),
+    defMin: v.number(),
+    defMax: v.number(),
+    midMin: v.number(),
+    midMax: v.number(),
+    fwdMin: v.number(),
+    fwdMax: v.number(),
+    maxPerRealClub: v.number(),
+    minOvr: v.number(),
+    maxU21: v.number(),
+    lineupLockHours: v.number(),
+  },
+  handler: async (ctx, next) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const tournament = await getTournament(ctx);
+    if (!tournament) throw new ConvexError("El torneo no está disponible.");
+    await requireAdmin(ctx, tournament._id, userId, "configuracion");
+
+    const current = await loadRules(ctx, tournament._id);
+
+    const groups: Array<{ label: string; min: number; max: number }> = [
+      { label: "Porteros", min: next.gkMin, max: next.gkMax },
+      { label: "Defensas", min: next.defMin, max: next.defMax },
+      { label: "Medios", min: next.midMin, max: next.midMax },
+      { label: "Delanteros", min: next.fwdMin, max: next.fwdMax },
+    ];
+    for (const group of groups) {
+      if (group.min < 0 || group.max < group.min) {
+        throw new ConvexError(
+          `El rango de ${group.label} no es válido: el mínimo no puede superar al máximo.`,
+        );
+      }
+    }
+    if (next.squadSize < 11 || next.squadSize > 40) {
+      throw new ConvexError(
+        "El tamaño de plantilla debe estar entre 11 y 40 jugadores.",
+      );
+    }
+    const minimumNeeded = groups.reduce((sum, group) => sum + group.min, 0);
+    if (minimumNeeded > next.squadSize) {
+      throw new ConvexError(
+        `Los mínimos por posición suman ${minimumNeeded} jugadores y no caben en una plantilla de ${next.squadSize}.`,
+      );
+    }
+    if (next.budget < 0) {
+      throw new ConvexError("El presupuesto no puede ser negativo.");
+    }
+    if (next.maxU21 < 0 || next.maxU21 > 15) {
+      throw new ConvexError("El límite de sub-21 debe estar entre 0 y 15.");
+    }
+
+    const changes: string[] = [];
+    const compare = (label: string, before: number, after: number, money = false) => {
+      if (before === after) return;
+      changes.push(
+        money
+          ? `${label}: ${formatMoney(before)} → ${formatMoney(after)}`
+          : `${label}: ${before} → ${after}`,
+      );
+    };
+    compare("Presupuesto", current.budget, next.budget, true);
+    compare("Tamaño de plantilla", current.squadSize, next.squadSize);
+    compare("Porteros mín.", current.gkMin, next.gkMin);
+    compare("Porteros máx.", current.gkMax, next.gkMax);
+    compare("Defensas mín.", current.defMin, next.defMin);
+    compare("Defensas máx.", current.defMax, next.defMax);
+    compare("Medios mín.", current.midMin, next.midMin);
+    compare("Medios máx.", current.midMax, next.midMax);
+    compare("Delanteros mín.", current.fwdMin, next.fwdMin);
+    compare("Delanteros máx.", current.fwdMax, next.fwdMax);
+    compare("Jugadores por club real", current.maxPerRealClub, next.maxPerRealClub);
+    compare("OVR mínimo", current.minOvr, next.minOvr);
+    compare("Sub-21 máx.", current.maxU21, next.maxU21);
+    compare("Cierre de alineación (h)", current.lineupLockHours, next.lineupLockHours);
+
+    if (changes.length === 0) {
+      return { changed: 0 };
+    }
+
+    const rulesDoc = await ctx.db
+      .query("tournamentRules")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .first();
+    if (rulesDoc) {
+      await ctx.db.patch(rulesDoc._id, { ...next, updatedAt: Date.now(), updatedBy: userId });
+    } else {
+      await ctx.db.insert("tournamentRules", {
+        tournamentId: tournament._id,
+        ...next,
+        updatedAt: Date.now(),
+        updatedBy: userId,
+      });
+    }
+
+    const user = await ctx.db.get(userId);
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      actorUserId: userId,
+      actorName: user?.name ?? "Administración",
+      action: "Reglas actualizadas",
+      entity: "tournamentRules",
+      entityId: rulesDoc?._id ?? tournament._id,
+      detail: changes.join(" · "),
+    });
+
+    return { changed: changes.length, changes };
+  },
+});
+
+export const setTournamentStatus = mutation({
+  args: {
+    status: tournamentStatusValidator,
+    marketOpen: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { status, marketOpen }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const tournament = await getTournament(ctx);
+    if (!tournament) throw new ConvexError("El torneo no está disponible.");
+    await requireAdmin(ctx, tournament._id, userId, "configuracion");
+
+    await ctx.db.patch(tournament._id, {
+      status,
+      marketOpen: marketOpen ?? tournament.marketOpen,
+    });
+
+    const user = await ctx.db.get(userId);
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      actorUserId: userId,
+      actorName: user?.name ?? "Administración",
+      action: "Estado del torneo actualizado",
+      entity: "tournament",
+      entityId: tournament._id,
+      detail: `${tournament.status} → ${status}${typeof marketOpen === "boolean" ? ` · mercado ${marketOpen ? "abierto" : "cerrado"}` : ""}`,
+    });
+
+    return { status };
+  },
+});
+
+/** Admin is a role, not an account: a President can also be Administrator. */
+export const grantAdmin = mutation({
+  args: {
+    email: v.string(),
+    role: adminRoleValidator,
+    permissions: v.array(v.string()),
+  },
+  handler: async (ctx, { email, role, permissions }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const tournament = await getTournament(ctx);
+    if (!tournament) throw new ConvexError("El torneo no está disponible.");
+    await requireAdmin(ctx, tournament._id, userId, "presidentes");
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.includes("@")) {
+      throw new ConvexError(
+        "Introduce un correo válido para asignar el rol de Administrador.",
+      );
+    }
+
+    const invited = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", cleanEmail))
+      .first();
+    if (!invited) {
+      throw new ConvexError(
+        `No existe ninguna cuenta con ${cleanEmail} en este torneo. Pídele que se registre con ese correo y vuelve a intentarlo.`,
+      );
+    }
+
+    const validPermissions = permissions.filter((permission) =>
+      (PERMISSIONS as readonly string[]).includes(permission),
+    );
+    const granted = role === "principal" ? [...PERMISSIONS] : validPermissions;
+
+    const existing = await loadAdmin(ctx, tournament._id, invited._id);
+    if (existing) {
+      await ctx.db.patch(existing._id, { role, permissions: granted });
+    } else {
+      await ctx.db.insert("tournamentAdmins", {
+        tournamentId: tournament._id,
+        userId: invited._id,
+        role,
+        permissions: granted,
+        createdAt: Date.now(),
+      });
+    }
+
+    const actor = await ctx.db.get(userId);
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      actorUserId: userId,
+      actorName: actor?.name ?? "Administración",
+      action: existing ? "Permisos de administrador actualizados" : "Administrador asignado",
+      entity: "tournamentAdmins",
+      entityId: invited._id,
+      detail: `${invited.name ?? invited.email ?? cleanEmail} · rol ${role === "principal" ? "Administrador principal" : "Co-Administrador"} · permisos: ${granted.length ? granted.join(", ") : "ninguno"}`,
+    });
+
+    return { granted: granted.length };
+  },
+});
+
+export const revokeAdmin = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId: targetUserId }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const tournament = await getTournament(ctx);
+    if (!tournament) throw new ConvexError("El torneo no está disponible.");
+    await requireAdmin(ctx, tournament._id, userId, "presidentes");
+
+    if (targetUserId === userId) {
+      throw new ConvexError(
+        "No puedes retirarte a ti mismo el rol de Administrador principal.",
+      );
+    }
+
+    const admin = await loadAdmin(ctx, tournament._id, targetUserId);
+    if (!admin) {
+      throw new ConvexError("Esa cuenta no es Administrador de este torneo.");
+    }
+
+    await ctx.db.delete(admin._id);
+    const actor = await ctx.db.get(userId);
+    const target = await ctx.db.get(targetUserId);
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      actorUserId: userId,
+      actorName: actor?.name ?? "Administración",
+      action: "Permisos de administrador retirados",
+      entity: "tournamentAdmins",
+      entityId: targetUserId,
+      detail: `${target?.name ?? target?.email ?? "Cuenta"} deja de ser Administrador del torneo.`,
+    });
+
+    return { revoked: true };
+  },
+});
