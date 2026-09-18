@@ -166,6 +166,27 @@ export type TournamentRules = {
 
 export const DEFAULT_RULES: TournamentRules = {
   budget: 350_000_000,
+  squadSize: 26,
+  gkMin: 2,
+  gkMax: 3,
+  defMin: 5,
+  defMax: 9,
+  midMin: 5,
+  midMax: 10,
+  fwdMin: 5,
+  fwdMax: 9,
+  maxPerRealClub: 3,
+  minOvr: 70,
+  maxU21: 5,
+  lineupLockHours: 2,
+};
+
+/**
+ * Configuration shipped with the first seed of the tournament. Used once, on
+ * bootstrap, to migrate an untouched early configuration to the current rules.
+ */
+export const LEGACY_SEEDED_RULES: TournamentRules = {
+  budget: 350_000_000,
   squadSize: 20,
   gkMin: 2,
   gkMax: 3,
@@ -465,6 +486,7 @@ export function evaluateSquadRules(
   const perRealClub = new Map<string, number>();
   for (const player of squad) {
     if (ownClubName && player.realClub === ownClubName) continue;
+    if (player.realClub === FREE_AGENT_CLUB) continue; // free agents belong to no club
     perRealClub.set(player.realClub, (perRealClub.get(player.realClub) ?? 0) + 1);
   }
   const biggestGroup = [...perRealClub.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -477,7 +499,7 @@ export function evaluateSquadRules(
     passed: maxFromClub <= rules.maxPerRealClub,
     detail:
       maxFromClub <= rules.maxPerRealClub
-        ? `Ningún club externo aporta más de ${rules.maxPerRealClub} jugadores a tu plantilla. Tu propio club no cuenta para este límite.`
+        ? `Ningún club externo aporta más de ${rules.maxPerRealClub} jugadores a tu plantilla. Ni tu propio club ni los agentes libres cuentan para este límite.`
         : `${biggestGroup?.[0]} aporta ${maxFromClub} jugadores a tu plantilla y el máximo es ${rules.maxPerRealClub}.`,
   });
 
@@ -574,7 +596,10 @@ export function evaluateSigning(
       : `${candidate.name} tiene ${candidate.ovr} de OVR y el torneo exige al menos ${rules.minOvr}.`,
   );
   const sameClub = squad.filter(
-    (p) => p.realClub === candidate.realClub && p.realClub !== ownClubName,
+    (p) =>
+      p.realClub === candidate.realClub &&
+      p.realClub !== ownClubName &&
+      p.realClub !== FREE_AGENT_CLUB,
   ).length;
   push(
     "signing-club",
@@ -1014,6 +1039,9 @@ export function formatDuration(ms: number): string {
 }
 
 export const FC_VERSION = "FC 27 · Snapshot 10/09/2026";
+
+/** Players with no club in the snapshot: the free-agent pool of the tournament. */
+export const FREE_AGENT_CLUB = "Agente libre";
 
 /* ------------------------------------------------------------------ *
  * Tournament state machine

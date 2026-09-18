@@ -10,9 +10,12 @@
  * Player tuple: [nombre, posición, OVR, edad, valor(M€), nacionalidad, bandera]
  */
 
-import { FC_VERSION, type Position } from "./rulesEngine";
+import { FC_VERSION, FREE_AGENT_CLUB, type Position } from "./rulesEngine";
 
 type PlayerSeed = [string, Position, number, number, number, string, string];
+
+export const FREE_AGENT_LEAGUE = "Sin club";
+export const FREE_AGENT_CLUB_NAME = FREE_AGENT_CLUB;
 
 export type ClubSeed = {
   name: string;
@@ -263,6 +266,33 @@ export const CLUBS: ClubSeed[] = [
       ["Ibrahim Mbaye", "DC", 75, 18, 20, "Francia", "🇫🇷"],
     ],
   },
+];
+
+/**
+ * Free agents: the part of the snapshot with no club. They are the entry point
+ * of the market for a President who wants to reinforce the squad immediately.
+ */
+export const FREE_AGENTS: PlayerSeed[] = [
+  ["Keylor Navas", "POR", 78, 39, 3, "Costa Rica", "🇨🇷"],
+  ["Loris Karius", "POR", 74, 33, 2, "Alemania", "🇩🇪"],
+  ["Sergio Ramos", "DFC", 79, 40, 2, "España", "🇪🇸"],
+  ["Mats Hummels", "DFC", 80, 37, 3, "Alemania", "🇩🇪"],
+  ["Marcos Alonso", "LI", 75, 35, 2, "España", "🇪🇸"],
+  ["Juan Cuadrado", "LD", 75, 38, 1, "Colombia", "🇨🇴"],
+  ["Alex Telles", "LI", 76, 33, 4, "Brasil", "🇧🇷"],
+  ["Ricardo Rodríguez", "LI", 75, 34, 3, "Suiza", "🇨🇭"],
+  ["Hakim Ziyech", "MCO", 79, 33, 6, "Marruecos", "🇲🇦"],
+  ["Jesse Lingard", "MC", 74, 33, 3, "Inglaterra", "🇬🇧"],
+  ["Nemanja Matić", "MCD", 77, 37, 2, "Serbia", "🇷🇸"],
+  ["Adnan Januzaj", "EI", 74, 31, 3, "Bélgica", "🇧🇪"],
+  ["Anwar El Ghazi", "ED", 74, 31, 2, "Países Bajos", "🇳🇱"],
+  ["Ivan Rakitić", "MC", 78, 38, 2, "Croacia", "🇭🇷"],
+  ["Lorenzo Insigne", "EI", 79, 34, 4, "Italia", "🇮🇹"],
+  ["Wissam Ben Yedder", "DC", 77, 35, 3, "Francia", "🇫🇷"],
+  ["Luis Suárez", "DC", 78, 39, 2, "Uruguay", "🇺🇾"],
+  ["Edinson Cavani", "DC", 77, 39, 2, "Uruguay", "🇺🇾"],
+  ["Kevin Gameiro", "DC", 74, 39, 1, "Francia", "🇫🇷"],
+  ["Iago Aspas", "ED", 78, 39, 2, "España", "🇪🇸"],
 ];
 
 export const PLAYER_SOURCE = {

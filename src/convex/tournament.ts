@@ -2,13 +2,18 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { PERMISSIONS, adminRoleValidator, tournamentStatusValidator } from "./schema";
-import type { AdminOverviewView, AppStateView } from "./appTypes";
+import type {
+  AdminOverviewView,
+  AppStateView,
+  MarketSummaryView,
+} from "./appTypes";
 import {
   buildActions,
   buildActivity,
   buildAdmins,
   buildClubViews,
   buildNextEvent,
+  buildOffers,
   buildPresidents,
   createSquadForClub,
   getTournament,
@@ -16,12 +21,17 @@ import {
   loadPresident,
   loadRules,
   loadSquadPlayers,
+  loadTournamentOffers,
   logAudit,
+  seedFreeAgents,
   seedTournament,
   toTournamentView,
 } from "./context";
 import {
   DEFAULT_FORMATION,
+  DEFAULT_RULES,
+  FREE_AGENT_CLUB,
+  LEGACY_SEEDED_RULES,
   computeSquadStats,
   evaluateLineup,
   evaluateSquadRules,
@@ -32,6 +42,7 @@ import {
   type Lineup,
   type PlayerAvailability,
 } from "./rulesEngine";
+import { COMMITTED_STATUSES, OPEN_STATUSES, type OfferStatus } from "./marketEngine";
 import type { Id } from "./_generated/dataModel";
 
 /* ------------------------------------------------------------------ *
@@ -42,6 +53,18 @@ function nicknameFromEmail(email: string): string {
   const local = email.split("@")[0] ?? "presidente";
   const clean = local.replace(/[^a-zA-Z0-9._-]/g, "");
   return `@${clean || "presidente"}`;
+}
+
+function emptyMarket(open: boolean): MarketSummaryView {
+  return {
+    open,
+    freeAgents: 0,
+    received: 0,
+    sent: 0,
+    reserved: 0,
+    executed: 0,
+    committedCash: 0,
+  };
 }
 
 function requireAuth(userId: Id<"users"> | null): Id<"users"> {
@@ -111,6 +134,11 @@ export const ensureSetup = mutation({
       .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament!._id))
       .collect();
 
+    // Free agents belong to the versioned snapshot and can be added to an
+    // already seeded deployment without touching any squad.
+    await seedFreeAgents(ctx, tournament._id);
+    await migrateSeededRules(ctx, tournament._id, userId, displayName!);
+
     if (admins.length === 0) {
       await ctx.db.insert("tournamentAdmins", {
         tournamentId: tournament._id,
@@ -133,6 +161,47 @@ export const ensureSetup = mutation({
     return { tournamentId: tournament._id };
   },
 });
+
+/**
+ * Early deployments shipped a 20-player squad limit, before the market existed.
+ * If the configuration is still the untouched seed and no operation has been
+ * negotiated yet, it moves to the current rules so the market is usable.
+ */
+async function migrateSeededRules(
+  ctx: MutationCtx,
+  tournamentId: Id<"tournaments">,
+  userId: Id<"users">,
+  actorName: string,
+): Promise<void> {
+  const rulesDoc = await ctx.db
+    .query("tournamentRules")
+    .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+    .first();
+  if (!rulesDoc) return;
+
+  const current = await loadRules(ctx, tournamentId);
+  const isLegacy =
+    JSON.stringify(current) === JSON.stringify(LEGACY_SEEDED_RULES);
+  if (!isLegacy) return;
+
+  const offers = await loadTournamentOffers(ctx, tournamentId);
+  if (offers.length > 0) return;
+
+  await ctx.db.patch(rulesDoc._id, {
+    ...DEFAULT_RULES,
+    updatedAt: Date.now(),
+    updatedBy: userId,
+  });
+  await logAudit(ctx, {
+    tournamentId,
+    actorUserId: userId,
+    actorName,
+    action: "Reglas actualizadas",
+    entity: "tournamentRules",
+    entityId: rulesDoc._id,
+    detail: `Tamaño de plantilla: 20 → ${DEFAULT_RULES.squadSize} · cupos de medios ${DEFAULT_RULES.midMin}-${DEFAULT_RULES.midMax} · delanteros ${DEFAULT_RULES.fwdMin}-${DEFAULT_RULES.fwdMax} (configuración inicial migrada para habilitar el mercado)`,
+  });
+}
 
 /* ------------------------------------------------------------------ *
  * Main control-room query
@@ -188,6 +257,7 @@ export const state = query({
         nextEvent: null,
         isAdmin: Boolean(admin),
         adminRole: admin?.role ?? null,
+        market: emptyMarket(tournament.marketOpen),
         actions: [],
         activity: [],
       };
@@ -247,6 +317,52 @@ export const state = query({
 
     const activity = await buildActivity(ctx, tournament._id, 10);
 
+    const offers = await loadTournamentOffers(ctx, tournament._id);
+    const offerViews = await buildOffers(ctx, {
+      tournamentId: tournament._id,
+      offers,
+      viewerPresidentId: president._id,
+      tournamentAllowsOperations:
+        tournament.status !== "suspendido" && tournament.status !== "cancelado",
+      marketOpen: tournament.marketOpen,
+    });
+    const mine = offerViews.filter((offer) => offer.side !== "sistema");
+    const openStatuses = (status: OfferStatus) => OPEN_STATUSES.includes(status);
+    const reservedStatuses = (status: OfferStatus) =>
+      status === "reservada" || status === "aceptada";
+    const freeAgentRows = await ctx.db
+      .query("players")
+      .withIndex("by_real_club", (q) => q.eq("realClub", FREE_AGENT_CLUB))
+      .collect();
+    const ownedPlayerIds = new Set(
+      (
+        await ctx.db
+          .query("squadPlayers")
+          .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+          .collect()
+      ).map((row) => row.playerId as string),
+    );
+    const market: MarketSummaryView = {
+      open: tournament.marketOpen,
+      freeAgents: freeAgentRows.filter((player) => !ownedPlayerIds.has(player._id as string))
+        .length,
+      received: mine.filter(
+        (offer) => offer.side === "recibida" && openStatuses(offer.status),
+      ).length,
+      sent: mine.filter(
+        (offer) => offer.side === "enviada" && openStatuses(offer.status),
+      ).length,
+      reserved: mine.filter((offer) => reservedStatuses(offer.status)).length,
+      executed: mine.filter((offer) => offer.status === "ejecutada").length,
+      committedCash: offers
+        .filter(
+          (offer) =>
+            offer.bidderPresidentId === president._id &&
+            COMMITTED_STATUSES.includes(offer.status as OfferStatus),
+        )
+        .reduce((sum, offer) => sum + offer.cash, 0),
+    };
+
     return {
       needsClub: false,
       user: knownUser,
@@ -283,8 +399,14 @@ export const state = query({
       nextEvent,
       isAdmin: Boolean(admin),
       adminRole: admin?.role ?? null,
+      market,
       actions: buildActions({
         isAdmin: Boolean(admin),
+        market: {
+          received: market.received,
+          reserved: market.reserved,
+          open: market.open,
+        },
         squadSize: squad.length,
         availability,
         violations: evaluation.violations.map((violation) => ({
@@ -478,6 +600,16 @@ export const adminOverview = query({
       .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
       .collect();
 
+    const offers = await loadTournamentOffers(ctx, tournament._id);
+    const offerViews = await buildOffers(ctx, {
+      tournamentId: tournament._id,
+      offers,
+      viewerPresidentId: null,
+      tournamentAllowsOperations:
+        tournament.status !== "suspendido" && tournament.status !== "cancelado",
+      marketOpen: tournament.marketOpen,
+    });
+
     return {
       tournament: toTournamentView(tournament),
       rules,
@@ -485,6 +617,16 @@ export const adminOverview = query({
       admins,
       clubs,
       activity,
+      market: {
+        open: tournament.marketOpen,
+        reserved: offerViews.filter(
+          (offer) => offer.status === "reservada" || offer.status === "aceptada",
+        ),
+        recent: offerViews.slice(0, 12),
+        pending: offerViews.filter(
+          (offer) => offer.status === "enviada" || offer.status === "negociacion",
+        ).length,
+      },
       totals: {
         squads: squads.length,
         players: squadPlayers.length,

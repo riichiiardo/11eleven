@@ -6,10 +6,20 @@ import type {
   ClubView,
   MyAction,
   NextEventView,
+  OfferPlayerLite,
+  OfferView,
   PresidentView,
   TournamentView,
 } from "./appTypes";
-import { CLUBS, TOURNAMENT_SEED, toEuros } from "./footballData";
+import type { OfferStatus } from "./marketEngine";
+import {
+  CLUBS,
+  FREE_AGENTS,
+  FREE_AGENT_CLUB_NAME,
+  FREE_AGENT_LEAGUE,
+  TOURNAMENT_SEED,
+  toEuros,
+} from "./footballData";
 import {
   DEFAULT_FORMATION,
   DEFAULT_RULES,
@@ -147,17 +157,67 @@ export async function seedTournament(
     });
   }
 
+  const freeAgentVersion = await seedFreeAgents(ctx, tournamentId);
+
   await ctx.db.insert("auditLog", {
     tournamentId,
     actorName: "Sistema",
     action: "Torneo creado",
     entity: "tournament",
     entityId: tournamentId,
-    detail: `${TOURNAMENT_SEED.name} · ${CLUBS.length} clubes · ${CLUBS.length * 20} jugadores · ${FC_VERSION}`,
+    detail: `${TOURNAMENT_SEED.name} · ${CLUBS.length} clubes · ${CLUBS.length * 20} jugadores · ${freeAgentVersion} agentes libres · ${FC_VERSION}`,
     createdAt: now,
   });
 
   return tournamentId;
+}
+
+/**
+ * Free agents are part of the versioned snapshot, not of a club. Adding them is
+ * idempotent so an existing deployment can pick them up on the next bootstrap.
+ */
+export async function seedFreeAgents(
+  ctx: MutationCtx,
+  tournamentId: Id<"tournaments">,
+): Promise<number> {
+  const existing = await ctx.db
+    .query("players")
+    .withIndex("by_real_club", (q) => q.eq("realClub", FREE_AGENT_CLUB_NAME))
+    .collect();
+
+  const known = new Set(existing.map((player) => player.name));
+  let inserted = 0;
+
+  for (const [name, position, ovr, age, valueM, nationality, flag] of FREE_AGENTS) {
+    if (known.has(name)) continue;
+    await ctx.db.insert("players", {
+      name,
+      position,
+      group: groupOf(position),
+      ovr,
+      age,
+      value: toEuros(valueM),
+      nationality,
+      flag,
+      realClub: FREE_AGENT_CLUB_NAME,
+      realLeague: FREE_AGENT_LEAGUE,
+      fcVersion: FC_VERSION,
+    });
+    inserted += 1;
+  }
+
+  if (inserted > 0) {
+    await ctx.db.insert("auditLog", {
+      tournamentId,
+      actorName: "Sistema",
+      action: "Agentes libres importados",
+      entity: "player",
+      detail: `${inserted} jugadores sin club incorporados al mercado desde ${FC_VERSION}`,
+      createdAt: Date.now(),
+    });
+  }
+
+  return inserted;
 }
 
 /* ------------------------------------------------------------------ *
@@ -484,6 +544,198 @@ export async function logAudit(
 }
 
 /* ------------------------------------------------------------------ *
+ * Market views
+ * ------------------------------------------------------------------ */
+
+export async function loadTournamentOffers(
+  ctx: QueryCtx,
+  tournamentId: Id<"tournaments">,
+): Promise<Doc<"offers">[]> {
+  const rows = await ctx.db
+    .query("offers")
+    .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+    .collect();
+  return rows.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/**
+ * Turns raw offer rows into the view the UI reasons about: which side the
+ * President is on, what can be done next, and why a reserved agreement is not
+ * executable yet.
+ */
+export async function buildOffers(
+  ctx: QueryCtx,
+  params: {
+    tournamentId: Id<"tournaments">;
+    offers: Doc<"offers">[];
+    viewerPresidentId: Id<"presidents"> | null;
+    tournamentAllowsOperations: boolean;
+    marketOpen: boolean;
+  },
+): Promise<OfferView[]> {
+  const { tournamentId, offers, viewerPresidentId, tournamentAllowsOperations, marketOpen } =
+    params;
+
+  const clubCache = new Map<string, Doc<"clubs"> | null>();
+  const presidentCache = new Map<string, Doc<"presidents"> | null>();
+  const userCache = new Map<string, string>();
+  const playerCache = new Map<string, Doc<"players"> | null>();
+  const ownershipCache = new Map<string, Doc<"squadPlayers"> | null>();
+
+  const getClub = async (id: Id<"clubs"> | undefined) => {
+    if (!id) return null;
+    if (!clubCache.has(id)) clubCache.set(id, await ctx.db.get(id));
+    return clubCache.get(id) ?? null;
+  };
+
+  const getPresident = async (id: Id<"presidents"> | undefined) => {
+    if (!id) return null;
+    if (!presidentCache.has(id)) presidentCache.set(id, await ctx.db.get(id));
+    return presidentCache.get(id) ?? null;
+  };
+
+  const getPresidentName = async (id: Id<"presidents"> | undefined) => {
+    const president = await getPresident(id);
+    if (!president) return "—";
+    if (!userCache.has(president.userId)) {
+      const user = await ctx.db.get(president.userId);
+      userCache.set(president.userId, user?.name ?? president.displayName);
+    }
+    return userCache.get(president.userId) ?? president.displayName;
+  };
+
+  const getPlayer = async (id: Id<"players">) => {
+    if (!playerCache.has(id)) playerCache.set(id, await ctx.db.get(id));
+    return playerCache.get(id) ?? null;
+  };
+
+  // Ownership is the key of every market decision.
+  const squadPlayers = await ctx.db
+    .query("squadPlayers")
+    .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+    .collect();
+  for (const row of squadPlayers) ownershipCache.set(row.playerId as string, row);
+
+  const playerLite = async (
+    playerId: Id<"players">,
+  ): Promise<OfferPlayerLite | null> => {
+    const player = await getPlayer(playerId);
+    if (!player) return null;
+    const ownership = ownershipCache.get(playerId as string) ?? null;
+    const ownerClub = ownership ? await getClub(ownership.clubId) : null;
+    return {
+      playerId: player._id,
+      name: player.name,
+      position: player.position,
+      group: player.group,
+      ovr: player.ovr,
+      age: player.age,
+      value: player.value,
+      flag: player.flag,
+      clubName: ownerClub?.name ?? null,
+    };
+  };
+
+  const views: OfferView[] = [];
+
+  for (const offer of offers) {
+    const bidderClub = await getClub(offer.bidderClubId);
+    const sellerClub = await getClub(offer.sellerClubId);
+    const requested = (
+      await Promise.all(offer.requestedPlayerIds.map((id) => playerLite(id)))
+    ).filter((player): player is OfferPlayerLite => Boolean(player));
+    const offered = (
+      await Promise.all(offer.offeredPlayerIds.map((id) => playerLite(id)))
+    ).filter((player): player is OfferPlayerLite => Boolean(player));
+
+    const side: OfferView["side"] =
+      viewerPresidentId === null
+        ? "sistema"
+        : offer.bidderPresidentId === viewerPresidentId
+          ? "enviada"
+          : offer.sellerPresidentId === viewerPresidentId
+            ? "recibida"
+            : "sistema";
+
+    const blockers: string[] = [];
+    if (offer.status === "reservada" || offer.status === "aceptada") {
+      if (!tournamentAllowsOperations) {
+        blockers.push(
+          "El torneo está suspendido o cancelado: ninguna operación se ejecuta en esta fase.",
+        );
+      }
+      if (!marketOpen) {
+        blockers.push(
+          "La ventana de mercado está cerrada. La operación espera a que Administración la abra para ejecutarse.",
+        );
+      }
+      for (const player of requested) {
+        const ownership = ownershipCache.get(player.playerId as string) ?? null;
+        const stillWithSeller = ownership
+          ? offer.sellerClubId
+            ? ownership.clubId === offer.sellerClubId
+            : false
+          : true;
+        if (!stillWithSeller) {
+          blockers.push(
+            `${player.name} ya no pertenece a ${sellerClub?.name ?? "la lista de agentes libres"}: la operación quedó sin efecto.`,
+          );
+        }
+      }
+      for (const player of offered) {
+        const ownership = ownershipCache.get(player.playerId as string) ?? null;
+        if (!ownership || ownership.clubId !== offer.bidderClubId) {
+          blockers.push(
+            `${player.name} ya no está en la plantilla de ${bidderClub?.name ?? "tu club"}.`,
+          );
+        }
+      }
+    }
+
+    views.push({
+      id: offer._id,
+      type: offer.type,
+      status: offer.status as OfferStatus,
+      cash: offer.cash,
+      message: offer.message ?? null,
+      createdAt: offer.createdAt,
+      updatedAt: offer.updatedAt,
+      agreedAt: offer.agreedAt ?? null,
+      executedAt: offer.executedAt ?? null,
+      side,
+      bidderNickname: (await getPresident(offer.bidderPresidentId))?.nickname ?? "—",
+      bidderClubName: bidderClub?.name ?? "Club sin asignar",
+      bidderClubColors: [
+        bidderClub?.colorPrimary ?? "#1d4ed8",
+        bidderClub?.colorSecondary ?? "#0b1a30",
+      ],
+      bidderIsMe: Boolean(
+        viewerPresidentId && offer.bidderPresidentId === viewerPresidentId,
+      ),
+      sellerNickname: offer.sellerPresidentId
+        ? (await getPresident(offer.sellerPresidentId))?.nickname ?? "—"
+        : null,
+      sellerClubName: sellerClub?.name ?? null,
+      sellerClubColors: sellerClub
+        ? [sellerClub.colorPrimary, sellerClub.colorSecondary]
+        : null,
+      requested,
+      offered,
+      canRespond:
+        side === "recibida" && (offer.status === "enviada" || offer.status === "negociacion"),
+      canCancel:
+        (side === "enviada" || side === "recibida") &&
+        ["enviada", "negociacion", "reservada", "aceptada"].includes(offer.status),
+      blockers,
+      invalidReason: offer.invalidReason ?? null,
+    });
+  }
+
+  void getPresidentName;
+  return views;
+}
+
+/* ------------------------------------------------------------------ *
  * Deadlines + "qué debo hacer"
  * ------------------------------------------------------------------ */
 
@@ -533,6 +785,7 @@ export function buildActions(params: {
   lineupComplete: boolean;
   lockAt: number | null;
   rules: TournamentRules;
+  market: { received: number; reserved: number; open: boolean };
 }): MyAction[] {
   const actions: MyAction[] = [];
   const {
@@ -544,7 +797,48 @@ export function buildActions(params: {
     lineupComplete,
     lockAt,
     rules,
+    market,
   } = params;
+
+  if (market.received > 0) {
+    actions.push({
+      id: "offers-received",
+      tone: "warning",
+      title:
+        market.received === 1
+          ? "Tienes una oferta sin responder"
+          : `Tienes ${market.received} ofertas sin responder`,
+      description:
+        "Otros Presidentes quieren operar contigo. Puedes aceptar, rechazar o enviar una contraoferta desde el panel de negociaciones.",
+      action: { label: "Ver ofertas", to: "/dashboard/mercado/negociaciones" },
+    });
+  }
+
+  if (market.reserved > 0) {
+    actions.push({
+      id: "offers-reserved",
+      tone: "info",
+      title:
+        market.reserved === 1
+          ? "Una operación acordada está reservada"
+          : `${market.reserved} operaciones acordadas reservadas`,
+      description:
+        "Los jugadores implicados quedan comprometidos: se ejecutarán en la validación final, cuando Administración abra el mercado.",
+      action: { label: "Ver operaciones", to: "/dashboard/mercado/negociaciones" },
+    });
+  }
+
+  const slotsFree = rules.squadSize - squadSize;
+  if (market.open && slotsFree > 0) {
+    actions.push({
+      id: "market-open",
+      tone: "info",
+      title: `Mercado abierto · ${slotsFree} plaza(s) libres`,
+      description:
+        "Puedes incorporar jugadores: el motor de reglas valida presupuesto, cupos por posición y sub-21 antes de enviar cualquier oferta.",
+      action: { label: "Ir al mercado", to: "/dashboard/mercado" },
+    });
+  }
 
   const lockIn = lockAt ? lockAt - Date.now() : null;
   if (lockIn !== null && lockIn > 0 && lockIn < 12 * 60 * 60 * 1000) {
@@ -597,7 +891,7 @@ export function buildActions(params: {
       tone: "info",
       title: "Define la situación de tu plantilla",
       description:
-        "Ningún jugador está marcado como transferible o en negociación. Los demás Presidentes no sabrán qué puertas están abiertas.",
+        "Ningún jugador está marcado como transferible o en negociación. En el mercado nadie podrá ofertar por tu plantilla si todo está neutro.",
       action: { label: "Estado de jugadores", to: "/dashboard/club/estado" },
     });
   }

@@ -1,13 +1,19 @@
-import type { AppStateView } from "@/convex/appTypes";
+import { useState } from "react";
+import { api } from "@/convex/_generated/api";
+import type { AppStateView, MarketPlayerView } from "@/convex/appTypes";
 import { formatMoney, TOURNAMENT_STATUS_META } from "@/convex/rulesEngine";
 import { useOutletContext, useNavigate, Link } from "react-router";
 import { relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
+import { useQuery } from "convex/react";
 import { Crest } from "@/components/eleven/Crest";
 import { Countdown, SectionCard, StatTile, StatusPill, ToneDot } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
 import { GroupMeter, RuleCheckList } from "@/components/eleven/RuleCheckList";
 import { AvailabilityBadge, OvrBadge, PlayerAvatar } from "@/components/eleven/PlayerBits";
+import { MarketPlayerCard } from "@/components/eleven/MarketPlayerCard";
+import { OfferDialog } from "@/components/eleven/OfferDialog";
+import { OfferStatusPill } from "@/components/eleven/OfferBits";
 import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
@@ -17,9 +23,11 @@ import {
   CheckCircle2,
   ClipboardList,
   Crown,
+  Handshake,
   Info,
   ShieldAlert,
   Shirt,
+  ShoppingBag,
   TrendingUp,
   Trophy,
   Users,
@@ -30,6 +38,19 @@ export default function Home() {
   const state = useOutletContext<AppStateView>();
   const navigate = useNavigate();
   const now = useNow(30000);
+  const [marketTarget, setMarketTarget] = useState<MarketPlayerView | null>(null);
+
+  // The control room also answers "what is happening in the market" without
+  // sending the President to another screen first (prompt §31).
+  // Only what the President can act on today: players whose club has an active
+  // presidency plus the free-agent pool, so the strip is never four locked cards.
+  const featured = useQuery(api.market.browse, {
+    scope: "todos",
+    sort: "ovr",
+    onlyAffordable: true,
+    limit: 4,
+  });
+  const negotiations = useQuery(api.market.overview);
 
   const tournament = state.tournament;
   const club = state.club;
@@ -383,6 +404,74 @@ export default function Home() {
             </div>
           </SectionCard>
 
+          <SectionCard
+            title="Mis negociaciones"
+            icon={Handshake}
+            action={{ label: "Ver todas", to: "/dashboard/mercado/negociaciones" }}
+          >
+            {negotiations === undefined ? (
+              <p className="text-sm text-muted-foreground">
+                Cargando tus negociaciones…
+              </p>
+            ) : negotiations === null ? (
+              <p className="text-sm text-muted-foreground">
+                El mercado no está disponible para tu cuenta.
+              </p>
+            ) : negotiations.received.length === 0 &&
+              negotiations.sent.length === 0 &&
+              negotiations.reserved.length === 0 ? (
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-sm text-muted-foreground">
+                  No tienes negociaciones abiertas. Hay {state.market.freeAgents}{" "}
+                  agentes libres disponibles para reforzar tu plantilla.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => navigate("/dashboard/mercado")}
+                >
+                  <ShoppingBag className="size-4" aria-hidden="true" />
+                  Abrir el mercado
+                </Button>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {[...negotiations.received, ...negotiations.sent, ...negotiations.reserved]
+                  .slice(0, 4)
+                  .map((offer) => (
+                    <li key={offer.id} className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <OfferStatusPill status={offer.status} />
+                        {offer.canRespond ? (
+                          <span className="text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                            Requiere respuesta
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 truncate text-sm font-semibold">
+                        {offer.bidderIsMe
+                          ? `Ofreces por ${offer.requested[0]?.name ?? "un jugador"}`
+                          : `${offer.bidderNickname} quiere a ${
+                              offer.requested[0]?.name ?? "tu jugador"
+                            }`}
+                      </p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {formatMoney(offer.cash)} · {relativeTime(offer.updatedAt, now)}
+                      </p>
+                    </li>
+                  ))}
+                <li>
+                  <Button asChild variant="outline" className="min-h-11 w-full">
+                    <Link to="/dashboard/mercado/negociaciones">
+                      Gestionar negociaciones
+                    </Link>
+                  </Button>
+                </li>
+              </ul>
+            )}
+          </SectionCard>
+
           <SectionCard title="Actividad reciente" icon={Activity}>
             {state.activity.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -458,6 +547,46 @@ export default function Home() {
           </li>
         </ul>
       </SectionCard>
+
+      {/* ------------------------------------------------------ Mercado destacado */}
+      <SectionCard
+        title="Mercado destacado"
+        icon={ShoppingBag}
+        action={{ label: "Ver todo el mercado", to: "/dashboard/mercado" }}
+      >
+        {featured === undefined ? (
+          <p className="text-sm text-muted-foreground">Cargando el mercado…</p>
+        ) : featured.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            El catálogo del torneo todavía no tiene jugadores publicados.
+          </p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {featured.map((player) => (
+              <li key={player.playerId}>
+                <MarketPlayerCard
+                  player={player}
+                  budgetAvailable={state.budget.available}
+                  onOffer={(target) => setMarketTarget(target)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+
+      {marketTarget ? (
+        <OfferDialog
+          key={marketTarget.playerId}
+          player={marketTarget}
+          squad={state.squad}
+          budget={state.budget}
+          open
+          onOpenChange={(open) => {
+            if (!open) setMarketTarget(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

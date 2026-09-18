@@ -28,11 +28,13 @@ import {
   BookOpen,
   ClipboardList,
   Gauge,
+  Handshake,
   LayoutDashboard,
   LogOut,
   Menu,
   Shield,
   Shirt,
+  ShoppingBag,
   User,
   Users,
 } from "lucide-react";
@@ -64,6 +66,17 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
     ],
   },
   {
+    title: "Mercado",
+    items: [
+      { label: "Mercado", to: "/dashboard/mercado", icon: ShoppingBag, end: true },
+      {
+        label: "Negociaciones",
+        to: "/dashboard/mercado/negociaciones",
+        icon: Handshake,
+      },
+    ],
+  },
+  {
     title: "Torneo",
     items: [
       { label: "Reglas del torneo", to: "/dashboard/reglas", icon: BookOpen },
@@ -76,6 +89,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
 const MOBILE_NAV: NavItem[] = [
   { label: "Inicio", to: "/dashboard", icon: LayoutDashboard, end: true },
   { label: "Club", to: "/dashboard/club", icon: Shield, end: true },
+  { label: "Mercado", to: "/dashboard/mercado", icon: ShoppingBag, end: true },
   { label: "Once", to: "/dashboard/formacion", icon: Shirt },
 ];
 

@@ -70,6 +70,22 @@ export const adminRoleValidator = v.union(
   v.literal("coAdmin"),
 );
 
+/** Market operation lifecycle (offer, trade, reservation, execution). */
+export const offerStatusValidator = v.union(
+  v.literal("borrador"),
+  v.literal("enviada"),
+  v.literal("negociacion"),
+  v.literal("aceptada"),
+  v.literal("reservada"),
+  v.literal("ejecutada"),
+  v.literal("rechazada"),
+  v.literal("cancelada"),
+  v.literal("expirada"),
+  v.literal("invalidada"),
+);
+
+export const offerTypeValidator = v.union(v.literal("cash"), v.literal("trade"));
+
 /** Permission keys a co-administrator can be granted. */
 export const PERMISSIONS = [
   "configuracion",
@@ -230,6 +246,39 @@ const schema = defineSchema(
       .index("by_squad", ["squadId"])
       .index("by_club", ["clubId"])
       .index("by_player", ["playerId"]),
+
+    /* ----------------------------------------------------------------
+     * Market: offers, trades and reserved agreements
+     * ---------------------------------------------------------------- */
+
+    offers: defineTable({
+      tournamentId: v.id("tournaments"),
+      type: offerTypeValidator,
+      bidderPresidentId: v.id("presidents"),
+      bidderClubId: v.id("clubs"),
+      sellerPresidentId: v.optional(v.id("presidents")),
+      sellerClubId: v.optional(v.id("clubs")),
+      /** Players the bidder wants (from the seller or from the free-agent pool). */
+      requestedPlayerIds: v.array(v.id("players")),
+      /** Players the bidder gives away (trades only). */
+      offeredPlayerIds: v.array(v.id("players")),
+      /** Cash paid by the bidder, in euros. */
+      cash: v.number(),
+      message: v.optional(v.string()),
+      status: offerStatusValidator,
+      /** Counter-offer chain. */
+      parentOfferId: v.optional(v.id("offers")),
+      /** Last rule validation stored with the operation for auditability. */
+      lastValidation: v.optional(v.string()),
+      invalidReason: v.optional(v.string()),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      agreedAt: v.optional(v.number()),
+      executedAt: v.optional(v.number()),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_bidder", ["bidderPresidentId"])
+      .index("by_seller", ["sellerPresidentId"]),
 
     /* ----------------------------------------------------------------
      * Audit trail — every critical operation leaves a trace

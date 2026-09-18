@@ -18,6 +18,8 @@ const ClubPage = lazy(() => import("./pages/app/Club.tsx"));
 const SquadPage = lazy(() => import("./pages/app/Squad.tsx"));
 const PlayerStatusPage = lazy(() => import("./pages/app/PlayerStatus.tsx"));
 const FormationPage = lazy(() => import("./pages/app/Formation.tsx"));
+const MarketPage = lazy(() => import("./pages/app/Market.tsx"));
+const NegotiationsPage = lazy(() => import("./pages/app/Negotiations.tsx"));
 const RulesPage = lazy(() => import("./pages/app/Rules.tsx"));
 const ProfilePage = lazy(() => import("./pages/app/Profile.tsx"));
 const AdminPage = lazy(() => import("./pages/app/Admin.tsx"));
@@ -147,6 +149,11 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="club/plantilla" element={<SquadPage />} />
                 <Route path="club/estado" element={<PlayerStatusPage />} />
                 <Route path="formacion" element={<FormationPage />} />
+                <Route path="mercado" element={<MarketPage />} />
+                <Route
+                  path="mercado/negociaciones"
+                  element={<NegotiationsPage />}
+                />
                 <Route path="reglas" element={<RulesPage />} />
                 <Route path="perfil" element={<ProfilePage />} />
                 <Route path="admin" element={<AdminPage />} />

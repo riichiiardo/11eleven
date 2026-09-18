@@ -41,12 +41,17 @@ import {
   AlertTriangle,
   Crown,
   Gauge,
+  Handshake,
   Loader2,
+  PlayCircle,
   ScrollText,
   ShieldCheck,
   UserPlus,
   Users,
 } from "lucide-react";
+import { useMarketActions } from "@/hooks/use-market-actions";
+import { OfferCard } from "@/components/eleven/OfferCard";
+import { OfferStatusPill } from "@/components/eleven/OfferBits";
 
 const PERMISSION_LABELS: Record<string, string> = {
   configuracion: "Configuración",
@@ -133,6 +138,10 @@ export default function Admin() {
             <Users className="size-4" aria-hidden="true" />
             Presidentes
           </TabsTrigger>
+          <TabsTrigger value="mercado" className="min-h-10">
+            <Handshake className="size-4" aria-hidden="true" />
+            Mercado
+          </TabsTrigger>
           <TabsTrigger value="auditoria" className="min-h-10">
             <ScrollText className="size-4" aria-hidden="true" />
             Auditoría
@@ -153,6 +162,10 @@ export default function Admin() {
 
         <TabsContent value="presidentes" className="flex flex-col gap-5">
           <PresidentsPanel overview={overview} />
+        </TabsContent>
+
+        <TabsContent value="mercado" className="flex flex-col gap-5">
+          <MarketPanel overview={overview} />
         </TabsContent>
 
         <TabsContent value="auditoria">
@@ -277,6 +290,132 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
             </TableBody>
           </Table>
         </div>
+      </SectionCard>
+    </>
+  );
+}
+
+/**
+ * "Modo árbitro" (prompt §40): Administración opens the draft moment and every
+ * reserved agreement is validated one last time against the live state before
+ * it is applied. Failures keep their human explanation in the audit log.
+ */
+function MarketPanel({ overview }: { overview: AdminOverviewView }) {
+  const { executeReserved, busyKey } = useMarketActions();
+  const { market } = overview;
+  const busy = busyKey === "ejecutar";
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Ventana de mercado"
+          value={market.open ? "Abierta" : "Cerrada"}
+          hint={
+            market.open
+              ? "Las operaciones se ejecutan al aceptarse"
+              : "Los acuerdos se reservan hasta que la abras"
+          }
+        />
+        <MetricCard
+          label="Operaciones abiertas"
+          value={`${market.pending}`}
+          hint="Ofertas esperando respuesta"
+        />
+        <MetricCard
+          label="Acuerdos reservados"
+          value={`${market.reserved.length}`}
+          hint="Listos para validación final"
+        />
+        <MetricCard
+          label="Ejecutadas recientemente"
+          value={`${market.recent.filter((offer) => offer.status === "ejecutada").length}`}
+          hint={`${market.recent.length} en el historial completo`}
+        />
+      </div>
+
+      <SectionCard title="Centro de control del mercado" icon={Handshake}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            Al ejecutar, cada acuerdo vuelve a comprobarse contra el estado actual de
+            ambas plantillas, los cupos por posición, el límite por club real y los
+            presupuestos. Si algo cambió desde el acuerdo, la operación queda
+            invalidada con el motivo registrado y los jugadores vuelven a estar
+            disponibles.
+          </p>
+          <Button
+            type="button"
+            className="min-h-11 shrink-0"
+            disabled={busy || market.reserved.length === 0}
+            onClick={() => executeReserved()}
+          >
+            {busy ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <PlayCircle className="size-4" aria-hidden="true" />
+            )}
+            Validar y ejecutar reservadas
+          </Button>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Acuerdos reservados"
+        icon={ScrollText}
+        bodyClassName={market.reserved.length === 0 ? undefined : "p-4"}
+      >
+        {market.reserved.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay acuerdos reservados. Cuando dos Presidentes lleguen a un acuerdo
+            aparecerá aquí con su validación final antes de aplicarse.
+          </p>
+        ) : (
+          <ul className="grid gap-4 xl:grid-cols-2">
+            {market.reserved.map((offer) => (
+              <li key={offer.id} className="flex flex-col gap-2">
+                <OfferCard offer={offer} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={busy}
+                  onClick={() => executeReserved(offer.id)}
+                >
+                  <PlayCircle className="size-4" aria-hidden="true" />
+                  Validar y ejecutar esta operación
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Últimas operaciones del torneo" icon={Users} bodyClassName="p-0">
+        {market.recent.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">
+            Todavía no se ha registrado ninguna operación en el torneo.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {market.recent.slice(0, 10).map((offer) => (
+              <li key={offer.id} className="flex flex-wrap items-center gap-2 p-3">
+                <OfferStatusPill status={offer.status} />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                  {offer.bidderClubName} → {offer.sellerClubName ?? "Agente libre"}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {offer.requested.map((player) => player.name).join(", ") || "—"}
+                </span>
+                <span className="num text-xs font-bold">
+                  {formatMoney(offer.cash)}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {relativeTime(offer.updatedAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </SectionCard>
     </>
   );
