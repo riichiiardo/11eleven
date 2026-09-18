@@ -52,7 +52,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
     try {
       await chooseClub({ clubId: candidate.id });
       toast.success(`¡Bienvenido a ${candidate.name}!`, {
-        description: "Ya puedes gestionar tu plantilla y tu once titular.",
+        description: "Tu plantilla arranca vacía: todo se decide en el primer draft.",
       });
       setCandidate(null);
     } catch (cause) {
@@ -76,8 +76,8 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
             <p className="mt-2 max-w-2xl text-sm text-white/70">
               Hola {state.user.name}, cada Presidente representa un club dentro de{" "}
               <strong className="font-semibold text-white">{state.tournament?.name}</strong>{" "}
-              ({state.tournament?.season}). La elección es definitiva durante la temporada: el
-              club llega con su plantilla oficial y su plantilla media de OVR.
+              ({state.tournament?.season}). La elección es definitiva durante la temporada: tu
+              club arranca con la plantilla vacía y la construirás en el primer draft.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -181,19 +181,17 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                     </div>
                   </div>
 
-                  <dl className="num grid grid-cols-3 gap-2 text-[11px] text-white/70">
+                  <dl className="num grid grid-cols-2 gap-2 text-[11px] text-white/70">
+                    <div>
+                      <dt className="uppercase tracking-wide text-white/45">Presupuesto</dt>
+                      <dd className="text-sm font-semibold text-white">
+                        {formatMoney(rules?.budget ?? 0)}
+                      </dd>
+                    </div>
                     <div>
                       <dt className="uppercase tracking-wide text-white/45">Plantilla</dt>
-                      <dd className="text-sm font-semibold text-white">{club.rosterSize}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide text-white/45">OVR medio</dt>
-                      <dd className="text-sm font-semibold text-white">{club.averageOvr}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide text-white/45">Valor</dt>
                       <dd className="text-sm font-semibold text-white">
-                        {formatMoney(club.totalValue)}
+                        {club.rosterSize} / {rules?.squadSize ?? "—"}
                       </dd>
                     </div>
                   </dl>
@@ -278,9 +276,9 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
               </dl>
 
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Recibirás la plantilla oficial del club con sus valoraciones y podrás fijar el
-                once titular. El motor de reglas validará cada movimiento contra el reglamento
-                del torneo.
+                Arrancas con la plantilla vacía: construirás tu equipo en el primer draft fichando
+                del catálogo FC 27 con este presupuesto. El motor de reglas validará cada ficha
+                contra el reglamento del torneo (cupos por posición, OVR y sub-21).
               </p>
 
               <DialogFooter>

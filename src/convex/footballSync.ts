@@ -22,7 +22,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { getTournament, loadAdmin, seedFreeAgents, logAudit } from "./context";
-import { FC_VERSION, FREE_AGENT_CLUB, type Position } from "./rulesEngine";
+import { FC_VERSION, type Position } from "./rulesEngine";
 
 export const SYNCED_ACTION = "Catálogo sincronizado";
 export const SYNC_FAILED_ACTION = "Sincronización de catálogo fallida";
@@ -281,9 +281,9 @@ export const catalogState = query({
 
     return {
       total: rows.length,
-      freeAgents: rows.filter(
-        (player) => player.realClub === FREE_AGENT_CLUB && !ownedIds.has(player._id as string),
-      ).length,
+      // "Libre" = aún sin dueño en el torneo (criterio real de draft y mercado;
+      // el club de origen SoFIFA del jugador no determina su disponibilidad).
+      freeAgents: Math.max(0, rows.length - ownedIds.size),
       owned: ownedIds.size,
       version: FC_VERSION,
       lastSync: parseSummary(lastSyncEntry?.entityId),
