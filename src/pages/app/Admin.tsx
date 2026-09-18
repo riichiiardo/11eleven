@@ -42,23 +42,16 @@ import {
   Crown,
   Gauge,
   Handshake,
-  Hourglass,
   Loader2,
-  PauseCircle,
   PlayCircle,
   ScrollText,
   ShieldCheck,
-  SkipForward,
-  StopCircle,
   UserPlus,
   Users,
-  Zap,
 } from "lucide-react";
 import { useMarketActions } from "@/hooks/use-market-actions";
-import { useDraftActions } from "@/hooks/use-draft-actions";
 import { OfferCard } from "@/components/eleven/OfferCard";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
-import { TurnStrip, DraftStatusPill } from "@/components/eleven/DraftBits";
 
 const PERMISSION_LABELS: Record<string, string> = {
   configuracion: "Configuración",
@@ -149,10 +142,6 @@ export default function Admin() {
             <Handshake className="size-4" aria-hidden="true" />
             Mercado
           </TabsTrigger>
-          <TabsTrigger value="draft" className="min-h-10">
-            <Zap className="size-4" aria-hidden="true" />
-            Draft
-          </TabsTrigger>
           <TabsTrigger value="auditoria" className="min-h-10">
             <ScrollText className="size-4" aria-hidden="true" />
             Auditoría
@@ -177,10 +166,6 @@ export default function Admin() {
 
         <TabsContent value="mercado" className="flex flex-col gap-5">
           <MarketPanel overview={overview} />
-        </TabsContent>
-
-        <TabsContent value="draft" className="flex flex-col gap-5">
-          <DraftPanel overview={overview} />
         </TabsContent>
 
         <TabsContent value="auditoria">
