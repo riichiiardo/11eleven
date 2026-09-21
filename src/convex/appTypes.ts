@@ -482,6 +482,15 @@ export type AppStateView = {
   president: PresidentView | null;
   club: ClubView | null;
   clubs: ClubView[];
+  teamCatalog: Array<{
+    id: string;
+    name: string;
+    league: string;
+    country: string;
+    colors: [string, string];
+    takenByMe: boolean;
+    takenByOther: boolean;
+  }>;
   squad: SquadPlayerView[];
   stats: SquadStats | null;
   evaluation: SquadEvaluation | null;

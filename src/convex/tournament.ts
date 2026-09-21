@@ -34,9 +34,7 @@ import {
   seedFreeAgents,
   seedTournament,
   toTournamentView,
-} from "./context";
-import {
-  DEFAULT_FORMATION,
+} from "./context";import { DEFAULT_FORMATION,
   DEFAULT_RULES,
   FREE_AGENT_CLUB,
   LEGACY_SEEDED_RULES,
@@ -315,6 +313,45 @@ export const state = query({
 
     const president = await loadPresident(ctx, tournament._id, userId);
 
+    // Build team catalog for the active tournament.
+    const allTeams = await ctx.db.query("teamCatalog").collect();
+    const tournamentClubs = await ctx.db
+      .query("clubs")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    const takenByCatalog = new Map<string, Id<"clubs">>();
+    for (const club of tournamentClubs) {
+      if (club.catalogTeamId) {
+        takenByCatalog.set(club.catalogTeamId, club._id);
+      }
+    }
+    const presArtifacts = await ctx.db
+      .query("presidents")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    const ownerByClub = new Map(
+      presArtifacts.map((p) => [p.clubId as string, p.userId]),
+    );
+    const teamCatalog = allTeams
+      .map((team) => {
+        const clubId = takenByCatalog.get(team._id) ?? null;
+        return {
+          id: team._id,
+          name: team.name,
+          league: team.league,
+          country: team.country,
+          colors: [team.colorPrimary, team.colorSecondary] as [string, string],
+          takenByMe:
+            clubId !== null &&
+            ownerByClub.get(clubId) === userId,
+          takenByOther:
+            clubId !== null &&
+            ownerByClub.get(clubId) !== undefined &&
+            ownerByClub.get(clubId) !== userId,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     if (!president) {
       return {
         needsClub: true,
@@ -326,6 +363,7 @@ export const state = query({
         president: null,
         club: null,
         clubs,
+        teamCatalog,
         squad: [],
         stats: null,
         evaluation: null,
