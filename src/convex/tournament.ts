@@ -220,9 +220,10 @@ export async function seedTeamCatalogFallback(
   ctx: MutationCtx,
 ): Promise<number> {
   const existing = await ctx.db.query("teamCatalog").collect();
-  if (existing.length > 0) return 0;
+  const existingNames = new Set(existing.map((t) => t.name));
   let inserted = 0;
   for (const team of CATALOG_TEAM_FALLBACK) {
+    if (existingNames.has(team.name)) continue;
     await ctx.db.insert("teamCatalog", {
       name: team.name,
       league: team.league,
