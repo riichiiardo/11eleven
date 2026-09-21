@@ -79,10 +79,12 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
               <strong className="font-semibold text-white">
                 {state.tournament?.name}
               </strong>{" "}
-              ({state.tournament?.season}) puedes presidir cualquier equipo del
-              catálogo mundial (SoFIFA · FC 27). La elección es definitiva: tu
-              equipo arranca con la plantilla vacía y la construirás en el
-              primer draft.
+              ({state.tournament?.season}) tienes acceso a más de 100 equipos
+              de las principales ligas del mundo: Premier League, LaLiga, Serie A,
+              Bundesliga, Ligue 1, Liga Portugal, Eredivisie, Superliga Turca,
+              Liga Argentina, Brasileirão, Liga MX, Saudi Pro League y más.
+              La elección es definitiva: tu equipo arranca vacío y la
+              construirás en el primer draft.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -93,7 +95,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
               </Badge>
             ) : null}
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">
-              {state.clubs.length} equipos en la liga ·{" "}
+              {state.clubs.length} equipos · {new Set(state.clubs.map((c) => c.league)).size} ligas ·{" "}
               {state.clubs.filter((club) => !club.presidentNickname).length}{" "}
               disponibles
             </p>

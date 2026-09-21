@@ -105,31 +105,31 @@ const FLOW = [
     step: "01",
     title: "Elige tu club",
     description:
-      "Explora los clubes habilitados con su plantilla base, OVR medio y presupuesto antes de confirmar.",
+      "Explora más de 100 equipos de Premier League, LaLiga, Serie A, Bundesliga, Ligue 1 y más. Elige el que quieras presidir.",
   },
   {
     step: "02",
-    title: "Recibe la plantilla",
+    title: "Únete a tu liga",
     description:
-      "El club llega con sus jugadores, valoraciones y situación inicial. Todo versionado y auditable.",
+      "Crea una liga con reglas a tu medida o únete a una existente con código de invitación.",
   },
   {
     step: "03",
-    title: "Fija tu once",
+    title: "Construye en el draft",
     description:
-      "Escoge entre cinco formaciones, coloca titulares y revisa la validación en vivo antes de guardar.",
+      "Todos los equipos arrancan vacíos. Fichas del catálogo FC 27 en turnos cronometrados con validación de reglas en vivo.",
   },
   {
     step: "04",
-    title: "Cumple el reglamento",
+    title: "Gestiona el mercado",
     description:
-      "Cupos por posición, sub-21 y máximo por club real se controlan solos en cada movimiento.",
+      "Ofertas, trades, negociaciones y acuerdos reservados. El motor valida presupuesto y cupos en cada operación.",
   },
   {
     step: "05",
-    title: "Compite",
+    title: "Compite en la tabla",
     description:
-      "El calendario, el mercado y el draft llegan en las siguientes fases sobre la misma base de clubes y plantillas.",
+      "Calendario ida y vuelta, jornadas, resultados fantasy y Match Center con los puntos de tu once titular.",
   },
 ];
 
@@ -178,17 +178,17 @@ const DEMO_CHECKS: RuleCheck[] = [
 ];
 
 const DEMO_XI = [
-  { name: "André Onana", position: "POR", ovr: 83, group: "GK" as const, flag: "🇨🇲" },
-  { name: "Diogo Dalot", position: "LD", ovr: 81, group: "DEF" as const, flag: "🇵🇹" },
-  { name: "Matthijs de Ligt", position: "DFC", ovr: 84, group: "DEF" as const, flag: "🇳🇱" },
-  { name: "Lisandro Martínez", position: "DFC", ovr: 84, group: "DEF" as const, flag: "🇦🇷" },
-  { name: "Luke Shaw", position: "LI", ovr: 82, group: "DEF" as const, flag: "🇬🇧" },
-  { name: "Manuel Ugarte", position: "MCD", ovr: 82, group: "MID" as const, flag: "🇺🇾" },
-  { name: "Kobbie Mainoo", position: "MC", ovr: 82, group: "MID" as const, flag: "🇬🇧" },
-  { name: "Alejandro Garnacho", position: "ED", ovr: 81, group: "FWD" as const, flag: "🇦🇷" },
-  { name: "Bruno Fernandes", position: "MCO", ovr: 87, group: "MID" as const, flag: "🇵🇹" },
-  { name: "Marcus Rashford", position: "EI", ovr: 85, group: "FWD" as const, flag: "🇬🇧" },
-  { name: "Rasmus Højlund", position: "DC", ovr: 83, group: "FWD" as const, flag: "🇩🇰" },
+  { name: "Marc-André ter Stegen", position: "POR", ovr: 85, group: "GK" as const, flag: "🇩🇪" },
+  { name: "Jules Koundé", position: "LD", ovr: 85, group: "DEF" as const, flag: "🇫🇷" },
+  { name: "Pau Cubarsí", position: "DFC", ovr: 82, group: "DEF" as const, flag: "🇪🇸" },
+  { name: "Ronald Araújo", position: "DFC", ovr: 84, group: "DEF" as const, flag: "🇺🇾" },
+  { name: "Alejandro Balde", position: "LI", ovr: 83, group: "DEF" as const, flag: "🇪🇸" },
+  { name: "Frenkie de Jong", position: "MCD", ovr: 86, group: "MID" as const, flag: "🇳🇱" },
+  { name: "Pedri", position: "MC", ovr: 88, group: "MID" as const, flag: "🇪🇸" },
+  { name: "Lamine Yamal", position: "ED", ovr: 89, group: "FWD" as const, flag: "🇪🇸" },
+  { name: "Dani Olmo", position: "MCO", ovr: 85, group: "MID" as const, flag: "🇪🇸" },
+  { name: "Raphinha", position: "EI", ovr: 87, group: "FWD" as const, flag: "🇧🇷" },
+  { name: "Robert Lewandowski", position: "DC", ovr: 87, group: "FWD" as const, flag: "🇵🇱" },
 ];
 
 function Reveal({
@@ -282,9 +282,7 @@ export default function Landing() {
                 <span className="text-brand-bright">una liga de Presidentes.</span>
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-white/70">
-                11Eleven es la plataforma para presidir un club de fútbol fantasy: plantilla,
-                formación, táctica y reglas verificadas por un motor que sabe qué puedes hacer,
-                qué no y por qué.
+                11Eleven es la plataforma para presidir un club de fútbol fantasy con acceso a más de 100 equipos de las ligas más importantes del mundo. Elige tu club, arma tu plantilla en el draft y compite con reglas verificadas por un motor que sabe qué puedes hacer, qué no y por qué.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Button asChild size="lg" className="min-h-12 px-6 text-sm">
@@ -304,8 +302,8 @@ export default function Landing() {
               </div>
               <dl className="mt-10 grid max-w-lg grid-cols-2 gap-4 sm:grid-cols-4">
                 {[
-                  ["5", "Formaciones"],
-                  ["20", "Jugadores por club"],
+                  ["100+", "Equipos del mundo"],
+                  ["15+", "Ligas disponibles"],
                   ["10", "Reglas del motor"],
                   ["AA", "WCAG 2.2"],
                 ].map(([value, label]) => (
@@ -330,15 +328,15 @@ export default function Landing() {
             <div className="rounded-2xl border border-white/12 bg-card p-4 text-foreground shadow-2xl">
               <div className="flex items-center gap-3">
                 <Crest
-                  name="Manchester United"
-                  shortName="MUN"
-                  colors={["#DA291C", "#FBE122"]}
+                  name="FC Barcelona"
+                  shortName="BAR"
+                  colors={["#A50044", "#004D98"]}
                   size="md"
                 />
                 <div className="min-w-0">
-                  <p className="display truncate text-sm">Manchester United</p>
+                  <p className="display truncate text-sm">FC Barcelona</p>
                   <p className="truncate text-[11px] text-muted-foreground">
-                    Premier League · @Ricardo · Jornada 12
+                    LaLiga · @Ricardo · Jornada 12
                   </p>
                 </div>
                 <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
@@ -683,13 +681,11 @@ export default function Landing() {
       {/* ----------------------------------------------------------------- CTA */}
       <section className="border-t border-white/10 bg-gradient-to-br from-brand/25 via-navy-deep to-pitch/20">
         <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-6 px-4 py-16 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-20">
-          <Reveal>
-            <h2 className="display max-w-2xl text-3xl leading-tight sm:text-4xl">
+          <Reveal>              <h2 className="display max-w-2xl text-3xl leading-tight sm:text-4xl">
               Tu club está esperando Presidente
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75">
-              Entra, elige tu club y gestiona la plantilla desde el primer minuto. Si eres el
-              primer Presidente del torneo, además quedas como Administrador principal.
+              Entra, elige entre más de 100 equipos de las principales ligas del mundo, crea tu liga con reglas personalizadas y gestiona la plantilla desde el primer draft. Si eres el primer Presidente del torneo, además quedas como Administrador principal.
             </p>
           </Reveal>
           <Reveal delay={0.1}>

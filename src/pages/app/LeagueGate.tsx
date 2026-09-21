@@ -112,10 +112,9 @@ export default function LeagueGate({ state }: { state: NeedsLeagueState }) {
           <h1 className="display mt-4 text-3xl leading-tight sm:text-4xl">
             Bienvenido, {state.user.name}
           </h1>
-          <p className="max-w-2xl text-sm text-white/70">
-            En 11Eleven eres el <strong className="text-white">Presidente</strong>{" "}
-            de tu propio club de fantasía. Crea tu liga y configura sus reglas,
-            o únete a la de un amigo con su código de invitación.
+          <p className="max-w-2xl text-sm text-white/70">              En 11Eleven eres el <strong className="text-white">Presidente</strong>{" "}
+              de tu propio club de fantasía con acceso a más de 100 equipos de las principales ligas del mundo. Crea tu liga y configura sus reglas,
+              o únete a la de un amigo con su código de invitación.
           </p>
         </header>
 
@@ -159,7 +158,7 @@ export default function LeagueGate({ state }: { state: NeedsLeagueState }) {
             <span className="display text-lg">Unirme a una liga</span>
             <span className="text-xs leading-relaxed text-white/65">
               Tienes un código de invitación? Entra a una liga existente,
-              elige cualquier equipo del catálogo mundial y compite en el draft.
+              elige entre más de 100 equipos de las principales ligas del mundo y compite en el draft.
             </span>
           </button>
         </div>
