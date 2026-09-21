@@ -1,4 +1,5 @@
 import { api } from "@/convex/_generated/api";
+import type { AppStateView, NeedsLeagueState } from "@/convex/appTypes";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 
@@ -12,18 +13,29 @@ export function useNow(intervalMs = 1000): number {
   return now;
 }
 
+export type DashboardState = AppStateView | NeedsLeagueState;
+
 /**
  * The control-room query. `undefined` means loading, `null` means the
- * tournament has not been bootstrapped yet (see useEnsureTournament).
+ * bootstrap has not run yet (see useEnsureTournament).
  */
-export function useTournamentState() {
+export function useTournamentState(): {
+  state: DashboardState | undefined | null;
+  isLoading: boolean;
+  isFullState: boolean;
+} {
   const state = useQuery(api.tournament.state);
-  return { state, isLoading: state === undefined };
+  return {
+    state,
+    isLoading: state === undefined,
+    isFullState: state !== undefined && state !== null && !state.needsLeague,
+  };
 }
 
 /**
- * Idempotent bootstrap: creates the tournament, the versioned FC 27 player
- * catalogue and grants the first account the Administrador principal role.
+ * Idempotent bootstrap: migrates pre-multi-league deployments (membership +
+ * active pointer) and returns `needsLeague` for brand new users, whose UI is
+ * the create/join gate.
  */
 export function useEnsureTournament(ready: boolean) {
   const ensureSetup = useMutation(api.tournament.ensureSetup);
@@ -37,7 +49,7 @@ export function useEnsureTournament(ready: boolean) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "No se pudo inicializar el torneo.",
+          : "No se pudo inicializar la aplicación.",
       );
     });
   }, [ready, ensureSetup]);

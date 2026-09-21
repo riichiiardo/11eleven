@@ -22,7 +22,7 @@ import { CheckCircle2, Info, Loader2, Search, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ClubSelection({ state }: { state: AppStateView }) {
-  const chooseClub = useMutation(api.tournament.chooseClub);
+  const chooseTeam = useMutation(api.tournament.chooseCatalogTeam);
   const [query, setQuery] = useState("");
   const [league, setLeague] = useState<string>("Todas");
   const [candidate, setCandidate] = useState<ClubView | null>(null);
@@ -47,16 +47,17 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
   const rules = state.rules;
 
   const confirm = async () => {
-    if (!candidate) return;
+    if (!candidate?.catalogTeamId) return;
     setSaving(true);
     try {
-      await chooseClub({ clubId: candidate.id });
+      await chooseTeam({ catalogTeamId: candidate.catalogTeamId });
       toast.success(`¡Bienvenido a ${candidate.name}!`, {
-        description: "Tu plantilla arranca vacía: todo se decide en el primer draft.",
+        description:
+          "Tu plantilla arranca vacía: todo se decide en el primer draft.",
       });
       setCandidate(null);
     } catch (cause) {
-      toast.error("No se pudo confirmar el club", {
+      toast.error("No se pudo confirmar el equipo", {
         description: errorMessage(cause),
       });
     } finally {
@@ -71,32 +72,37 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
           <div>
             <BrandLockup />
             <h1 className="display mt-6 text-3xl leading-tight sm:text-4xl">
-              Elige el club que vas a presidir
+              Elige el equipo que vas a presidir
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-white/70">
-              Hola {state.user.name}, cada Presidente representa un club dentro de{" "}
-              <strong className="font-semibold text-white">{state.tournament?.name}</strong>{" "}
-              ({state.tournament?.season}). La elección es definitiva durante la temporada: tu
-              club arranca con la plantilla vacía y la construirás en el primer draft.
+              Hola {state.user.name}, dentro de{" "}
+              <strong className="font-semibold text-white">
+                {state.tournament?.name}
+              </strong>{" "}
+              ({state.tournament?.season}) puedes presidir cualquier equipo del
+              catálogo mundial (SoFIFA · FC 27). La elección es definitiva: tu
+              equipo arranca con la plantilla vacía y la construirás en el
+              primer draft.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
             {state.isAdmin ? (
               <Badge className="border-0 bg-gold/20 text-amber-100">
                 <ShieldCheck className="size-3.5" aria-hidden="true" />
-                Administrador principal del torneo
+                Administrador de la liga
               </Badge>
             ) : null}
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">
-              {state.clubs.length} clubes habilitados ·{" "}
-              {state.clubs.filter((club) => !club.presidentNickname).length} disponibles
+              {state.clubs.length} equipos en la liga ·{" "}
+              {state.clubs.filter((club) => !club.presidentNickname).length}{" "}
+              disponibles
             </p>
           </div>
         </header>
 
         {rules ? (
           <section
-            aria-label="Reglas clave del torneo"
+            aria-label="Reglas clave de la liga"
             className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 sm:grid-cols-2 lg:grid-cols-4"
           >
             <RuleChip label="Presupuesto" value={formatMoney(rules.budget)} />
@@ -128,8 +134,8 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar club, liga o país…"
-                aria-label="Buscar club"
+                placeholder="Buscar equipo, liga o país…"
+                aria-label="Buscar equipo"
                 className="h-11 border-white/15 bg-white/10 pl-9 text-white placeholder:text-white/45"
               />
             </div>
@@ -174,7 +180,9 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                       size="lg"
                     />
                     <div className="min-w-0">
-                      <p className="display truncate text-sm text-white">{club.name}</p>
+                      <p className="display truncate text-sm text-white">
+                        {club.name}
+                      </p>
                       <p className="truncate text-[11px] text-white/60">
                         {club.league} · {club.country}
                       </p>
@@ -183,13 +191,17 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
 
                   <dl className="num grid grid-cols-2 gap-2 text-[11px] text-white/70">
                     <div>
-                      <dt className="uppercase tracking-wide text-white/45">Presupuesto</dt>
+                      <dt className="uppercase tracking-wide text-white/45">
+                        Presupuesto
+                      </dt>
                       <dd className="text-sm font-semibold text-white">
                         {formatMoney(rules?.budget ?? 0)}
                       </dd>
                     </div>
                     <div>
-                      <dt className="uppercase tracking-wide text-white/45">Plantilla</dt>
+                      <dt className="uppercase tracking-wide text-white/45">
+                        Plantilla
+                      </dt>
                       <dd className="text-sm font-semibold text-white">
                         {club.rosterSize} / {rules?.squadSize ?? "—"}
                       </dd>
@@ -210,12 +222,12 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
 
                   <Button
                     type="button"
-                    disabled={taken}
+                    disabled={taken || !club.catalogTeamId}
                     onClick={() => setCandidate(club)}
                     className="min-h-11"
                     variant={taken ? "secondary" : "default"}
                   >
-                    {taken ? "No disponible" : "Seleccionar club"}
+                    {taken ? "No disponible" : "Seleccionar equipo"}
                   </Button>
                 </li>
               );
@@ -224,20 +236,27 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
 
           {visible.length === 0 ? (
             <p className="rounded-xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/70">
-              No hay clubes que coincidan con «{query}». Prueba con otro nombre o cambia de liga.
+              No hay equipos que coincidan con «{query}». Prueba con otro nombre
+              o cambia de liga.
             </p>
           ) : null}
         </section>
       </div>
 
-      <Dialog open={Boolean(candidate)} onOpenChange={(open) => !open && setCandidate(null)}>
+      <Dialog
+        open={Boolean(candidate)}
+        onOpenChange={(open) => !open && setCandidate(null)}
+      >
         <DialogContent className="sm:max-w-md">
           {candidate ? (
             <>
               <DialogHeader>
-                <DialogTitle className="display">¿Quieres representar este club?</DialogTitle>
+                <DialogTitle className="display">
+                  ¿Quieres representar este equipo?
+                </DialogTitle>
                 <DialogDescription>
-                  Esta decisión te asigna la presidencia dentro de {state.tournament?.name}.
+                  Esta decisión te asigna la presidencia dentro de{" "}
+                  {state.tournament?.name}.
                 </DialogDescription>
               </DialogHeader>
 
@@ -270,15 +289,17 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                     Plantilla inicial
                   </dt>
                   <dd className="num mt-0.5 font-bold">
-                    {candidate.rosterSize} / {rules?.squadSize ?? candidate.rosterSize}
+                    {candidate.rosterSize} /{" "}
+                    {rules?.squadSize ?? candidate.rosterSize}
                   </dd>
                 </div>
               </dl>
 
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Arrancas con la plantilla vacía: construirás tu equipo en el primer draft fichando
-                del catálogo FC 27 con este presupuesto. El motor de reglas validará cada ficha
-                contra el reglamento del torneo (cupos por posición, OVR y sub-21).
+                Arrancas con la plantilla vacía: construirás tu equipo en el
+                primer draft fichando del catálogo FC 27 con este presupuesto.
+                El motor de reglas validará cada ficha contra el reglamento de
+                la liga (cupos por posición, OVR y sub-21).
               </p>
 
               <DialogFooter>
@@ -299,11 +320,14 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                 >
                   {saving ? (
                     <>
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      <Loader2
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
                       Confirmando…
                     </>
                   ) : (
-                    "Confirmar club"
+                    "Confirmar equipo"
                   )}
                 </Button>
               </DialogFooter>

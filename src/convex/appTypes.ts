@@ -28,6 +28,8 @@ export type ClubView = {
   totalValue: number;
   presidentNickname: string | null;
   presidentName: string | null;
+  /** teamCatalog entry this club was instantiated from (SoFIFA team). */
+  catalogTeamId: Id<"teamCatalog"> | null;
 };
 
 export type TournamentView = {
@@ -441,8 +443,39 @@ export type CompetitionCalendarView = {
   summary: CompetitionSummaryView;
 };
 
+/* ------------------------------------------------------------------ *
+ * Multi-league
+ * ------------------------------------------------------------------ */
+
+/** A league the user belongs to (created, joined or administrated). */
+export type LeagueSummaryView = {
+  id: Id<"tournaments">;
+  code: string;
+  name: string;
+  season: string;
+  memberCount: number;
+  isAdmin: boolean;
+  myClubName: string | null;
+  active: boolean;
+  createdAt: number;
+};
+
+/**
+ * The signed-in state of a user without an active league: the control room is
+ * replaced by the create/join gate until they pick or start one.
+ */
+export type NeedsLeagueState = {
+  needsLeague: true;
+  user: { id: Id<"users">; name: string; email: string; nickname: string };
+  leagues: LeagueSummaryView[];
+};
+
 export type AppStateView = {
   needsClub: boolean;
+  /** Always false in the full app state (see NeedsLeagueState). */
+  needsLeague: false;
+  /** Every league the user belongs to, active one first. */
+  leagues: LeagueSummaryView[];
   user: { id: Id<"users">; name: string; email: string; nickname: string };
   tournament: TournamentView | null;
   rules: TournamentRules | null;

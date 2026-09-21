@@ -134,6 +134,9 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // 11Eleven: which league (tournament) the user is operating right now.
+      activeTournamentId: v.optional(v.id("tournaments")),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     /* ----------------------------------------------------------------
@@ -149,6 +152,8 @@ const schema = defineSchema(
       totalMatchdays: v.number(),
       marketOpen: v.boolean(),
       nextMatchdayAt: v.optional(v.number()),
+      /** The President who created the league (Administrador principal). */
+      ownerUserId: v.optional(v.id("users")),
       createdAt: v.number(),
     }).index("by_code", ["code"]),
 
@@ -183,6 +188,23 @@ const schema = defineSchema(
       .index("by_tournament", ["tournamentId"])
       .index("by_user", ["userId"]),
 
+    /**
+     * Membership of a user inside a league. Separate from `presidents`
+     * (the competitive entity that owns a club) so a user can join a league
+     * BEFORE picking a team and so Administrators are members too.
+     */
+    leagueMembers: defineTable({
+      tournamentId: v.id("tournaments"),
+      userId: v.id("users"),
+      role: v.union(
+        v.literal("presidente"),
+        v.literal("administrador"),
+      ),
+      joinedAt: v.number(),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_user", ["userId"]),
+
     /** A President owns one club per tournament. */
     presidents: defineTable({
       tournamentId: v.id("tournaments"),
@@ -201,6 +223,23 @@ const schema = defineSchema(
      * Clubs + player catalogue (versioned snapshot)
      * ---------------------------------------------------------------- */
 
+    /**
+     * Global team catalogue (SoFIFA). Every league lets its Presidents pick
+     * ANY team listed here; picking a team instantiates a `clubs` row inside
+     * the league with an EMPTY squad ready for the draft.
+     */
+    teamCatalog: defineTable({
+      sofifaTeamId: v.optional(v.number()),
+      name: v.string(),
+      league: v.string(),
+      country: v.string(),
+      colorPrimary: v.string(),
+      colorSecondary: v.string(),
+    })
+      .index("by_team_id", ["sofifaTeamId"])
+      .index("by_name", ["name"])
+      .index("by_league", ["league"]),
+
     clubs: defineTable({
       tournamentId: v.id("tournaments"),
       name: v.string(),
@@ -209,6 +248,8 @@ const schema = defineSchema(
       country: v.string(),
       colorPrimary: v.string(),
       colorSecondary: v.string(),
+      /** teamCatalog entry this club was instantiated from. */
+      catalogTeamId: v.optional(v.id("teamCatalog")),
     })
       .index("by_tournament", ["tournamentId"])
       .index("by_league", ["league"]),

@@ -6,17 +6,20 @@ import type {
   AdminOverviewView,
   AppStateView,
   MarketSummaryView,
+  NeedsLeagueState,
 } from "./appTypes";
 import {
   buildCompetitionSummary,
   seedFixtures,
 } from "./competition";
+import { CLUBS } from "./footballData";
 import { loadDraftAdmin, loadDraftSummary } from "./draft";
 import {
   buildActions,
   buildActivity,
   buildAdmins,
   buildClubViews,
+  buildMyLeagues,
   buildNextEvent,
   buildOffers,
   buildPresidents,
@@ -106,8 +109,23 @@ async function requireAdmin(
  * ------------------------------------------------------------------ */
 
 /**
- * Idempotent bootstrap: creates the tournament + versioned player catalogue on
- * first run, and grants the first account the Administrador principal role.
+ * Offline team fallback for the global catalogue: derived from the bundled
+ * snapshot clubs so a fresh deployment always has teams to pick before any
+ * SoFIFA sync runs. Idempotent seeding never modifies existing rows.
+ */
+const CATALOG_TEAM_FALLBACK = CLUBS.map((club) => ({
+  name: club.name,
+  league: club.league,
+  country: club.country,
+  colors: club.colors,
+}));
+
+/**
+ * Idempotent bootstrap, multi-league aware. It NO LONGER auto-creates a
+ * tournament: a user without a league gets `needsLeague` and the UI shows the
+ * create/join gate (creating a league walks them through the rules step).
+ * Existing deployments are migrated in place: their league gets membership rows
+ * and the active-league pointer is back-filled.
  */
 export const ensureSetup = mutation({
   args: {},
@@ -116,57 +134,106 @@ export const ensureSetup = mutation({
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError("No se encontró tu cuenta.");
 
-    let tournament = await getTournament(ctx);
-    if (!tournament) {
-      const tournamentId = await seedTournament(ctx);
-      tournament = await ctx.db.get(tournamentId);
-    }
-    if (!tournament) {
-      throw new ConvexError("No se pudo inicializar el torneo. Inténtalo de nuevo.");
-    }
-
     const displayName =
       user.name?.trim() ||
       nicknameFromEmail(user.email ?? "").replace("@", "") ||
       "Presidente";
-
     if (!user.name) {
       await ctx.db.patch(userId, { name: displayName });
     }
 
-    const admins = await ctx.db
-      .query("tournamentAdmins")
-      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament!._id))
+    const memberships = await ctx.db
+      .query("leagueMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
-    // Free agents belong to the versioned snapshot and can be added to an
-    // already seeded deployment without touching any squad.
-    await seedFreeAgents(ctx, tournament._id);
-    await migrateSeededRules(ctx, tournament._id, userId, displayName!);
-    await seedFixtures(ctx, tournament);
-
-    if (admins.length === 0) {
-      await ctx.db.insert("tournamentAdmins", {
-        tournamentId: tournament._id,
-        userId,
-        role: "principal",
-        permissions: [...PERMISSIONS],
-        createdAt: Date.now(),
-      });
-      await logAudit(ctx, {
-        tournamentId: tournament._id,
-        actorUserId: userId,
-        actorName: displayName,
-        action: "Administrador principal asignado",
-        entity: "tournament",
-        entityId: tournament._id,
-        detail: `${displayName} abre el torneo como Administrador principal y Presidente.`,
-      });
+    // Already a member: make sure the active pointer exists and finish.
+    if (memberships.length > 0) {
+      const activeId = user.activeTournamentId;
+      const activeValid =
+        activeId && memberships.some((row) => row.tournamentId === activeId);
+      if (!activeValid) {
+        await ctx.db.patch(userId, {
+          activeTournamentId: memberships[0].tournamentId,
+        });
+      }
+      return {
+        tournamentId: activeValid ? activeId : memberships[0].tournamentId,
+      };
     }
 
-    return { tournamentId: tournament._id };
+    // Legacy migration: the user operated the pre-multi-league deployment (a
+    // president or admin row exists) but has no membership yet.
+    const presidentRows = await ctx.db
+      .query("presidents")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const adminRows = await ctx.db
+      .query("tournamentAdmins")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const legacyTournamentId =
+      user.activeTournamentId ??
+      presidentRows[0]?.tournamentId ??
+      adminRows[0]?.tournamentId ??
+      null;
+
+    if (legacyTournamentId) {
+      const tournament = await ctx.db.get(legacyTournamentId);
+      if (tournament) {
+        const alreadyAdmin = adminRows.some(
+          (row) => row.tournamentId === legacyTournamentId,
+        );
+        await ctx.db.insert("leagueMembers", {
+          tournamentId: legacyTournamentId,
+          userId,
+          role: alreadyAdmin ? "administrador" : "presidente",
+          joinedAt: Date.now(),
+        });
+        // Free agents belong to the versioned snapshot and can be added to an
+        // already seeded deployment without touching any squad.
+        await seedFreeAgents(ctx, legacyTournamentId);
+        await seedTeamCatalogFallback(ctx);
+        await migrateSeededRules(
+          ctx,
+          legacyTournamentId,
+          userId,
+          displayName,
+        );
+        await seedFixtures(ctx, tournament);
+        await ctx.db.patch(userId, { activeTournamentId: legacyTournamentId });
+        return { tournamentId: legacyTournamentId };
+      }
+    }
+
+    // Brand new user: no league anywhere. The UI gate takes it from here.
+    return { needsLeague: true as const };
   },
 });
+
+/**
+ * Ensures the global team catalogue has at least the bundled snapshot teams,
+ * so a fresh deployment can pick teams even before any SoFIFA sync runs.
+ * Idempotent: existing rows are never duplicated or modified.
+ */
+export async function seedTeamCatalogFallback(
+  ctx: MutationCtx,
+): Promise<number> {
+  const existing = await ctx.db.query("teamCatalog").collect();
+  if (existing.length > 0) return 0;
+  let inserted = 0;
+  for (const team of CATALOG_TEAM_FALLBACK) {
+    await ctx.db.insert("teamCatalog", {
+      name: team.name,
+      league: team.league,
+      country: team.country,
+      colorPrimary: team.colors[0],
+      colorSecondary: team.colors[1],
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
 
 /**
  * Early deployments shipped a 20-player squad limit, before the market existed.
@@ -215,19 +282,12 @@ async function migrateSeededRules(
 
 export const state = query({
   args: {},
-  handler: async (ctx): Promise<AppStateView | null> => {
+  handler: async (ctx): Promise<AppStateView | NeedsLeagueState | null> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
     if (!user) return null;
 
-    const tournament = await getTournament(ctx);
-    if (!tournament) return null;
-
-    const rules = await loadRules(ctx, tournament._id);
-    const admin = await loadAdmin(ctx, tournament._id, userId);
-    const clubs = await buildClubViews(ctx, tournament._id);
-    const tournamentView = toTournamentView(tournament);
     const email = user.email ?? "";
     const baseNickname = nicknameFromEmail(email);
     const knownUser = {
@@ -237,11 +297,28 @@ export const state = query({
       nickname: baseNickname,
     };
 
+    const tournament = await getTournament(ctx);
+    if (!tournament) {
+      // No league anywhere: the UI shows the create/join gate.
+      return {
+        needsLeague: true,
+        user: knownUser,
+        leagues: [],
+      };
+    }
+
+    const rules = await loadRules(ctx, tournament._id);
+    const admin = await loadAdmin(ctx, tournament._id, userId);
+    const clubs = await buildClubViews(ctx, tournament._id);
+    const tournamentView = toTournamentView(tournament);
+
     const president = await loadPresident(ctx, tournament._id, userId);
 
     if (!president) {
       return {
         needsClub: true,
+        needsLeague: false,
+        leagues: await buildMyLeagues(ctx, userId, tournament._id),
         user: knownUser,
         tournament: tournamentView,
         rules,
@@ -385,6 +462,8 @@ export const state = query({
 
     return {
       needsClub: false,
+      needsLeague: false,
+      leagues: await buildMyLeagues(ctx, userId, tournament._id),
       user: knownUser,
       tournament: tournamentView,
       rules,
@@ -476,7 +555,11 @@ export const state = query({
  * Club selection
  * ------------------------------------------------------------------ */
 
-/** A President belongs to a tournament and owns ONE club inside it. */
+/**
+ * LEGACY claim path kept so pre-catalogue deployments keep compiling while the
+ * UI migrates: claims an EXISTING club row of the active league with an empty
+ * squad. New flows must use `chooseCatalogTeam`.
+ */
 export const chooseClub = mutation({
   args: { clubId: v.id("clubs") },
   handler: async (ctx, { clubId }) => {
@@ -484,20 +567,18 @@ export const chooseClub = mutation({
     const user = await ctx.db.get(userId);
     const tournament = await getTournament(ctx);
     if (!tournament) {
-      throw new ConvexError(
-        "El torneo todavía no está inicializado. Recarga la página e inténtalo de nuevo.",
-      );
+      throw new ConvexError("Primero crea o únete a una liga.");
     }
 
     const club = await ctx.db.get(clubId);
     if (!club || club.tournamentId !== tournament._id) {
-      throw new ConvexError("El club seleccionado no pertenece a este torneo.");
+      throw new ConvexError("El club seleccionado no pertenece a esta liga.");
     }
 
     const existing = await loadPresident(ctx, tournament._id, userId);
     if (existing) {
       throw new ConvexError(
-        "Ya presides un club en este torneo. Un cambio de club requiere autorización de Administración.",
+        "Ya presides un equipo en esta liga. Un cambio requiere autorización de Administración.",
       );
     }
 
@@ -507,7 +588,7 @@ export const chooseClub = mutation({
       .first();
     if (taken) {
       throw new ConvexError(
-        `${club.name} ya tiene Presidente en este torneo. Elige otro club disponible.`,
+        `${club.name} ya tiene Presidente en esta liga. Elige otro equipo disponible.`,
       );
     }
 
@@ -542,6 +623,122 @@ export const chooseClub = mutation({
       entity: "club",
       entityId: clubId,
       detail: `${displayName} (${nickname}) asume la presidencia de ${club.name} · plantilla vacía: se construye en el primer draft · presupuesto ${formatMoney(rules.budget)}`,
+    });
+
+    return { clubId, squadSize: size };
+  },
+});
+
+/**
+ * A President picks ANY team from the global catalogue for their ACTIVE
+ * league. The club is instantiated league-scoped with an EMPTY squad (draft
+ * fills it) and the President gets the full rules budget. The old fixed-roster
+ * club picker (`chooseClub`) was replaced by this catalogue flow.
+ */
+export const chooseCatalogTeam = mutation({
+  args: { catalogTeamId: v.id("teamCatalog") },
+  handler: async (ctx, { catalogTeamId }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const user = await ctx.db.get(userId);
+    const tournament = await getTournament(ctx);
+    if (!tournament) {
+      throw new ConvexError(
+        "Primero crea o únete a una liga para elegir tu equipo.",
+      );
+    }
+
+    const team = await ctx.db.get(catalogTeamId);
+    if (!team) {
+      throw new ConvexError(
+        "Ese equipo ya no está en el catálogo. Sincroniza de nuevo desde SoFIFA.",
+      );
+    }
+
+    const existing = await loadPresident(ctx, tournament._id, userId);
+    if (existing) {
+      throw new ConvexError(
+        "Ya presides un equipo en esta liga. Un cambio de club requiere autorización de Administración.",
+      );
+    }
+
+    const clubs = await ctx.db
+      .query("clubs")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    const alreadyUsed = clubs.find(
+      (club) => club.catalogTeamId === catalogTeamId,
+    );
+    if (alreadyUsed) {
+      throw new ConvexError(
+        `${team.name} ya fue elegido por otro Presidente en ${tournament.name}. Elige otro equipo disponible.`,
+      );
+    }
+
+    const rules = await loadRules(ctx, tournament._id);
+    const nickname = nicknameFromEmail(user?.email ?? "");
+    const displayName = user?.name?.trim() || nickname.replace("@", "");
+    const now = Date.now();
+
+    const clubId = await ctx.db.insert("clubs", {
+      tournamentId: tournament._id,
+      name: team.name,
+      shortName: team.name
+        .replace(/[().]/g, "")
+        .split(/\s+/)
+        .slice(0, 3)
+        .map((word) => word[0])
+        .join("")
+        .toUpperCase(),
+      league: team.league,
+      country: team.country,
+      colorPrimary: team.colorPrimary,
+      colorSecondary: team.colorSecondary,
+      catalogTeamId: team._id,
+    });
+
+    const presidentId = await ctx.db.insert("presidents", {
+      tournamentId: tournament._id,
+      userId,
+      nickname,
+      displayName,
+      clubId,
+      budget: rules.budget,
+      joinedAt: now,
+    });
+
+    const { size } = await createSquadForClub(ctx, {
+      tournamentId: tournament._id,
+      clubId,
+      presidentId,
+      clubName: team.name,
+    });
+
+    // Membership safety net (creator/join flows already insert it).
+    const memberships = await ctx.db
+      .query("leagueMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    if (!memberships.some((row) => row.tournamentId === tournament._id)) {
+      const alreadyAdmin = Boolean(
+        await loadAdmin(ctx, tournament._id, userId),
+      );
+      await ctx.db.insert("leagueMembers", {
+        tournamentId: tournament._id,
+        userId,
+        role: alreadyAdmin ? "administrador" : "presidente",
+        joinedAt: now,
+      });
+    }
+
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      clubId,
+      actorUserId: userId,
+      actorName: displayName,
+      action: "Presidencia asumida",
+      entity: "club",
+      entityId: clubId,
+      detail: `${displayName} (${nickname}) asume la presidencia de ${team.name} (${team.league}) · plantilla vacía: se construye en el primer draft · presupuesto ${formatMoney(rules.budget)}`,
     });
 
     return { clubId, squadSize: size };

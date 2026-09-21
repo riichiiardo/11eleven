@@ -1,9 +1,11 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type {
   AdminView,
   AuditEntryView,
   ClubView,
+  LeagueSummaryView,
   MyAction,
   NextEventView,
   OfferPlayerLite,
@@ -41,13 +43,36 @@ export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
  * Tournament
  * ------------------------------------------------------------------ */
 
+/**
+ * Active league of the caller: the last league they created or joined, stored
+ * on the user. All tournament-scoped reads go through this helper, so switching
+ * league instantly re-points every query in the app. `ensureSetup` back-fills
+ * `leagueMembers` for deployments that predate multi-league, so the membership
+ * lookup below is always authoritative.
+ */
 export async function getTournament(
   ctx: QueryCtx,
 ): Promise<Doc<"tournaments"> | null> {
-  return await ctx.db
-    .query("tournaments")
-    .withIndex("by_code", (q) => q.eq("code", TOURNAMENT_CODE))
-    .first();
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+  const user = await ctx.db.get(userId);
+  const activeId = user?.activeTournamentId;
+
+  if (activeId) {
+    const active = await ctx.db.get(activeId);
+    if (active) return active;
+  }
+
+  // Fall back to the first league this user belongs to.
+  const memberships = await ctx.db
+    .query("leagueMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  if (memberships.length > 0) {
+    const first = await ctx.db.get(memberships[0].tournamentId);
+    if (first) return first;
+  }
+  return null;
 }
 
 export async function loadRules(
@@ -400,6 +425,54 @@ export async function seedSquadForClub(
 }
 
 /* ------------------------------------------------------------------ *
+ * Multi-league views
+ * ------------------------------------------------------------------ */
+
+/** Every league the user belongs to; `activeId` is pinned to the top. */
+export async function buildMyLeagues(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  activeId: Id<"tournaments"> | null,
+): Promise<LeagueSummaryView[]> {
+  const memberships = await ctx.db
+    .query("leagueMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+
+  const views: LeagueSummaryView[] = [];
+  for (const membership of memberships) {
+    const tournament = await ctx.db.get(membership.tournamentId);
+    if (!tournament) continue;
+    const president = await loadPresident(ctx, tournament._id, userId);
+    const admin = await loadAdmin(ctx, tournament._id, userId);
+    const members = await ctx.db
+      .query("leagueMembers")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    let clubName: string | null = null;
+    if (president) {
+      const club = await ctx.db.get(president.clubId);
+      clubName = club?.name ?? null;
+    }
+    views.push({
+      id: tournament._id,
+      code: tournament.code,
+      name: tournament.name,
+      season: tournament.season,
+      memberCount: members.length,
+      isAdmin: Boolean(admin) || membership.role === "administrador",
+      myClubName: clubName,
+      active: activeId !== null && tournament._id === activeId,
+      createdAt: tournament.createdAt,
+    });
+  }
+
+  return views.sort((a, b) =>
+    a.active === b.active ? b.createdAt - a.createdAt : a.active ? -1 : 1,
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Views for the UI
  * ------------------------------------------------------------------ */
 
@@ -417,13 +490,23 @@ export async function buildClubViews(
     .collect();
   const catalogue = await ctx.db.query("players").collect();
 
+  // Squad membership is the source of truth: with the draft-first model every
+  // club starts EMPTY and only players acquired via draft/market count here.
+  const squadRows = await ctx.db
+    .query("squadPlayers")
+    .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+    .collect();
+  void catalogue;
+
   const rosterByClub = new Map<string, { size: number; ovr: number; value: number }>();
-  for (const player of catalogue) {
-    const entry = rosterByClub.get(player.realClub) ?? { size: 0, ovr: 0, value: 0 };
+  for (const row of squadRows) {
+    const player = await ctx.db.get(row.playerId);
+    if (!player) continue;
+    const entry = rosterByClub.get(row.clubId) ?? { size: 0, ovr: 0, value: 0 };
     entry.size += 1;
     entry.ovr += player.ovr;
     entry.value += player.value;
-    rosterByClub.set(player.realClub, entry);
+    rosterByClub.set(row.clubId, entry);
   }
 
   const presidentByClub = new Map(
@@ -434,7 +517,7 @@ export async function buildClubViews(
   for (const club of clubs) {
     const president = presidentByClub.get(club._id as string);
     const user = president ? await ctx.db.get(president.userId) : null;
-    const roster = rosterByClub.get(club.name) ?? { size: 0, ovr: 0, value: 0 };
+    const roster = rosterByClub.get(club._id as string) ?? { size: 0, ovr: 0, value: 0 };
     views.push({
       id: club._id,
       name: club.name,
@@ -448,6 +531,7 @@ export async function buildClubViews(
       totalValue: roster.value,
       presidentNickname: president?.nickname ?? null,
       presidentName: president ? user?.name ?? president.displayName : null,
+      catalogTeamId: club.catalogTeamId ?? null,
     });
   }
 
