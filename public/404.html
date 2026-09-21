@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>11Eleven · Redirigiendo...</title>
+  <script>
+    // GitHub Pages SPA redirect: preserve path and query string
+    // https://github.com/rafgraph/spa-github-pages
+    (function(l) {
+      if (l.search[1] === '/') {
+        document.title = '11Eleven';
+        // Remove leading slash and decode
+        var path = decodeURIComponent(l.search.slice(1));
+        // Replace with the correct path + original hash + query
+        window.history.replaceState(null, null,
+          l.pathname.slice(0, -1) + path + l.hash
+        );
+      }
+    }(window.location))
+  </script>
+  <meta http-equiv="refresh" content="0;url=/" />
+  <link rel="canonical" href="/" />
+  <style>
+    body {
+      margin: 0;
+      background: #0b1a30;
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .loading {
+      text-align: center;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .loading h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .loading p {
+      opacity: 0.7;
+      font-size: 0.875rem;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <h1>⚽ 11Eleven</h1>
+    <p>Redirigiendo al centro de control...</p>
+  </div>
+</body>
+</html>

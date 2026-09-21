@@ -18,6 +18,17 @@
     rel="stylesheet"
   />
   <title>11Eleven · Fantasy Football Manager</title>
+  <!-- GitHub Pages SPA redirect: preserve path when 404.html redirects -->
+  <script type="module">
+    (function(l) {
+      if (l.search[1] === '/') {
+        var path = decodeURIComponent(l.search.slice(1));
+        window.history.replaceState(null, null,
+          l.pathname.slice(0, -1) + path + l.hash
+        );
+      }
+    }(window.location))
+  </script>
 </head>
 
 
