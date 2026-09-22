@@ -104,7 +104,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
     colorSecondary: entry.colors[1],
     shortName: entry.name.slice(0, 3).toUpperCase(),
     catalogTeamId: entry.id as Id<"teamCatalog">,
-    presidentnickname: entry.takenByMe ? (state.president?.nickname ?? "Tú") : null,
+    presidentNickname: entry.takenByMe ? (state.president?.nickname ?? "Tú") : null,
     rosterSize: 0,
     averageOvr: 0,
     totalValue: 0,
