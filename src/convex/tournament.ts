@@ -586,6 +586,7 @@ export const state = query({
         },
       }),
       activity,
+      teamCatalog,
     };
   },
 });
