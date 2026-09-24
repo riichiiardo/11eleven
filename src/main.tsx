@@ -97,6 +97,10 @@ class RootErrorBoundary extends React.Component<
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
+// GitHub Pages serves the build under /eleven11/ (vite --base), dev serves it
+// at /. BASE_URL covers both without branching on environment.
+const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
+
 
 
 function RouteSyncer() {
@@ -130,7 +134,7 @@ createRoot(document.getElementById("root")!).render(
         <VlyToolbar />
       </ToolbarErrorBoundary>
       <ConvexAuthProvider client={convex}>
-        <BrowserRouter>
+        <BrowserRouter basename={routerBasename}>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
             <Routes>

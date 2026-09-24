@@ -18,13 +18,16 @@
     rel="stylesheet"
   />
   <title>11Eleven · Fantasy Football Manager</title>
-  <!-- GitHub Pages SPA redirect: preserve path when 404.html redirects -->
+  <!-- GitHub Pages SPA redirect: decode the path parked by 404.html.
+       Query separators are carried as ~and~ and restored below. -->
   <script type="module">
     (function(l) {
       if (l.search[1] === '/') {
-        var path = decodeURIComponent(l.search.slice(1));
+        var decoded = l.search.slice(1).split('&').map(function(s) {
+          return s.replace(/~and~/g, '&');
+        }).join('?');
         window.history.replaceState(null, null,
-          l.pathname.slice(0, -1) + path + l.hash
+          l.pathname.slice(0, -1) + decoded + l.hash
         );
       }
     }(window.location))

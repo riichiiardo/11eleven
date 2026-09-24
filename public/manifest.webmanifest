@@ -1,16 +1,16 @@
 {
-  "name": "freebuff.com application",
-  "short_name": "freebuff.com",
-  "description": "freebuff.com application",
-  "start_url": "/",
+  "name": "11Eleven · Fantasy Football Manager",
+  "short_name": "11Eleven",
+  "description": "Gestión de clubes, plantillas y presidencia para ligas de fútbol fantasy.",
+  "start_url": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#0b1a30",
+  "theme_color": "#0b1a30",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "logo.svg",
       "sizes": "any",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]
