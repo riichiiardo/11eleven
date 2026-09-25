@@ -33,7 +33,11 @@ jobs:
         run: bunx tsc -b
 
       - name: Build
-        run: bunx vite build --base=/eleven11/
+        # GitHub Pages serves a project site under /<repo-name>/, so the base
+        # is derived from the repository name at runtime. Hardcoding it broke
+        # the deploy when the repo was renamed (assets resolved to a 404 path
+        # and the page rendered blank).
+        run: bunx vite build --base=/${{ github.event.repository.name }}/
         env:
           # Public Convex endpoint (it ships in the client bundle anyway).
           # Override by setting the VITE_CONVEX_URL secret in the repo.

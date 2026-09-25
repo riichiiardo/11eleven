@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>11Eleven · Redirigiendo...</title>
   <script>
-    // GitHub Pages SPA redirect for the project site /eleven11/
+    // GitHub Pages SPA redirect (project site, any repo name):
     // https://github.com/rafgraph/spa-github-pages — pathSegmentsToKeep = 1
+    // The first path segment (the repo name) is derived from the current URL,
+    // so nothing here hardcodes a base path.
     (function (l) {
-      var pathSegmentsToKeep = 1; // "/eleven11"
+      var pathSegmentsToKeep = 1; // "/<repo>"
       if (l.search[1] === '/') {
         // Already in encoded form: decode and restore the real route.
         document.title = '11Eleven';
@@ -19,7 +21,7 @@
           l.pathname.slice(0, -1) + decoded + l.hash
         );
       } else {
-        // Real deep link (e.g. /eleven11/auth?returnTo=...): park the path in
+        // Real deep link (e.g. /<repo>/auth?returnTo=...): park the path in
         // the query string so GitHub serves index.html instead of this page.
         l.replace(
           l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
@@ -31,8 +33,6 @@
       }
     }(window.location));
   </script>
-  <meta http-equiv="refresh" content="0;url=/eleven11/" />
-  <link rel="canonical" href="/eleven11/" />
   <style>
     body {
       margin: 0;
@@ -66,6 +66,9 @@
   <div class="loading">
     <h1>⚽ 11Eleven</h1>
     <p>Redirigiendo al centro de control...</p>
+    <noscript>
+      <p>Activa JavaScript para continuar a 11Eleven.</p>
+    </noscript>
   </div>
 </body>
 </html>
