@@ -42,6 +42,7 @@ Nada más: el resto del deploy es automático en cada push a `main`.
 | Variable | Descripción | Dónde obtenerla |
 |----------|-------------|-----------------|
 | `VITE_CONVEX_URL` | URL del backend Convex | Dashboard de Convex → Settings |
+| `SOFIFA_PROXY_URL` | *(Opcional, va en **Convex** → Settings → Environment Variables)* Proxy HTTP(S) para la API de SoFIFA: Cloudflare le devuelve 403 a las IPs de datacenter. Formato `http://usuario:clave@host:puerto`. Sin esta variable, sincroniza desde **EA Ratings**, que no necesita proxy. | Proveedor de proxy residencial o de forwarding |
 
 ## Estructura del Proyecto
 
@@ -81,6 +82,17 @@ Nada más: el resto del deploy es automático en cada push a `main`.
 - Casi siempre es un base path mal inyectado: verificar el paso **Build** del
   workflow (`--base=/<repo>/` se genera de `github.event.repository.name`)
 - Comprobar en DevTools → Network que los `/assets/*.js` respondan 200
+
+### Sincronización del catálogo: «SoFIFA devolvió un bloqueo de Cloudflare (403)»
+- **Causa**: SoFIFA protege su API con Cloudflare y bloquea las IPs de datacenter
+  (la de Convex incluida); no es un bug de la app.
+- **Solución recomendada**: Administración → Catálogo → fuente
+  **EA SPORTS FC 27 · ratings oficiales**. Descarga los 19.789 jugadores en
+  lotes de 100 por página sin proxy.
+- **Alternativa con SoFIFA**: definir `SOFIFA_PROXY_URL` en Convex → Settings →
+  Environment Variables (proxy HTTP(S), no SOCKS) y volver a sincronizar.
+- **Respaldo**: si ninguna fuente responde se aplica el snapshot local
+  versionado y el torneo sigue siendo jugable.
 
 ### La app carga pero no conecta con el backend
 - Verificar el secret `VITE_CONVEX_URL` (o el fallback del workflow)

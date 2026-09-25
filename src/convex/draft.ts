@@ -490,10 +490,14 @@ export const pool = query({
     const owned = await ownedPlayerIds(ctx, tournament._id);
     const catalogue = await ctx.db.query("players").collect();
 
-    const rows: DraftPoolPlayerView[] = [];
-    for (const player of catalogue) {
-      if (owned.has(player._id as string)) continue;
-      if (args.group && args.group !== "todos" && player.group !== args.group) continue;
+    // Cheap pre-filter and sort first: with the full FC 27 catalogue (~19.7k
+    // players) the rules engine must only run on the rows we are about to
+    // return, otherwise the query blows Convex's 1-second user-code budget.
+    const matches = catalogue.filter((player) => {
+      if (owned.has(player._id as string)) return false;
+      if (args.group && args.group !== "todos" && player.group !== args.group) {
+        return false;
+      }
       const term = args.search?.trim().toLowerCase();
       if (term) {
         const haystack = [
@@ -505,25 +509,36 @@ export const pool = query({
         ]
           .join(" ")
           .toLowerCase();
-        if (!haystack.includes(term)) continue;
+        if (!haystack.includes(term)) return false;
       }
+      return true;
+    });
 
-      const candidate = {
-        name: player.name,
-        position: player.position,
-        ovr: player.ovr,
-        age: player.age,
-        value: player.value,
-        realClub: player.realClub,
-      };
+    const sort = args.sort ?? "ovr";
+    matches.sort((a, b) => {
+      if (sort === "value") return b.value - a.value;
+      if (sort === "age") return a.age - b.age;
+      if (sort === "name") return a.name.localeCompare(b.name);
+      return b.ovr - a.ovr;
+    });
+
+    const available = draft?.status === "en_curso";
+    const rows: DraftPoolPlayerView[] = [];
+    for (const player of matches.slice(0, args.limit ?? 60)) {
       const evaluation = evaluateSigning(
         rules,
         squadPlayers,
-        candidate,
+        {
+          name: player.name,
+          position: player.position,
+          ovr: player.ovr,
+          age: player.age,
+          value: player.value,
+          realClub: player.realClub,
+        },
         president.budget,
         club.name,
       );
-      const available = draft?.status === "en_curso";
       rows.push({
         playerId: player._id,
         name: player.name,
@@ -547,14 +562,7 @@ export const pool = query({
       });
     }
 
-    const sort = args.sort ?? "ovr";
-    rows.sort((a, b) => {
-      if (sort === "value") return b.value - a.value;
-      if (sort === "age") return a.age - b.age;
-      if (sort === "name") return a.name.localeCompare(b.name);
-      return b.ovr - a.ovr;
-    });
-    return rows.slice(0, args.limit ?? 60);
+    return rows;
   },
 });
 

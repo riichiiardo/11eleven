@@ -20,7 +20,6 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
 import { getTournament, loadAdmin, seedFreeAgents, logAudit } from "./context";
 import { FC_VERSION, type Position } from "./rulesEngine";
 
@@ -50,8 +49,10 @@ export const applyCatalog = internalMutation({
     players: v.array(catalogPlayerValidator),
     fcVersion: v.string(),
     source: v.string(),
+    /** The sync action applies the catalogue in chunks and logs once itself. */
+    log: v.optional(v.boolean()),
   },
-  handler: async (ctx, { players, fcVersion, source }) => {
+  handler: async (ctx, { players, fcVersion, source, log }) => {
     const tournament = await getTournament(ctx);
     if (!tournament) {
       throw new ConvexError("El torneo no está disponible.");
@@ -118,16 +119,51 @@ export const applyCatalog = internalMutation({
       fcVersion,
       at: Date.now(),
     };
-    await logAudit(ctx, {
-      tournamentId: tournament._id,
-      actorName: "Sistema",
-      action: SYNCED_ACTION,
-      entity: "catalog",
-      entityId: JSON.stringify(summary),
-      detail: `${source} (${fcVersion}): ${inserted} nuevos, ${updated} actualizados, ${unchanged} sin cambios · plantillas intactas`,
-    });
+    if (log !== false) {
+      await logAudit(ctx, {
+        tournamentId: tournament._id,
+        actorName: "Sistema",
+        action: SYNCED_ACTION,
+        entity: "catalog",
+        entityId: JSON.stringify(summary),
+        detail: `${source} (${fcVersion}): ${inserted} nuevos, ${updated} actualizados, ${unchanged} sin cambios · plantillas intactas`,
+      });
+    }
 
     return summary;
+  },
+});
+
+/**
+ * One audit entry per synchronisation call. The action imports the catalogue
+ * in bounded chunks (each chunk stays silent) and reports the totals here, so
+ * Administration sees the whole batch instead of a fragment per chunk.
+ */
+export const logSyncSuccess = internalMutation({
+  args: {
+    actorName: v.string(),
+    source: v.string(),
+    summary: v.object({
+      inserted: v.number(),
+      updated: v.number(),
+      unchanged: v.number(),
+      fcVersion: v.string(),
+    }),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { actorName, source, summary, note }) => {
+    const tournament = await getTournament(ctx);
+    if (!tournament) return null;
+    const payload = { ...summary, source, at: Date.now() };
+    await logAudit(ctx, {
+      tournamentId: tournament._id,
+      actorName,
+      action: SYNCED_ACTION,
+      entity: "catalog",
+      entityId: JSON.stringify(payload),
+      detail: `${source} (${summary.fcVersion}): ${summary.inserted} nuevos, ${summary.updated} actualizados, ${summary.unchanged} sin cambios${note ? ` · ${note}` : " · plantillas intactas"}`,
+    });
+    return null;
   },
 });
 
@@ -278,6 +314,7 @@ export const catalogState = query({
       audit.find((entry) => entry.action === SYNCED_ACTION) ?? null;
     const lastErrorEntry =
       audit.find((entry) => entry.action === SYNC_FAILED_ACTION) ?? null;
+    const lastSync = parseSummary(lastSyncEntry?.entityId);
 
     return {
       total: rows.length,
@@ -285,8 +322,8 @@ export const catalogState = query({
       // el club de origen SoFIFA del jugador no determina su disponibilidad).
       freeAgents: Math.max(0, rows.length - ownedIds.size),
       owned: ownedIds.size,
-      version: FC_VERSION,
-      lastSync: parseSummary(lastSyncEntry?.entityId),
+      version: lastSync?.fcVersion ?? FC_VERSION,
+      lastSync,
       lastError:
         lastErrorEntry === null
           ? null

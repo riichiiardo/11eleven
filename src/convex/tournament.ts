@@ -32,11 +32,9 @@ import {
   loadTournamentOffers,
   logAudit,
   seedFreeAgents,
-  seedTournament,
   toTournamentView,
 } from "./context";import { DEFAULT_FORMATION,
   DEFAULT_RULES,
-  FREE_AGENT_CLUB,
   LEGACY_SEEDED_RULES,
   computeSquadStats,
   evaluateLineup,
@@ -483,10 +481,7 @@ export const state = query({
     const openStatuses = (status: OfferStatus) => OPEN_STATUSES.includes(status);
     const reservedStatuses = (status: OfferStatus) =>
       status === "reservada" || status === "aceptada";
-    const freeAgentRows = await ctx.db
-      .query("players")
-      .withIndex("by_real_club", (q) => q.eq("realClub", FREE_AGENT_CLUB))
-      .collect();
+    const catalogue = await ctx.db.query("players").collect();
     const ownedPlayerIds = new Set(
       (
         await ctx.db
@@ -497,7 +492,7 @@ export const state = query({
     );
     const market: MarketSummaryView = {
       open: tournament.marketOpen,
-      freeAgents: freeAgentRows.filter((player) => !ownedPlayerIds.has(player._id as string))
+      freeAgents: catalogue.filter((player) => !ownedPlayerIds.has(player._id as string))
         .length,
       received: mine.filter(
         (offer) => offer.side === "recibida" && openStatuses(offer.status),

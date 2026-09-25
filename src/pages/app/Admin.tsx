@@ -17,6 +17,7 @@ import { SectionCard } from "@/components/eleven/SectionCard";
 import { Countdown, StatTile } from "@/components/eleven/SectionCard";
 import { Crest } from "@/components/eleven/Crest";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -218,28 +219,92 @@ export default function Admin() {
   );
 }
 
+type CatalogSource = "ea" | "sofifa" | "snapshot";
+
+const SOURCE_META: Record<CatalogSource, { label: string; hint: string }> = {
+  ea: {
+    label: "EA SPORTS FC 27 · ratings oficiales (19.789)",
+    hint: "Fuente recomendada: los ratings oficiales de EA, 100 jugadores por página y sin proxy. Se importa en lotes para no agotar el tiempo de una sola operación.",
+  },
+  sofifa: {
+    label: "SoFIFA · API pública (requiere proxy)",
+    hint: "SoFIFA responde 403 (Cloudflare) a las IPs de datacenter. Solo funciona si defines SOFIFA_PROXY_URL (http://usuario:clave@host:puerto) en Convex → Settings → Environment Variables.",
+  },
+  snapshot: {
+    label: "Snapshot local versionado (respaldo)",
+    hint: "Importa los agentes libres incluidos con la app. Es el respaldo automático cuando ninguna fuente externa responde.",
+  },
+};
+
 /**
- * Catálogo de jugadores: estado de la sincronización SoFIFA + botón de
- * sincronización. Administración define la base de datos con la que juega el
- * torneo; las plantillas y la propiedad de jugadores nunca se tocan aquí.
+ * Catálogo de jugadores: fuentes, estado de la sincronización y progreso.
+ * Administración define la base de datos con la que juega el torneo; las
+ * plantillas y la propiedad de jugadores nunca se tocan aquí.
  */
 function CatalogPanel() {
   const catalog = useQuery(api.footballSync.catalogState);
   const syncAction = useAction(api.footballApi.syncCatalog);
+  const [source, setSource] = useState<CatalogSource>("ea");
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{
+    page: number;
+    totalPages: number;
+    fetched: number;
+    inserted: number;
+    updated: number;
+  } | null>(null);
 
   const handleSync = async () => {
     setBusy(true);
+    setProgress(null);
     try {
-      const result = await syncAction({});
-      if (result.fallback) {
-        toast.warning("SoFIFA no accesible", {
-          description: result.note ?? undefined,
+      if (source === "snapshot") {
+        const result = await syncAction({ source });
+        toast.success("Snapshot local aplicado", {
+          description: `${result.inserted} agentes libres incorporados · ${result.unchanged} ya estaban en el catálogo`,
+        });
+        return;
+      }
+
+      // EA pages are 1-based; SoFIFA cursors count full pages from 0.
+      let page = source === "sofifa" ? 0 : 1;
+      let totalPages = 0;
+      let fetched = 0;
+      let inserted = 0;
+      let updated = 0;
+      let unchanged = 0;
+      let done = false;
+      let guard = 0;
+      let note: string | null = null;
+
+      while (!done && guard < 80) {
+        guard += 1;
+        const result = await syncAction({ source, page });
+        page = result.page;
+        totalPages = result.totalPages || totalPages;
+        fetched += result.fetched;
+        inserted += result.inserted;
+        updated += result.updated;
+        unchanged += result.unchanged;
+        done = result.done;
+        if (result.note) note = result.note;
+        setProgress({ page, totalPages, fetched, inserted, updated });
+        if (result.fallback) {
+          toast.warning(source === "sofifa" ? "SoFIFA no accesible" : "Fuente no accesible", {
+            description: result.note ?? undefined,
+          });
+          return;
+        }
+        if (result.fetched === 0) break;
+      }
+
+      const summary = `${fetched} jugadores descargados · ${inserted} nuevos · ${updated} actualizados · ${unchanged} sin cambios`;
+      if (note) {
+        toast.warning("Sincronización parcial", {
+          description: `${summary} · ${note}`,
         });
       } else {
-        toast.success("Catálogo sincronizado desde SoFIFA", {
-          description: `${result.inserted} nuevos · ${result.updated} actualizados · ${result.unchanged} sin cambios`,
-        });
+        toast.success("Catálogo sincronizado", { description: summary });
       }
     } catch (cause) {
       toast.error("No se pudo sincronizar el catálogo", {
@@ -247,22 +312,46 @@ function CatalogPanel() {
       });
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
   return (
     <SectionCard
-      title="Catálogo de jugadores (SoFIFA)"
+      title="Catálogo de jugadores"
       icon={Database}
       accent="gold"
       bodyClassName="flex flex-col gap-5"
     >
       <p className="text-sm text-muted-foreground">
-        El catálogo es la base de jugadores de la que beben el draft y el mercado. Al sincronizar,
-        se importan los ratings actualizados desde la API pública de SoFIFA (FC 27). Si SoFIFA no
-        responde, se aplica el snapshot local versionado como respaldo: el torneo siempre queda
-        jugable. Las plantillas y la propiedad de jugadores nunca se modifican.
+        El catálogo es la base de jugadores de la que beben el draft y el mercado. Sincroniza los
+        ratings oficiales de EA SPORTS FC 27 (más de 19.000 jugadores) o, si prefieres, la API de
+        SoFIFA con proxy. La importación avanza por lotes y nunca toca las plantillas ni la
+        propiedad de los jugadores: solo se actualiza la tabla de jugadores.
       </p>
+
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="catalog-source">Fuente de datos</Label>
+          <Select
+            value={source}
+            onValueChange={(value) => setSource(value as CatalogSource)}
+            disabled={busy}
+          >
+            <SelectTrigger id="catalog-source" className="min-h-11 w-full">
+              <SelectValue placeholder="Selecciona una fuente" />
+            </SelectTrigger>
+            <SelectContent>
+              { (Object.keys(SOURCE_META) as CatalogSource[]).map((key) => (
+                <SelectItem key={key} value={key}>
+                  {SOURCE_META[key].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">{SOURCE_META[source].hint}</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
@@ -307,7 +396,7 @@ function CatalogPanel() {
         <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
           <div className="flex flex-col gap-0.5">
-            <span className="font-medium">Último intento con SoFIFA falló</span>
+            <span className="font-medium">Último intento de sincronización falló</span>
             <span className="text-muted-foreground">
               {catalog.lastError.message} · {relativeTime(catalog.lastError.at)}
             </span>
@@ -315,18 +404,48 @@ function CatalogPanel() {
         </div>
       )}
 
-      <div>
-        <Button onClick={handleSync} disabled={busy} className="min-h-11">
-          {busy ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw className="size-4" aria-hidden="true" />
-          )}
-          {busy ? "Sincronizando con SoFIFA…" : "Sincronizar desde SoFIFA"}
-        </Button>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Puede tardar unos segundos. El resultado queda registrado en la auditoría con tu nombre.
-        </p>
+      <div className="flex flex-col gap-3">
+        {busy && progress ? (
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="font-semibold">
+                Descargando página {progress.page}
+                {progress.totalPages > 0 ? ` de ${progress.totalPages}` : "…"}
+              </span>
+              <span className="text-muted-foreground">
+                {progress.fetched} descargados · {progress.inserted} nuevos · {progress.updated}{" "}
+                actualizados
+              </span>
+            </div>
+            <Progress
+              className="mt-2 h-2"
+              value={
+                progress.totalPages > 0
+                  ? Math.min(100, Math.round(((progress.page - 1) / progress.totalPages) * 100))
+                  : 10
+              }
+            />
+          </div>
+        ) : null}
+
+        <div>
+          <Button onClick={handleSync} disabled={busy} className="min-h-11">
+            {busy ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw className="size-4" aria-hidden="true" />
+            )}
+            {busy
+              ? "Sincronizando…"
+              : source === "snapshot"
+                ? "Aplicar snapshot local"
+                : "Sincronizar catálogo completo"}
+          </Button>
+          <p className="mt-2 text-xs text-muted-foreground">
+            La descarga completa puede tardar unos minutos: se ejecuta por lotes y cada lote queda
+            registrado en la auditoría con tu nombre.
+          </p>
+        </div>
       </div>
     </SectionCard>
   );

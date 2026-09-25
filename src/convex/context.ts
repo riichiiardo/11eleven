@@ -206,16 +206,18 @@ export async function seedFreeAgents(
   ctx: MutationCtx,
   tournamentId: Id<"tournaments">,
 ): Promise<number> {
-  const existing = await ctx.db
-    .query("players")
-    .withIndex("by_real_club", (q) => q.eq("realClub", FREE_AGENT_CLUB_NAME))
-    .collect();
-
-  const known = new Set(existing.map((player) => player.name));
+  // Membership is checked by NAME against the catalogue: a live sync can
+  // re-attach a former free agent to a real club, and re-inserting it on every
+  // bootstrap would duplicate the row. One index lookup per candidate is also
+  // far cheaper than scanning a 19k-player catalogue.
   let inserted = 0;
 
   for (const [name, position, ovr, age, valueM, nationality, flag] of FREE_AGENTS) {
-    if (known.has(name)) continue;
+    const existing = await ctx.db
+      .query("players")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .first();
+    if (existing) continue;
     await ctx.db.insert("players", {
       name,
       position,
@@ -488,7 +490,6 @@ export async function buildClubViews(
     .query("presidents")
     .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
     .collect();
-  const catalogue = await ctx.db.query("players").collect();
 
   // Squad membership is the source of truth: with the draft-first model every
   // club starts EMPTY and only players acquired via draft/market count here.
@@ -496,7 +497,6 @@ export async function buildClubViews(
     .query("squadPlayers")
     .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
     .collect();
-  void catalogue;
 
   const rosterByClub = new Map<string, { size: number; ovr: number; value: number }>();
   for (const row of squadRows) {

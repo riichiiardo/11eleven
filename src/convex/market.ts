@@ -20,7 +20,6 @@ import {
   logAudit,
 } from "./context";
 import {
-  FREE_AGENT_CLUB,
   formatMoney,
   type PlayerAvailability,
   type RuleCheck,
@@ -231,7 +230,7 @@ export const browse = query({
     const locked = await lockedCash(ctx, tournament._id, president._id);
     const spendable = Math.max(0, budget - locked);
 
-    const rows: MarketPlayerView[] = [];
+    const rows: Array<Omit<MarketPlayerView, "ownerNickname">> = [];
     for (const player of catalogue) {
       const ownershipRow = ownership.get(player._id as string) ?? null;
       const ownerClub = ownershipRow ? clubById.get(ownershipRow.clubId as string) ?? null : null;
@@ -239,7 +238,10 @@ export const browse = query({
         ? presidentByClub.get(ownershipRow.clubId as string)?._id ?? null
         : null;
       const ownerIsMe = Boolean(ownershipRow && ownershipRow.clubId === president.clubId);
-      const freeAgent = !ownershipRow && player.realClub === FREE_AGENT_CLUB;
+      // With the draft-first model squads start empty, so ANY player without a
+      // president is a free agent you can sign. `realClub` keeps driving the
+      // "jugadores por club real" rule (R-07) instead of availability.
+      const freeAgent = !ownershipRow;
 
       const kind: MarketPlayerView["kind"] = freeAgent ? "libre" : "club";
       if (args.scope === "libre" && !freeAgent) continue;
@@ -275,9 +277,6 @@ export const browse = query({
       if (ownerIsMe) {
         blockedReason =
           "Es tu propio jugador: ya forma parte de tu plantilla y puedes gestionarlo desde Mi Club.";
-      } else if (!freeAgent && !ownershipRow) {
-        blockedReason =
-          "El club de este jugador aún no tiene Presidente en el torneo: su plantilla entra al mercado cuando se asigne la presidencia.";
       } else if (availability === "intransferible") {
         blockedReason = `${ownerClub?.name ?? "El club"} marcó a ${player.name} como intransferible: el Presidente bloqueó cualquier oferta por él.`;
       } else if (committedOfferId) {
@@ -306,7 +305,6 @@ export const browse = query({
         ownerColors: ownerClub
           ? [ownerClub.colorPrimary, ownerClub.colorSecondary]
           : null,
-        ownerNickname: ownerPresidentId ? await nicknameFor(ownerPresidentId) : null,
         ownerPresidentId,
         ownerIsMe,
         availability,
@@ -326,11 +324,20 @@ export const browse = query({
       return b.ovr - a.ovr;
     });
 
-    if (args.onlyAffordable) {
-      return rows.filter((row) => row.withinBudget && row.offerable);
-    }
-
-    return rows.slice(0, args.limit ?? 60);
+    const matches = args.onlyAffordable
+      ? rows.filter((row) => row.withinBudget && row.offerable)
+      : rows;
+    // Presenter fields (nicknames) are hydrated only for the page we return:
+    // with a 19k-player catalogue this keeps the query well inside Convex's
+    // 1-second user-code budget and its per-transaction read limits.
+    return await Promise.all(
+      matches.slice(0, args.limit ?? 60).map(async (row) => ({
+        ...row,
+        ownerNickname: row.ownerPresidentId
+          ? await nicknameFor(row.ownerPresidentId)
+          : null,
+      })),
+    );
   },
 });
 
@@ -374,15 +381,12 @@ export const overview = query({
       ),
     );
 
-    const freeAgents = await ctx.db
-      .query("players")
-      .withIndex("by_real_club", (q) => q.eq("realClub", FREE_AGENT_CLUB))
-      .collect();
+    const catalogue = await ctx.db.query("players").collect();
     const ownership = await ownershipRows(ctx, tournament._id);
 
     const summary: MarketSummaryView = {
       open: tournament.marketOpen,
-      freeAgents: freeAgents.filter((player) => !ownership.has(player._id as string)).length,
+      freeAgents: catalogue.filter((player) => !ownership.has(player._id as string)).length,
       received: received.length,
       sent: sent.length,
       reserved: reserved.length,
