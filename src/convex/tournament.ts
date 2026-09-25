@@ -235,6 +235,23 @@ export async function seedTeamCatalogFallback(
 }
 
 /**
+ * Self-heal for deployments whose global catalogue is empty (e.g. data left
+ * over from earlier test runs, or a database wiped after the last seed).
+ * Idempotent: it only writes when the table has no teams at all, and
+ * `seedTeamCatalogFallback` never duplicates existing rows.
+ */
+export const ensureTeamCatalog = mutation({
+  args: {},
+  handler: async (ctx) => {
+    requireAuth(await getAuthUserId(ctx));
+    const existing = await ctx.db.query("teamCatalog").first();
+    if (existing) return { inserted: 0 };
+    const inserted = await seedTeamCatalogFallback(ctx);
+    return { inserted };
+  },
+});
+
+/**
  * Early deployments shipped a 20-player squad limit, before the market existed.
  * If the configuration is still the untouched seed and no operation has been
  * negotiated yet, it moves to the current rules so the market is usable.

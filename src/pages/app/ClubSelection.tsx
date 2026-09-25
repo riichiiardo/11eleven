@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { AppStateView, ClubView } from "@/convex/appTypes";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -34,7 +34,34 @@ import { cn } from "@/lib/utils";
 export default function ClubSelection({ state }: { state: AppStateView }) {
   const navigate = useNavigate();
   const chooseTeam = useMutation(api.tournament.chooseCatalogTeam);
+  const ensureCatalog = useMutation(api.tournament.ensureTeamCatalog);
   const [query, setQuery] = useState("");
+  const [healingCatalog, setHealingCatalog] = useState(false);
+  const catalogRepair = useRef(false);
+
+  // Self-heal: if the global catalogue is empty (fresh deployment or stale
+  // test data), seed it once so the picker always has teams to show. The
+  // mutation is idempotent and the state query refreshes reactively.
+  useEffect(() => {
+    if (catalogRepair.current || state.teamCatalog.length > 0) return;
+    catalogRepair.current = true;
+    setHealingCatalog(true);
+    ensureCatalog()
+      .then((result) => {
+        if (result.inserted > 0) {
+          toast.success("Catálogo de equipos cargado", {
+            description: `${result.inserted} equipos disponibles para elegir.`,
+          });
+        }
+      })
+      .catch((cause: unknown) => {
+        catalogRepair.current = false;
+        toast.error("No se pudo cargar el catálogo de equipos", {
+          description: errorMessage(cause),
+        });
+      })
+      .finally(() => setHealingCatalog(false));
+  }, [state.teamCatalog.length, ensureCatalog]);
   const [country, setCountry] = useState<string>("Todos");
   const [league, setLeague] = useState<string>("Todas");
   const [candidate, setCandidate] = useState<ClubView | null>(null);
@@ -304,7 +331,9 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
 
           {visible.length === 0 ? (
             <p className="rounded-xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/70">
-              No hay equipos que coincidan con los filtros. Cambia de país, liga o término de búsqueda.
+              {healingCatalog
+                ? "Cargando el catálogo global de equipos…"
+                : "No hay equipos que coincidan con los filtros. Cambia de país, liga o término de búsqueda."}
             </p>
           ) : null}
         </section>

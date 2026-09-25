@@ -25,6 +25,7 @@ import {
 } from "./context";
 import { DEFAULT_RULES } from "./rulesEngine";
 import { PERMISSIONS } from "./schema";
+import { seedTeamCatalogFallback } from "./tournament";
 
 /** Maximum squads allowed per league — protects the draft/competition engines. */
 export const MAX_TEAMS_PER_LEAGUE = 24;
@@ -232,6 +233,12 @@ export const createLeague = mutation({
       role: "administrador",
       joinedAt: now,
     });
+
+    // A new league must always have teams to pick: seed the global catalogue
+    // when this deployment has none yet (idempotent, never duplicates).
+    if (!(await ctx.db.query("teamCatalog").first())) {
+      await seedTeamCatalogFallback(ctx);
+    }
 
     await ctx.db.patch(userId, { activeTournamentId: tournamentId });
 

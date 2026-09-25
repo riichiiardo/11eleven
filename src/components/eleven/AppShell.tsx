@@ -7,6 +7,7 @@ import { TOURNAMENT_STATUS_META } from "@/convex/rulesEngine";
 import { useAuth } from "@/hooks/use-auth";
 import { BrandLockup, ElevenMark } from "./Brand";
 import { Crest } from "./Crest";
+import { LeagueManagerDialog } from "./LeagueManager";
 import { Countdown, StatusPill, ToneDot } from "./SectionCard";
 import {
   Sheet,
@@ -36,6 +37,7 @@ import {
   Shirt,
   ShoppingBag,
   Swords,
+  Trophy,
   User,
   Users,
   UsersRound,
@@ -118,6 +120,7 @@ function UserMenu({
 }) {
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const [leaguesOpen, setLeaguesOpen] = useState(false);
   const initials = state.user.name
     .split(/\s+/)
     .map((part) => part[0])
@@ -170,6 +173,10 @@ function UserMenu({
           <BookOpen className="mr-2 size-4" aria-hidden="true" />
           Reglas del torneo
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setLeaguesOpen(true)}>
+          <Trophy className="mr-2 size-4" aria-hidden="true" />
+          Mis ligas
+        </DropdownMenuItem>
         {state.isAdmin ? (
           <DropdownMenuItem onClick={() => navigate("/dashboard/admin")}>
             <Gauge className="mr-2 size-4" aria-hidden="true" />
@@ -182,6 +189,11 @@ function UserMenu({
           Cerrar sesión
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <LeagueManagerDialog
+        open={leaguesOpen}
+        onOpenChange={setLeaguesOpen}
+        leagues={state.leagues}
+      />
     </DropdownMenu>
   );
 }
