@@ -11,6 +11,7 @@ import type {
 } from "./appTypes";
 import {
   buildOffers,
+  getCatalogTotal,
   getTournament,
   loadAdmin,
   loadPresident,
@@ -381,12 +382,12 @@ export const overview = query({
       ),
     );
 
-    const catalogue = await ctx.db.query("players").collect();
+    const catalogueTotal = await getCatalogTotal(ctx);
     const ownership = await ownershipRows(ctx, tournament._id);
 
     const summary: MarketSummaryView = {
       open: tournament.marketOpen,
-      freeAgents: catalogue.filter((player) => !ownership.has(player._id as string)).length,
+      freeAgents: Math.max(0, catalogueTotal - ownership.size),
       received: received.length,
       sent: sent.length,
       reserved: reserved.length,

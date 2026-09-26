@@ -20,7 +20,15 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { getTournament, loadAdmin, seedFreeAgents, logAudit } from "./context";
+import {
+  getCatalogTotal,
+  getTournament,
+  loadAdmin,
+  rebuildCatalogStats,
+  seedFreeAgents,
+  logAudit,
+  updateCatalogStats,
+} from "./context";
 import { FC_VERSION, type Position } from "./rulesEngine";
 
 export const SYNCED_ACTION = "Catálogo sincronizado";
@@ -111,6 +119,9 @@ export const applyCatalog = internalMutation({
       inserted += 1;
     }
 
+    // Advance the catalogue counter so "free agents" counts never need a scan.
+    await updateCatalogStats(ctx, inserted);
+
     const summary = {
       inserted,
       updated,
@@ -154,6 +165,9 @@ export const logSyncSuccess = internalMutation({
   handler: async (ctx, { actorName, source, summary, note }) => {
     const tournament = await getTournament(ctx);
     if (!tournament) return null;
+    // End of the batch: recount once so the counter stays authoritative even
+    // if rows were created outside the sync path.
+    await rebuildCatalogStats(ctx);
     const payload = { ...summary, source, at: Date.now() };
     await logAudit(ctx, {
       tournamentId: tournament._id,
@@ -187,7 +201,7 @@ export const applySnapshot = internalMutation({
       throw new ConvexError("El torneo no está disponible.");
     }
     const inserted = await seedFreeAgents(ctx, tournament._id);
-    const total = (await ctx.db.query("players").collect()).length;
+    const total = await getCatalogTotal(ctx);
     const summary = {
       inserted,
       updated: 0,
@@ -247,6 +261,15 @@ export const assertCatalogAdmin = internalQuery({
   },
 });
 
+/**
+ * Rebuilds the `catalogStats` counter (one bounded scan). Internal so it can be
+ * run from the CLI to bootstrap a deployment that predates the counter.
+ */
+export const recountCatalog = internalMutation({
+  args: {},
+  handler: async (ctx) => ({ total: await rebuildCatalogStats(ctx) }),
+});
+
 /** Records why a SoFIFA attempt failed, for the Administration panel. */
 export const logSyncFailure = internalMutation({
   args: { actorName: v.string(), reason: v.string() },
@@ -298,7 +321,7 @@ export const catalogState = query({
     const tournament = await getTournament(ctx);
     if (!tournament) return null;
 
-    const rows = await ctx.db.query("players").collect();
+    const total = await getCatalogTotal(ctx);
     const owned = await ctx.db
       .query("squadPlayers")
       .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
@@ -317,10 +340,10 @@ export const catalogState = query({
     const lastSync = parseSummary(lastSyncEntry?.entityId);
 
     return {
-      total: rows.length,
+      total,
       // "Libre" = aún sin dueño en el torneo (criterio real de draft y mercado;
       // el club de origen SoFIFA del jugador no determina su disponibilidad).
-      freeAgents: Math.max(0, rows.length - ownedIds.size),
+      freeAgents: Math.max(0, total - ownedIds.size),
       owned: ownedIds.size,
       version: lastSync?.fcVersion ?? FC_VERSION,
       lastSync,

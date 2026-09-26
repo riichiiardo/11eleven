@@ -31,6 +31,7 @@ import type {
   DraftTurnView,
 } from "./appTypes";
 import {
+  getCatalogTotal,
   getTournament,
   loadAdmin,
   loadPresident,
@@ -213,7 +214,7 @@ export async function loadDraftSummary(
     .query("squadPlayers")
     .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
     .collect();
-  const pool = await ctx.db.query("players").collect();
+  const poolTotal = await getCatalogTotal(ctx);
   const owned = new Set(squadRows.map((row) => row.playerId as string));
 
   const base: DraftSummaryView = {
@@ -234,7 +235,7 @@ export async function loadDraftSummary(
     isMyTurn: false,
     myPosition: 0,
     orderSize: draft?.order.length ?? 0,
-    poolSize: pool.filter((player) => !owned.has(player._id as string)).length,
+    poolSize: Math.max(0, poolTotal - owned.size),
     myPicks: 0,
     totalPicks: 0,
     myBudget: president?.budget ?? 0,
@@ -341,7 +342,7 @@ export async function loadDraftAdmin(
     .query("squadPlayers")
     .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
     .collect();
-  const catalogue = await ctx.db.query("players").collect();
+  const catalogueTotal = await getCatalogTotal(ctx);
   const owned = new Set(squadRows.map((row) => row.playerId as string));
   const offers = await ctx.db
     .query("offers")
@@ -367,7 +368,7 @@ export async function loadDraftAdmin(
     orderSize: draft?.order.length ?? 0,
     totalSteps: draft ? sliceTotalSteps(draft.order.length, draft.totalRounds) : 0,
     totalPicks: 0,
-    poolSize: catalogue.filter((player) => !owned.has(player._id as string)).length,
+    poolSize: Math.max(0, catalogueTotal - owned.size),
     reservedPending: offers.filter(
       (offer) => offer.status === "reservada" || offer.status === "aceptada",
     ).length,

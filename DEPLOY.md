@@ -94,6 +94,16 @@ Nada más: el resto del deploy es automático en cada push a `main`.
 - **Respaldo**: si ninguna fuente responde se aplica el snapshot local
   versionado y el torneo sigue siendo jugable.
 
+### «Too many documents read in a single function execution (limit: 32000)»
+- **Causa**: con el catálogo completo (~17.900 jugadores) una consulta que
+  escanea la tabla `players` dos veces supera el tope de lecturas de Convex.
+- **Solución aplicada**: los recuentos (agentes libres, pool del draft, total
+  del catálogo) salen del contador singleton `catalogStats`, que mantienen las
+  mutaciones de sincronización y siembra; `market.browse` y `draft.pool` son los
+  únicos lugares que hacen un escaneo único de `players`.
+- **Recuento manual**: `bun convex run footballSync:recountCatalog '{}'`
+  (reconstruye el contador con una sola lectura acotada).
+
 ### La app carga pero no conecta con el backend
 - Verificar el secret `VITE_CONVEX_URL` (o el fallback del workflow)
 - Verificar que las funciones de Convex estén deployadas: `bun convex dev --once`

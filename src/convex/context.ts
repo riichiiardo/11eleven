@@ -183,7 +183,7 @@ export async function seedTournament(
   }
 
   const freeAgentVersion = await seedFreeAgents(ctx, tournamentId);
-  const importedCount = (await ctx.db.query("players").collect()).length;
+  const importedCount = await rebuildCatalogStats(ctx);
 
   await ctx.db.insert("auditLog", {
     tournamentId,
@@ -196,6 +196,53 @@ export async function seedTournament(
   });
 
   return tournamentId;
+}
+
+/**
+ * Catalogue size WITHOUT scanning the 19k-row `players` table.
+ *
+ * Convex caps a single function execution at 32.000 document reads: `state`
+ * used to scan `players` twice (once directly, once through the draft summary)
+ * and crashed with "Too many documents read". Every count now comes from the
+ * `catalogStats` singleton instead.
+ */
+export async function getCatalogTotal(ctx: QueryCtx): Promise<number> {
+  const stats = await ctx.db.query("catalogStats").first();
+  if (stats) return stats.total;
+  // Deployment created before the counter existed: a single fallback scan is
+  // safe (it is the only catalogue scan in the execution) until the next
+  // mutation materialises the row.
+  return (await ctx.db.query("players").collect()).length;
+}
+
+/** Applies `delta` to the counter, building it from a scan when missing. */
+export async function updateCatalogStats(
+  ctx: MutationCtx,
+  delta: number,
+): Promise<number> {
+  const stats = await ctx.db.query("catalogStats").first();
+  if (!stats) {
+    return await rebuildCatalogStats(ctx);
+  }
+  const total = Math.max(0, stats.total + delta);
+  if (total !== stats.total) {
+    await ctx.db.patch(stats._id, { total, updatedAt: Date.now() });
+  }
+  return total;
+}
+
+/** Authoritative recount (one bounded scan, mutations only). */
+export async function rebuildCatalogStats(ctx: MutationCtx): Promise<number> {
+  const total = (await ctx.db.query("players").collect()).length;
+  const stats = await ctx.db.query("catalogStats").first();
+  if (stats) {
+    if (stats.total !== total) {
+      await ctx.db.patch(stats._id, { total, updatedAt: Date.now() });
+    }
+    return total;
+  }
+  await ctx.db.insert("catalogStats", { total, updatedAt: Date.now() });
+  return total;
 }
 
 /**
@@ -233,6 +280,9 @@ export async function seedFreeAgents(
     });
     inserted += 1;
   }
+
+  // Keep the catalogue counter in sync so no query has to scan `players`.
+  await updateCatalogStats(ctx, inserted);
 
   if (inserted > 0) {
     await ctx.db.insert("auditLog", {

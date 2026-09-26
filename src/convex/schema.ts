@@ -271,6 +271,17 @@ const schema = defineSchema(
       .index("by_real_club", ["realClub"])
       .index("by_position", ["position"]),
 
+    /**
+     * Singleton counter for the global catalogue. Reading `players` twice in a
+     * single function execution blows Convex's 32.000-document read limit, so
+     * every "how many players / free agents" figure comes from here instead of
+     * a table scan. Maintained by the sync and seeding mutations.
+     */
+    catalogStats: defineTable({
+      total: v.number(),
+      updatedAt: v.number(),
+    }),
+
     /* ----------------------------------------------------------------
      * Squad ownership: PLAYER -> SQUAD_OWNERSHIP -> PRESIDENT -> TOURNAMENT
      * ---------------------------------------------------------------- */

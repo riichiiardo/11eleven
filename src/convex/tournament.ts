@@ -25,6 +25,7 @@ import {
   buildPresidents,
   createSquadForClub,
   getTournament,
+  getCatalogTotal,
   loadAdmin,
   loadPresident,
   loadRules,
@@ -481,7 +482,9 @@ export const state = query({
     const openStatuses = (status: OfferStatus) => OPEN_STATUSES.includes(status);
     const reservedStatuses = (status: OfferStatus) =>
       status === "reservada" || status === "aceptada";
-    const catalogue = await ctx.db.query("players").collect();
+    // The catalogue counter replaces a full `players` scan: two scans in this
+    // query (here + draft summary) exceeded Convex's 32.000-read limit.
+    const totalPlayers = await getCatalogTotal(ctx);
     const ownedPlayerIds = new Set(
       (
         await ctx.db
@@ -492,8 +495,7 @@ export const state = query({
     );
     const market: MarketSummaryView = {
       open: tournament.marketOpen,
-      freeAgents: catalogue.filter((player) => !ownedPlayerIds.has(player._id as string))
-        .length,
+      freeAgents: Math.max(0, totalPlayers - ownedPlayerIds.size),
       received: mine.filter(
         (offer) => offer.side === "recibida" && openStatuses(offer.status),
       ).length,
