@@ -1086,6 +1086,13 @@ export const updateRules = mutation({
     minOvr: v.number(),
     maxU21: v.number(),
     lineupLockHours: v.number(),
+    fc27FormationCode: v.string(),
+    formationInstructions: v.string(),
+    u20Min: v.number(),
+    u20InStartingLineup: v.union(v.literal("obligatory"), v.literal("substitute"), v.null()),
+    sameNationalityMin: v.number(),
+    sameNationalityRule: v.union(v.literal("obligatory"), v.literal("changeable"), v.null()),
+    sameNationalityMatchDurationMinutes: v.number(),
   },
   handler: async (ctx, next) => {
     const userId = requireAuth(await getAuthUserId(ctx));
@@ -1125,8 +1132,18 @@ export const updateRules = mutation({
     if (next.maxU21 < 0 || next.maxU21 > 15) {
       throw new ConvexError("El límite de sub-21 debe estar entre 0 y 15.");
     }
+    if (next.u20Min < 0 || next.u20Min > 11) {
+      throw new ConvexError("El mínimo de sub-20 debe estar entre 0 y 11.");
+    }
+    if (next.sameNationalityMin < 0 || next.sameNationalityMin > 22) {
+      throw new ConvexError("El mínimo de nacionalidad debe estar entre 0 y 22.");
+    }
+    if (next.sameNationalityMatchDurationMinutes < 0 || next.sameNationalityMatchDurationMinutes > 120) {
+      throw new ConvexError("La duración de la regla de nacionalidad debe estar entre 0 y 120 minutos.");
+    }
 
     const changes: string[] = [];
+    const formatString = (value: unknown): string => (typeof value === "string" ? value : String(value ?? "ninguno"));
     const compare = (label: string, before: number, after: number, money = false) => {
       if (before === after) return;
       changes.push(
@@ -1149,6 +1166,20 @@ export const updateRules = mutation({
     compare("OVR mínimo", current.minOvr, next.minOvr);
     compare("Sub-21 máx.", current.maxU21, next.maxU21);
     compare("Cierre de alineación (h)", current.lineupLockHours, next.lineupLockHours);
+    if (current.formationInstructions !== next.formationInstructions) {
+      changes.push(`Instrucciones de formación: ${formatString(current.formationInstructions)} → ${formatString(next.formationInstructions)}`);
+    }
+    if (current.fc27FormationCode !== next.fc27FormationCode) {
+      changes.push(`Código formación FC 27: ${formatString(current.fc27FormationCode)} → ${formatString(next.fc27FormationCode)}`);
+    }
+    if (current.u20InStartingLineup !== next.u20InStartingLineup) {
+      changes.push(`Sub-20 en XI: ${formatString(current.u20InStartingLineup ?? "ninguno")} → ${formatString(next.u20InStartingLineup ?? "ninguno")}`);
+    }
+    if (current.sameNationalityRule !== next.sameNationalityRule) {
+      changes.push(`Regla de nacionalidad: ${formatString(current.sameNationalityRule ?? "ninguna")} → ${formatString(next.sameNationalityRule ?? "ninguna")}`);
+    }
+    compare("Nacionalidad mínima", current.sameNationalityMin, next.sameNationalityMin);
+    compare("Minutos de nacionalidad", current.sameNationalityMatchDurationMinutes, next.sameNationalityMatchDurationMinutes);
 
     if (changes.length === 0) {
       return { changed: 0 };
@@ -1167,6 +1198,26 @@ export const updateRules = mutation({
         updatedAt: Date.now(),
         updatedBy: userId,
       });
+    }
+
+    const migrationDetails: string[] = [];
+    if (JSON.stringify(current) === JSON.stringify(LEGACY_SEEDED_RULES)) {
+      migrationDetails.push(
+        `Reglas de la plantilla inicial (20 plazas) con guión de formación FC 27: ${next.fc27FormationCode} · ${next.formationInstructions}`,
+      );
+    }
+    if (next.u20InStartingLineup) {
+      migrationDetails.push(
+        `Régimen de sub-20: ${next.u20InStartingLineup === "obligatory" ? "obligatorio desde el XI titular" : "sustituible como reserva"}`,
+      );
+    }
+    if (next.sameNationalityRule) {
+      migrationDetails.push(
+        `Regla de nacionalidad: mínimo ${next.sameNationalityMin} · ${next.sameNationalityRule === "obligatory" ? "siempre en campo" : "cambiable"} · ${next.sameNationalityMatchDurationMinutes} minutos`,
+      );
+    }
+    if (migrationDetails.length > 0) {
+      changes.push(`Migración de reglas de sub-20 y nacionalidad: ${migrationDetails.join(" · ")}`);
     }
 
     const user = await ctx.db.get(userId);

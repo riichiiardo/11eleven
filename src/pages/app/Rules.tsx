@@ -1,12 +1,15 @@
 import type { AppStateView } from "@/convex/appTypes";
 import { RULE_DESCRIPTORS } from "@/convex/rulesEngine";
 import { useOutletContext } from "react-router";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { RuleCheckList } from "@/components/eleven/RuleCheckList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router";
 import { BookOpen, Gauge, Info, Scale } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const SCOPE_CLASS: Record<string, string> = {
   Club: "border-brand/30 bg-brand/10 text-primary",
@@ -18,6 +21,7 @@ const SCOPE_CLASS: Record<string, string> = {
 export default function Rules() {
   const state = useOutletContext<AppStateView>();
   const rules = state.rules;
+  const updateRules = useMutation(api.tournament.updateRules);
   if (!rules || !state.tournament) return null;
 
   return (
@@ -78,6 +82,233 @@ export default function Rules() {
           <SectionCard title="Cómo te afectan ahora" icon={BookOpen}>
             <RuleCheckList checks={state.evaluation?.checks ?? []} variant="full" />
           </SectionCard>
+
+          <SectionCard title="Reglas propias del torneo" icon={Scale}>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                  <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+                  Mínimo de sub-20 en el XI
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={11}
+                  value={rules.u20Min}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    updateRules({
+                      budget: rules.budget,
+                      squadSize: rules.squadSize,
+                      gkMin: rules.gkMin,
+                      gkMax: rules.gkMax,
+                      defMin: rules.defMin,
+                      defMax: rules.defMax,
+                      midMin: rules.midMin,
+                      midMax: rules.midMax,
+                      fwdMin: rules.fwdMin,
+                      fwdMax: rules.fwdMax,
+                      maxPerRealClub: rules.maxPerRealClub,
+                      minOvr: rules.minOvr,
+                      maxU21: rules.maxU21,
+                      lineupLockHours: rules.lineupLockHours,
+                      fc27FormationCode: rules.fc27FormationCode,
+                      formationInstructions: rules.formationInstructions,
+                      u20Min: value,
+                      u20InStartingLineup: rules.u20InStartingLineup,
+                      sameNationalityMin: rules.sameNationalityMin,
+                      sameNationalityRule: rules.sameNationalityRule,
+                      sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                    });
+                  }}
+                  aria-label="Mínimo de sub-20 en el XI"
+                  className="font-mono"
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  Nº de jugadores de 20 años o menos que el torneo exige alinear en cada encuentro.
+                </p>
+              </div>
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                  <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+                  ¿De dónde sale el sub-20?
+                </label>
+                <Select
+                  value={rules.u20InStartingLineup ?? "ninguno"}
+                  onValueChange={(value) => {
+                    updateRules({
+                      budget: rules.budget,
+                      squadSize: rules.squadSize,
+                      gkMin: rules.gkMin,
+                      gkMax: rules.gkMax,
+                      defMin: rules.defMin,
+                      defMax: rules.defMax,
+                      midMin: rules.midMin,
+                      midMax: rules.midMax,
+                      fwdMin: rules.fwdMin,
+                      fwdMax: rules.fwdMax,
+                      maxPerRealClub: rules.maxPerRealClub,
+                      minOvr: rules.minOvr,
+                      maxU21: rules.maxU21,
+                      lineupLockHours: rules.lineupLockHours,
+                      fc27FormationCode: rules.fc27FormationCode,
+                      formationInstructions: rules.formationInstructions,
+                      u20Min: rules.u20Min,
+                      u20InStartingLineup: value === "ninguno" ? null : value,
+                      sameNationalityMin: rules.sameNationalityMin,
+                      sameNationalityRule: rules.sameNationalityRule,
+                      sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                    });
+                  }}
+                >
+                  <SelectTrigger aria-label="Régimen de sub-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ninguno">Sin regla</SelectItem>
+                    <SelectItem value="obligatory">Obligatorio desde el XI titular</SelectItem>
+                    <SelectItem value="substitute">Sustituible como reserva</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                  <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+                  Mínimo de jugadores de una misma nacionalidad
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={22}
+                  value={rules.sameNationalityMin}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    state.updateRules({
+                      budget: rules.budget,
+                      squadSize: rules.squadSize,
+                      gkMin: rules.gkMin,
+                      gkMax: rules.gkMax,
+                      defMin: rules.defMin,
+                      defMax: rules.defMax,
+                      midMin: rules.midMin,
+                      midMax: rules.midMax,
+                      fwdMin: rules.fwdMin,
+                      fwdMax: rules.fwdMax,
+                      maxPerRealClub: rules.maxPerRealClub,
+                      minOvr: rules.minOvr,
+                      maxU21: rules.maxU21,
+                      lineupLockHours: rules.lineupLockHours,
+                      fc27FormationCode: rules.fc27FormationCode,
+                      formationInstructions: rules.formationInstructions,
+                      u20Min: rules.u20Min,
+                      u20InStartingLineup: rules.u20InStartingLineup,
+                      sameNationalityMin: value,
+                      sameNationalityRule: rules.sameNationalityRule,
+                      sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                    });
+                  }}
+                  aria-label="Mínimo de jugadores de una misma nacionalidad"
+                  className="font-mono"
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  Nº de jugadores de una misma nacionalidad que debe estar en campo en todo el
+golpe, sin importar quién sea el que juega.
+                </p>
+              </div>
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                  <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+                  Regla de nacionalidad
+                </label>
+                <Select
+                  value={rules.sameNationalityRule ?? "ninguna"}
+                  onValueChange={(value) => {
+                    updateRules({
+                      budget: rules.budget,
+                      squadSize: rules.squadSize,
+                      gkMin: rules.gkMin,
+                      gkMax: rules.gkMax,
+                      defMin: rules.defMin,
+                      defMax: rules.defMax,
+                      midMin: rules.midMin,
+                      midMax: rules.midMax,
+                      fwdMin: rules.fwdMin,
+                      fwdMax: rules.fwdMax,
+                      maxPerRealClub: rules.maxPerRealClub,
+                      minOvr: rules.minOvr,
+                      maxU21: rules.maxU21,
+                      lineupLockHours: rules.lineupLockHours,
+                      fc27FormationCode: rules.fc27FormationCode,
+                      formationInstructions: rules.formationInstructions,
+                      u20Min: rules.u20Min,
+                      u20InStartingLineup: rules.u20InStartingLineup,
+                      sameNationalityMin: rules.sameNationalityMin,
+                      sameNationalityRule: value === "ninguna" ? null : value,
+                      sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                    });
+                  }}
+                >
+                  <SelectTrigger aria-label="Regla de nacionalidad">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ninguna">Sin regla</SelectItem>
+                    <SelectItem value="obligatory">Siempre en campo (sin cambio)</SelectItem>
+                    <SelectItem value="changeable">Cambiable (puede alejarse)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+                  <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+                  Minutos de permanencia
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={rules.sameNationalityMatchDurationMinutes}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    updateRules({
+                      budget: rules.budget,
+                      squadSize: rules.squadSize,
+                      gkMin: rules.gkMin,
+                      gkMax: rules.gkMax,
+                      defMin: rules.defMin,
+                      defMax: rules.defMax,
+                      midMin: rules.midMin,
+                      midMax: rules.midMax,
+                      fwdMin: rules.fwdMin,
+                      fwdMax: rules.fwdMax,
+                      maxPerRealClub: rules.maxPerRealClub,
+                      minOvr: rules.minOvr,
+                      maxU21: rules.maxU21,
+                      lineupLockHours: rules.lineupLockHours,
+                      fc27FormationCode: rules.fc27FormationCode,
+                      formationInstructions: rules.formationInstructions,
+                      u20Min: rules.u20Min,
+                      u20InStartingLineup: rules.u20InStartingLineup,
+                      sameNationalityMin: rules.sameNationalityMin,
+                      sameNationalityRule: rules.sameNationalityRule,
+                      sameNationalityMatchDurationMinutes: value,
+                    });
+                  }}
+                  aria-label="Minutos de permanencia de la regla de nacionalidad"
+                  className="font-mono"
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  Si la regla de nacionalidad es "cambiable", el jugador puede alejarse este número
+                  de minutos de permanencia en el encuentro.
+                </p>
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+      </div>
+    </div>
+  );
+}
 
           <div className="card-soft flex gap-3 p-4 text-xs leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />

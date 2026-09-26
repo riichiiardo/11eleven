@@ -162,6 +162,20 @@ export type TournamentRules = {
   minOvr: number;
   maxU21: number;
   lineupLockHours: number;
+  /** Código de formación extraído del FC 27 — entrada libre vinculada a los códigos estándar del motor. */
+  fc27FormationCode: string;
+  /** Instrucciones tácticas adicionales del presidente: cambios, rango de minutos, etc. */
+  formationInstructions: string;
+  /** Plazas de sub-20 en el XI obligatorio. `null` = sin regla. */
+  u20Min: number;
+  /** ¿De dónde sale el sub-20 en el partido: titular obligatorio o reserva sustituible. `null` = sin regla. */
+  u20InStartingLineup: "obligatory" | "substitute" | null;
+  /** Plazas de la misma nacionalidad que debe haber en campo en todo el encuentro. `null` = sin regla. */
+  sameNationalityMin: number;
+  /** Regla de nacionalidad: siempre en campo o cambiable. `null` = sin regla. */
+  sameNationalityRule: "obligatory" | "changeable" | null;
+  /** En minutos de permanencia en campo. `null` = sin regla. */
+  sameNationalityMatchDurationMinutes: number;
 };
 
 export const DEFAULT_RULES: TournamentRules = {
@@ -179,6 +193,13 @@ export const DEFAULT_RULES: TournamentRules = {
   minOvr: 70,
   maxU21: 5,
   lineupLockHours: 2,
+  fc27FormationCode: "4-2-3-1",
+  formationInstructions: "Pendiente de completar por el presidente.",
+  u20Min: 0,
+  u20InStartingLineup: null,
+  sameNationalityMin: 0,
+  sameNationalityRule: null,
+  sameNationalityMatchDurationMinutes: 0,
 };
 
 /**
@@ -200,6 +221,13 @@ export const LEGACY_SEEDED_RULES: TournamentRules = {
   minOvr: 70,
   maxU21: 5,
   lineupLockHours: 2,
+  fc27FormationCode: "4-2-3-1",
+  formationInstructions: "Pendiente de completar por el presidente.",
+  u20Min: 0,
+  u20InStartingLineup: null,
+  sameNationalityMin: 0,
+  sameNationalityRule: null,
+  sameNationalityMatchDurationMinutes: 0,
 };
 
 export type GroupLimits = { min: number; max: number };
@@ -339,7 +367,51 @@ export const RULE_DESCRIPTORS: RuleDescriptor[] = [
     max: 72,
     step: 1,
   },
+  {
+    code: "R-11",
+    title: "Jugadores sub-20 en el XI",
+    description:
+      "El torneo fija un mínimo de jugadores de 20 años o menos obligados a alinearse. Se toman desde el XI titular (obligatorio) o como reserva sustituible (cambiable en función del tiempo).",
+    scope: "Plantilla",
+    value: (r) =>
+      r.u20InStartingLineup === null
+        ? `Sin regla · mínimo ${r.u20Min}`
+        : `${r.u20Min} sub-20 · ${r.u20InStartingLineup === "obligatory" ? "desde el XI titular" : "como reserva sustituible"}`,
+    field: "u20Min",
+    min: 0,
+    max: 11,
+    step: 1,
+  },
+  {
+    code: "R-12",
+    title: "Mismas nacionalidades en el encuentro",
+    description:
+      "El torneo exige que, en todo el partido, el equipo cuente siempre con un número mínimo de jugadores de una misma nacionalidad, ya sea fijado en el XI o en el banco. El Presidente lo configura al crear el torneo.",
+    scope: "Plantilla",
+    value: (r) =>
+      r.sameNationalityRule === null
+        ? `Sin regla · mínimo ${r.sameNationalityMin}`
+        : `${r.sameNationalityMin} de una misma nacionalidad · ${r.sameNationalityRule === "obligatory" ? "siempre en campo" : "cambiable"} · ${r.sameNationalityMatchDurationMinutes} minutos de permanencia`,
+    field: "sameNationalityMin",
+    min: 0,
+    max: 22,
+    step: 1,
+  },
+  {
+    code: "R-13",
+    title: "Formación exportada del FC 27",
+    description:
+      "Código de formación seleccionado en el FC 27 y las instrucciones tácticas adicionales del presidente (cambios previstos, rango de minutos, bloqueos de posiciones…). El código se enlaza con los cinco formatos estándar del motor para mantener un XI siempre legal.",
+    scope: "Plantilla",
+    value: (r) =>
+      `${r.fc27FormationCode} · ${r.formationInstructions.length > 60 ? r.formationInstructions.slice(0, 60) + "…" : r.formationInstructions}`,
+    field: "fc27FormationCode",
+  },
 ];
+
+/* ------------------------------------------------------------------ *
+ * Formatting helpers (shared by server and client)
+ */
 
 /* ------------------------------------------------------------------ *
  * Squad shape + stats

@@ -15,6 +15,7 @@ import {
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errors";
+export default function Formation() {
 import { useLocation, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
@@ -47,6 +48,9 @@ export default function Formation() {
   const rules = state.rules;
   const squad = state.squad;
 
+  const [fc27Code, setFc27Code] = useState(rules.fc27FormationCode);
+  const [instructions, setInstructions] = useState(rules.formationInstructions);
+
   const evaluation = useMemo(
     () =>
       rules && lineup
@@ -55,7 +59,7 @@ export default function Formation() {
     [rules, squad, lineup, state.evaluation],
   );
 
-  const assignedIds = new Set(
+  const assignedIds = new Set();
     (lineup?.slots ?? []).map((slot) => slot.playerId).filter(Boolean) as string[],
   );
   const selectedPlayer = squad.find((player) => player.playerId === selectedPlayerId) ?? null;
@@ -160,6 +164,29 @@ export default function Formation() {
       await saveLineup({
         formation: lineup.formation,
         slots: lineup.slots,
+      });
+      await api.tournament.updateRules({
+        budget: rules.budget,
+        squadSize: rules.squadSize,
+        gkMin: rules.gkMin,
+        gkMax: rules.gkMax,
+        defMin: rules.defMin,
+        defMax: rules.defMax,
+        midMin: rules.midMin,
+        midMax: rules.midMax,
+        fwdMin: rules.fwdMin,
+        fwdMax: rules.fwdMax,
+        maxPerRealClub: rules.maxPerRealClub,
+        minOvr: rules.minOvr,
+        maxU21: rules.maxU21,
+        lineupLockHours: rules.lineupLockHours,
+        fc27FormationCode: fc27Code,
+        formationInstructions: instructions,
+        u20Min: rules.u20Min,
+        u20InStartingLineup: rules.u20InStartingLineup,
+        sameNationalityMin: rules.sameNationalityMin,
+        sameNationalityRule: rules.sameNationalityRule,
+        sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
       });
       setDraft(null);
       toast.success("Alineación guardada", {
@@ -284,6 +311,46 @@ export default function Formation() {
             ? " Al cambiar de esquema el motor recoloca a los jugadores compatibles y deja libres las posiciones que nadie puede cubrir."
             : ""}
         </p>
+      </SectionCard>
+
+      <SectionCard title="Guión de formación" icon={Shirt} accent="pitch">
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+              <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+              Código de formación FC 27
+            </label>
+            <Input
+              value={fc27Code}
+              onChange={(event) => setFc27Code(event.target.value)}
+              placeholder="ej. 4-2-3-1, 4-3-3, 4-4-2, 3-5-2, 5-2-3"
+              aria-label="Código de formación FC 27"
+              className="font-mono"
+            />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              El código seleccionado se enlaza con los cinco formatos estándar del motor para
+generar un XI siempre legal. El estado real lo valida el motor de reglas.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
+              <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+              Instrucciones adicionales
+            </label>
+            <textarea
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+              rows={4}
+              placeholder="Ej: cambios en los minutos 60-75, base 4-2-3-1 con delanteros más anchos, bloquear mediocentro…"
+              aria-label="Instrucciones adicionales de formación"
+              className="resize-y min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50"
+            />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              Cambios, rango de minutos, bloqueos de posiciones… El presidente los anota aquí
+              y queda registrada en la config de reglas del torneo.
+            </p>
+          </div>
+        </div>
       </SectionCard>
 
       <div className="grid gap-5 xl:grid-cols-3">

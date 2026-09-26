@@ -186,6 +186,13 @@ export const run = internalMutation({
       minOvr: 70,
       maxU21: 8,
       lineupLockHours: 3,
+      fc27FormationCode: "4-2-3-1",
+      formationInstructions: "Guión táctico inicial.",
+      u20Min: 1,
+      u20InStartingLineup: "obligatory",
+      sameNationalityMin: 2,
+      sameNationalityRule: "obligatory",
+      sameNationalityMatchDurationMinutes: 0,
       updatedAt: now,
     });
 

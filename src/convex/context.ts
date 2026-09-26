@@ -99,6 +99,13 @@ export async function loadRules(
     minOvr: doc.minOvr,
     maxU21: doc.maxU21,
     lineupLockHours: doc.lineupLockHours,
+    fc27FormationCode: doc.fc27FormationCode ?? DEFAULT_RULES.fc27FormationCode,
+    formationInstructions: doc.formationInstructions ?? DEFAULT_RULES.formationInstructions,
+    u20Min: doc.u20Min ?? DEFAULT_RULES.u20Min,
+    u20InStartingLineup: doc.u20InStartingLineup ?? DEFAULT_RULES.u20InStartingLineup,
+    sameNationalityMin: doc.sameNationalityMin ?? DEFAULT_RULES.sameNationalityMin,
+    sameNationalityRule: doc.sameNationalityRule ?? DEFAULT_RULES.sameNationalityRule,
+    sameNationalityMatchDurationMinutes: doc.sameNationalityMatchDurationMinutes ?? DEFAULT_RULES.sameNationalityMatchDurationMinutes,
   };
 }
 
