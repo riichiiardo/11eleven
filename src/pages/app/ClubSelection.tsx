@@ -67,32 +67,21 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
   const [candidate, setCandidate] = useState<ClubView | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const countries = useMemo(
-    () => ["Todos", ...new Set(state.teamCatalog.map((t) => t.country))],
-    [state.teamCatalog],
-  );
-  const leaguesByCountry = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const t of state.teamCatalog) {
-      const key = country === "Todos" ? "*" : country;
-      const target = key === "*" ? t.country : key;
-      const existing = map.get(target) ?? [];
-      if (!existing.includes(t.league)) existing.push(t.league);
-      map.set(target, existing);
-    }
-    return map;
-  }, [state.teamCatalog, country]);
   const leagueOptions = useMemo(() => {
-    if (country === "Todos") {
-      return ["Todas", ...new Set(state.teamCatalog.map((t) => t.league))];
-    }
-    const leagues = leaguesByCountry.get(country);
-    return leagues ? ["Todas", ...leagues] : [];
-  }, [country, leaguesByCountry]);
+    const term = country.trim().toLowerCase();
+    const leagues = state.teamCatalog
+      .filter((club) => !term || club.country.toLowerCase().includes(term))
+      .map((club) => club.league);
+    return ["Todas", ...new Set(leagues)];
+  }, [state.teamCatalog, country]);
 
   const visible = state.teamCatalog.filter((club) => {
-    const matchesCountry = country === "Todos" || club.country === country;
-    const matchesLeague = league === "Todas" || club.league === league;
+    const countryTerm = country.trim().toLowerCase();
+    const leagueTerm = league.trim().toLowerCase();
+    const matchesCountry =
+      country === "Todos" || !countryTerm || club.country.toLowerCase().includes(countryTerm);
+    const matchesLeague =
+      league === "Todas" || !leagueTerm || club.league.toLowerCase().includes(leagueTerm);
     const term = query.trim().toLowerCase();
     const matchesQuery =
       !term ||
@@ -355,7 +344,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                   name={candidate.name}
                   shortName={candidate.shortName}
                   colors={[candidate.colorPrimary, candidate.colorSecondary]}
-                  size="lg"
+                  size="xl"
                 />
                 <div>
                   <p className="display text-sm">{candidate.name}</p>

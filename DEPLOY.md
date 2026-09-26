@@ -52,8 +52,11 @@ Nada más: el resto del deploy es automático en cada push a `main`.
 │   └── deploy.yml          # GitHub Actions workflow (Pages)
 ├── public/
 │   ├── 404.html            # SPA redirect para GitHub Pages
+│   ├── crests/             # Escudos de los 115 clubes del catálogo (256px)
 │   ├── logo.svg
 │   └── manifest.webmanifest
+├── scripts/
+│   └── sync-crests.py      # Descarga y optimiza los escudos (fuente: ESPN)
 ├── src/
 │   └── convex/_generated/  # Typegen versionado (requerido para typecheck)
 ├── convex/  (src/convex/)  # Backend Convex
@@ -71,6 +74,11 @@ Nada más: el resto del deploy es automático en cada push a `main`.
    deployment correcto.
 4. **Base path**: nunca hardcodear `/` en links; usar rutas relativas al router
    (`Link to="/dashboard"` se resuelve con el basename automáticamente).
+5. **Escudos de clubes**: `public/crests/*.png` + el mapa `src/lib/crests.ts`.
+   Fuente: API pública de ESPN (sin clave ni coste). El componente `Crest`
+   muestra el PNG sobre un disco blanco con el aro en los colores del club y
+   cae a las iniciales si un club no está en el mapa. Actualización:
+   `python3 scripts/sync-crests.py fetch` (descarga + reduce a 256px).
 
 ## Troubleshooting
 
