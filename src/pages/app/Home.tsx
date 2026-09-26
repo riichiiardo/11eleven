@@ -48,12 +48,15 @@ export default function Home() {
   // sending the President to another screen first (prompt §31).
   // Only what the President can act on today: players whose club has an active
   // presidency plus the free-agent pool, so the strip is never four locked cards.
-  const featured = useQuery(api.market.browse, {
+  const featuredView = useQuery(api.market.browse, {
     scope: "todos",
     sort: "ovr",
     onlyAffordable: true,
     limit: 4,
   });
+  // The browse payload is { players: MarketPlayerView[], total: number,
+  // nationalities: string[] }. The leader board only consumes the player array.
+  const featured = featuredView ? (featuredView.players ?? []) : undefined;
   const negotiations = useQuery(api.market.overview);
 
   const tournament = state.tournament;

@@ -59,7 +59,9 @@ export default function Market() {
 
   const marketOpen = state.tournament?.marketOpen ?? false;
 
-  const players = useQuery(api.market.browse, {
+  // browse returns { players, total, nationalities }; the list body consumes the
+  // players array while total is still the server-side facet for the count.
+  const browseView = useQuery(api.market.browse, {
     scope,
     search: search.trim() || undefined,
     group: group as "GK" | "DEF" | "MID" | "FWD" | "todos",
@@ -67,11 +69,12 @@ export default function Market() {
     onlyAffordable,
     limit: 60,
   });
+  const players: MarketPlayerView[] = browseView ? (browseView.players ?? []) : [];
 
   const summary = state.market;
 
   const freeAgents = useMemo(
-    () => (players ?? []).filter((player) => player.kind === "libre").length,
+    () => players.filter((player) => player.kind === "libre").length,
     [players],
   );
 
