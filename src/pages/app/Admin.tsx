@@ -10,14 +10,13 @@ import {
 } from "@/convex/rulesEngine";
 import { errorMessage, relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import { useNavigate, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";
-import { Countdown, StatTile } from "@/components/eleven/SectionCard";
+import { Countdown } from "@/components/eleven/SectionCard";
 import { Crest } from "@/components/eleven/Crest";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,10 +64,25 @@ import { OfferStatusPill } from "@/components/eleven/OfferBits";
 import { TurnStrip, DraftStatusPill } from "@/components/eleven/DraftBits";
 import { MatchCard, StandingsTable } from "@/components/eleven/MatchBits";
 import {
+  Award,
   RefreshCw,
   Swords,
   Trophy,
 } from "lucide-react";
+import { FieldLabel, Tip } from "@/components/eleven/admin/AdminBits";
+import { PrizesPanel } from "@/components/eleven/admin/PrizesPanel";
+import { CatalogPanel } from "@/components/eleven/admin/CatalogPanel";
+import {
+  ChangeClubDialog,
+  GrantBudgetDialog,
+  InviteCard,
+  RemovePresidentDialog,
+} from "@/components/eleven/admin/PresidentTools";
+import { ResultReportButton } from "@/components/eleven/admin/ResultReportDialog";
+import {
+  CompetitionCard,
+  ResetLeagueCard,
+} from "@/components/eleven/admin/LeagueControls";
 
 const PERMISSION_LABELS: Record<string, string> = {
   configuracion: "Configuración",
@@ -151,6 +165,10 @@ export default function Admin() {
             <ScrollText className="size-4" aria-hidden="true" />
             Reglas
           </TabsTrigger>
+          <TabsTrigger value="premios" className="min-h-10">
+            <Award className="size-4" aria-hidden="true" />
+            Premios
+          </TabsTrigger>
           <TabsTrigger value="presidentes" className="min-h-10">
             <Users className="size-4" aria-hidden="true" />
             Presidentes
@@ -179,6 +197,8 @@ export default function Admin() {
 
         <TabsContent value="torneo" className="flex flex-col gap-5">
           <TournamentPanel overview={overview} />
+          {overview.tournament ? <CompetitionCard tournament={overview.tournament} /> : null}
+          <ResetLeagueCard overview={overview} />
         </TabsContent>
 
         <TabsContent value="reglas" className="flex flex-col gap-5">
@@ -187,6 +207,10 @@ export default function Admin() {
             presidents={overview.presidents}
             clubCount={overview.clubs.length}
           />
+        </TabsContent>
+
+        <TabsContent value="premios" className="flex flex-col gap-5">
+          <PrizesPanel overview={overview} />
         </TabsContent>
 
         <TabsContent value="presidentes" className="flex flex-col gap-5">
@@ -219,237 +243,6 @@ export default function Admin() {
   );
 }
 
-type CatalogSource = "ea" | "sofifa" | "snapshot";
-
-const SOURCE_META: Record<CatalogSource, { label: string; hint: string }> = {
-  ea: {
-    label: "EA SPORTS FC 27 · ratings oficiales (19.789)",
-    hint: "Fuente recomendada: los ratings oficiales de EA, 100 jugadores por página y sin proxy. Se importa en lotes para no agotar el tiempo de una sola operación.",
-  },
-  sofifa: {
-    label: "SoFIFA · API pública (requiere proxy)",
-    hint: "SoFIFA responde 403 (Cloudflare) a las IPs de datacenter. Solo funciona si defines SOFIFA_PROXY_URL (http://usuario:clave@host:puerto) en Convex → Settings → Environment Variables.",
-  },
-  snapshot: {
-    label: "Snapshot local versionado (respaldo)",
-    hint: "Importa los agentes libres incluidos con la app. Es el respaldo automático cuando ninguna fuente externa responde.",
-  },
-};
-
-/**
- * Catálogo de jugadores: fuentes, estado de la sincronización y progreso.
- * Administración define la base de datos con la que juega el torneo; las
- * plantillas y la propiedad de jugadores nunca se tocan aquí.
- */
-function CatalogPanel() {
-  const catalog = useQuery(api.footballSync.catalogState);
-  const syncAction = useAction(api.footballApi.syncCatalog);
-  const [source, setSource] = useState<CatalogSource>("ea");
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{
-    page: number;
-    totalPages: number;
-    fetched: number;
-    inserted: number;
-    updated: number;
-  } | null>(null);
-
-  const handleSync = async () => {
-    setBusy(true);
-    setProgress(null);
-    try {
-      if (source === "snapshot") {
-        const result = await syncAction({ source });
-        toast.success("Snapshot local aplicado", {
-          description: `${result.inserted} agentes libres incorporados · ${result.unchanged} ya estaban en el catálogo`,
-        });
-        return;
-      }
-
-      // EA pages are 1-based; SoFIFA cursors count full pages from 0.
-      let page = source === "sofifa" ? 0 : 1;
-      let totalPages = 0;
-      let fetched = 0;
-      let inserted = 0;
-      let updated = 0;
-      let unchanged = 0;
-      let done = false;
-      let guard = 0;
-      let note: string | null = null;
-
-      while (!done && guard < 80) {
-        guard += 1;
-        const result = await syncAction({ source, page });
-        page = result.page;
-        totalPages = result.totalPages || totalPages;
-        fetched += result.fetched;
-        inserted += result.inserted;
-        updated += result.updated;
-        unchanged += result.unchanged;
-        done = result.done;
-        if (result.note) note = result.note;
-        setProgress({ page, totalPages, fetched, inserted, updated });
-        if (result.fallback) {
-          toast.warning(source === "sofifa" ? "SoFIFA no accesible" : "Fuente no accesible", {
-            description: result.note ?? undefined,
-          });
-          return;
-        }
-        if (result.fetched === 0) break;
-      }
-
-      const summary = `${fetched} jugadores descargados · ${inserted} nuevos · ${updated} actualizados · ${unchanged} sin cambios`;
-      if (note) {
-        toast.warning("Sincronización parcial", {
-          description: `${summary} · ${note}`,
-        });
-      } else {
-        toast.success("Catálogo sincronizado", { description: summary });
-      }
-    } catch (cause) {
-      toast.error("No se pudo sincronizar el catálogo", {
-        description: errorMessage(cause),
-      });
-    } finally {
-      setBusy(false);
-      setProgress(null);
-    }
-  };
-
-  return (
-    <SectionCard
-      title="Catálogo de jugadores"
-      icon={Database}
-      accent="gold"
-      bodyClassName="flex flex-col gap-5"
-    >
-      <p className="text-sm text-muted-foreground">
-        El catálogo es la base de jugadores de la que beben el draft y el mercado. Sincroniza los
-        ratings oficiales de EA SPORTS FC 27 (más de 19.000 jugadores) o, si prefieres, la API de
-        SoFIFA con proxy. La importación avanza por lotes y nunca toca las plantillas ni la
-        propiedad de los jugadores: solo se actualiza la tabla de jugadores.
-      </p>
-
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="catalog-source">Fuente de datos</Label>
-          <Select
-            value={source}
-            onValueChange={(value) => setSource(value as CatalogSource)}
-            disabled={busy}
-          >
-            <SelectTrigger id="catalog-source" className="min-h-11 w-full">
-              <SelectValue placeholder="Selecciona una fuente" />
-            </SelectTrigger>
-            <SelectContent>
-              { (Object.keys(SOURCE_META) as CatalogSource[]).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {SOURCE_META[key].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">{SOURCE_META[source].hint}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          icon={Database}
-          label="Jugadores en catálogo"
-          value={catalog === undefined ? "…" : String(catalog?.total ?? 0)}
-        />
-        <StatTile
-          icon={Zap}
-          label="Agentes libres"
-          value={catalog === undefined ? "…" : String(catalog?.freeAgents ?? 0)}
-          tone="pitch"
-        />
-        <StatTile
-          icon={Users}
-          label="En plantillas"
-          value={catalog === undefined ? "…" : String(catalog?.owned ?? 0)}
-          tone="slate"
-        />
-        <StatTile
-          icon={Trophy}
-          label="Versión"
-          value={catalog?.version ?? "—"}
-          tone="gold"
-        />
-      </div>
-
-      {catalog?.lastSync && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-          <RefreshCw className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span className="text-muted-foreground">Última sincronización:</span>
-          <span className="font-medium">{relativeTime(catalog.lastSync.at)}</span>
-          <Badge variant="outline">{catalog.lastSync.source}</Badge>
-          <span className="text-muted-foreground">
-            {catalog.lastSync.inserted} nuevos · {catalog.lastSync.updated} actualizados ·{" "}
-            {catalog.lastSync.unchanged} sin cambios
-          </span>
-        </div>
-      )}
-
-      {catalog?.lastError && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium">Último intento de sincronización falló</span>
-            <span className="text-muted-foreground">
-              {catalog.lastError.message} · {relativeTime(catalog.lastError.at)}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {busy && progress ? (
-          <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="font-semibold">
-                Descargando página {progress.page}
-                {progress.totalPages > 0 ? ` de ${progress.totalPages}` : "…"}
-              </span>
-              <span className="text-muted-foreground">
-                {progress.fetched} descargados · {progress.inserted} nuevos · {progress.updated}{" "}
-                actualizados
-              </span>
-            </div>
-            <Progress
-              className="mt-2 h-2"
-              value={
-                progress.totalPages > 0
-                  ? Math.min(100, Math.round(((progress.page - 1) / progress.totalPages) * 100))
-                  : 10
-              }
-            />
-          </div>
-        ) : null}
-
-        <div>
-          <Button onClick={handleSync} disabled={busy} className="min-h-11">
-            {busy ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <RefreshCw className="size-4" aria-hidden="true" />
-            )}
-            {busy
-              ? "Sincronizando…"
-              : source === "snapshot"
-                ? "Aplicar snapshot local"
-                : "Sincronizar catálogo completo"}
-          </Button>
-          <p className="mt-2 text-xs text-muted-foreground">
-            La descarga completa puede tardar unos minutos: se ejecuta por lotes y cada lote queda
-            registrado en la auditoría con tu nombre.
-          </p>
-        </div>
-      </div>
-    </SectionCard>
-  );
-}
 
 function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
   const setStatus = useMutation(api.tournament.setTournamentStatus);
@@ -1045,6 +838,12 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
     (group) => group.status === "en_curso",
   );
   const leader = competition.leader;
+  const [reportMatchday, setReportMatchday] = useState(
+    String(competition.currentMatchday),
+  );
+  const reportGroup =
+    competition.matchdays.find((group) => String(group.matchday) === reportMatchday) ??
+    current;
 
   return (
     <>
@@ -1120,6 +919,79 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
               : "No hay jornada en curso: cierra una para activar la siguiente."}
           </p>
         </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Resultados detallados (modo árbitro)"
+        icon={ScrollText}
+        bodyClassName="flex flex-col gap-3"
+      >
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Indica el resultado de cada partido a mano: marcador, goles por jugador, tarjetas
+          amarillas y rojas por jugador, y los lesionados con el número de jornadas que estarán
+          de baja. La tabla del torneo se actualiza al instante y todo queda en la auditoría.
+        </p>
+
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <Label htmlFor="reportMatchday" className="text-xs">
+            Jornada a registrar
+          </Label>
+          <Select
+            value={reportMatchday}
+            onValueChange={setReportMatchday}
+          >
+            <SelectTrigger id="reportMatchday" className="min-h-11">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {competition.matchdays.map((group) => (
+                <SelectItem
+                  key={group.matchday}
+                  value={String(group.matchday)}
+                  className="min-h-10"
+                >
+                  Jornada {group.matchday}
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {group.playedCount}/{group.fixtures.length} jugados · {group.statusLabel}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {reportGroup && reportGroup.fixtures.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {reportGroup.fixtures.map((fixture) => (
+              <li
+                key={fixture.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                  <span className="truncate font-semibold">{fixture.home.name}</span>
+                  {fixture.homeGoals !== null && fixture.awayGoals !== null ? (
+                    <span className="num shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs font-bold">
+                      {fixture.homeGoals} – {fixture.awayGoals}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-xs text-muted-foreground">vs</span>
+                  )}
+                  <span className="truncate font-semibold">{fixture.away.name}</span>
+                  {fixture.status === "jugado" ? (
+                    <span className="shrink-0 text-[11px] text-muted-foreground">Jugado</span>
+                  ) : null}
+                </div>
+                <ResultReportButton fixture={fixture} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Esta jornada todavía no tiene partidos: genera el calendario desde «Sincronizar
+            calendario».
+          </p>
+        )}
       </SectionCard>
 
       <SectionCard title="Partido destacado de la jornada" icon={Swords}>
@@ -1228,12 +1100,18 @@ function RulesPanel({
   const numberField = (
     key: keyof RuleFormState,
     label: string,
-    options?: { hint?: string; step?: number },
+    options?: { hint?: string; step?: number; tip?: string },
   ) => (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={key} className="text-xs">
+      <FieldLabel
+        htmlFor={key}
+        tip={
+          options?.tip ??
+          `${label}: valor numérico que el motor de reglas aplica a toda la liga en tiempo real.`
+        }
+      >
         {label}
-      </Label>
+      </FieldLabel>
       <Input
         id={key}
         type="number"
@@ -1262,9 +1140,12 @@ function RulesPanel({
               Presupuesto y plantilla
             </legend>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="budgetMillions" className="text-xs">
-                Presupuesto (millones €)
-              </Label>
+              <FieldLabel
+                htmlFor="budgetMillions"
+                tip="Cuánto dinero recibe cada Presidente al unirse a la liga (y al reiniciarla). Con él ficha agentes libres y negocia en el mercado. Escribe el importe en millones: 50 = 50.000.000 €. No modifica los presupuestos ya gastados; lo que se suma después llega vía premios o presupuestos extra."
+              >
+                Presupuesto inicial por Presidente (millones €)
+              </FieldLabel>
               <Input
                 id="budgetMillions"
                 type="number"
@@ -1284,14 +1165,21 @@ function RulesPanel({
             </div>
             {numberField("squadSize", "Tamaño máximo de plantilla", {
               hint: "Entre 11 y 40 jugadores",
+              tip: "Máximo de jugadores que puede acumular un club (entre 11 y 40). Si lo bajas, los clubes que lo superen quedan marcados como incumplidos hasta que ajusten su plantilla. Cuanto más pequeño, más disputa por las grandes estrellas.",
             })}
-            {numberField("maxU21", "Máximo de jugadores sub-21")}
+            {numberField("maxU21", "Máximo de jugadores sub-21", {
+              tip: "Cuántos jugadores de 21 años o menos puede tener cada plantilla (entre 0 y 15). Úsalo para obligar a mezclar promesas con experiencia: 0 = prohibidos, 15 = plantilla muy joven.",
+            })}
             {numberField("maxPerRealClub", "Máximo por club real", {
               hint: "Evita concentrar la plantilla",
+              tip: "Máximo de jugadores del MISMO club del mundo que puedes tener a la vez (p. ej. no más de 2 del Real Madrid). Evita que todos repitan la once titular de un equipo. El valor mínimo habitual es 1.",
             })}
-            {numberField("minOvr", "OVR mínimo para fichar")}
+            {numberField("minOvr", "Valoración (OVR) mínima para fichar", {
+              tip: "No se permite fichar a nadie con valoración general (OVR) por debajo de este número. Baja el valor si quieres permitir madera joven o suplentes; súbelo para un mercado exclusivo de estrellas.",
+            })}
             {numberField("lineupLockHours", "Cierre de alineación (horas antes)", {
               hint: "Aplica a cada jornada",
+              tip: "Horas antes del kickoff de cada jornada en que tu alineación titular queda congelada: después no puedes cambiarla hasta el siguiente partido. 0 = se bloquea al cerrar la jornada. P. ej. 1 = hasta una hora antes.",
             })}
           </fieldset>
 
@@ -1299,14 +1187,30 @@ function RulesPanel({
             <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Cupos por posición
             </legend>
-            {numberField("gkMin", "Porteros mín.")}
-            {numberField("gkMax", "Porteros máx.")}
-            {numberField("defMin", "Defensas mín.")}
-            {numberField("defMax", "Defensas máx.")}
-            {numberField("midMin", "Medios mín.")}
-            {numberField("midMax", "Medios máx.")}
-            {numberField("fwdMin", "Delanteros mín.")}
-            {numberField("fwdMax", "Delanteros máx.")}
+            {numberField("gkMin", "Porteros · mínimo", {
+              tip: "Cuántos porteros (POR) debe tener como mínimo cada plantilla para poder alinear (lo habitual es 2). Si un club queda por debajo, el motor lo marca como incumplido hasta que lo repare.",
+            })}
+            {numberField("gkMax", "Porteros · máximo", {
+              tip: "Tope de porteros por plantilla (p. ej. 3). Deja siempre el máximo por encima del mínimo para que haya margen de elección.",
+            })}
+            {numberField("defMin", "Defensas · mínimo", {
+              tip: "Defensas (LD, DFC, LI) obligatorios en plantilla. Lo habitual es 4 o más para poder rotar en tres centrales o laterales.",
+            })}
+            {numberField("defMax", "Defensas · máximo", {
+              tip: "Tope de defensas: evita plantillas de solo defensas y obliga a repartir el presupuesto entre líneas.",
+            })}
+            {numberField("midMin", "Medios · mínimo", {
+              tip: "Mediocampistas (MCD, MC, MCO) obligatorios. Sin al menos 3-4 no podrás cubrir formaciones con mediocampo cargado.",
+            })}
+            {numberField("midMax", "Medios · máximo", {
+              tip: "Tope de mediocampistas por plantilla para que el mercado tenga demanda en todas las líneas.",
+            })}
+            {numberField("fwdMin", "Delanteros · mínimo", {
+              tip: "Delanteros (ED, EI, DC) obligatorios. Lo habitual es 3 o más para asegurar gol en cualquier formación.",
+            })}
+            {numberField("fwdMax", "Delanteros · máximo", {
+              tip: "Tope de delanteros: impide acumular solo goleadores y garantiza plantillas equilibradas.",
+            })}
           </fieldset>
         </div>
       </SectionCard>
@@ -1418,6 +1322,8 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
 
   return (
     <>
+      {overview.tournament ? <InviteCard code={overview.tournament.code} /> : null}
+
       <SectionCard title="Presidentes del torneo" icon={Users} bodyClassName="p-0">
         <div className="overflow-x-auto scroll-thin">
           <Table>
@@ -1428,7 +1334,8 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                 <TableHead className="text-center">Plantilla</TableHead>
                 <TableHead className="text-right">Presupuesto</TableHead>
                 <TableHead>Rol administrativo</TableHead>
-                <TableHead>Se unió</TableHead>
+                <TableHead>Acciones</TableHead>
+                <TableHead>Se unioprova</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1442,8 +1349,15 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                   </TableCell>
                   <TableCell className="text-sm">{president.clubName}</TableCell>
                   <TableCell className="num text-center">{president.squadSize}</TableCell>
-                  <TableCell className="num text-right">
-                    {formatMoney(president.budget)}
+                  <TableCell className="text-right">
+                    <span className="num block font-semibold">
+                      {formatMoney(president.budget)}
+                    </span>
+                    {president.budgetExtra > 0 ? (
+                      <span className="num block text-[11px] text-emerald-700 dark:text-emerald-300">
+                        +{formatMoney(president.budgetExtra)} extra
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     {president.adminRole ? (
@@ -1470,6 +1384,16 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                       <span className="text-xs text-muted-foreground">Presidencia</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1.5">
+                      <ChangeClubDialog
+                        president={president}
+                        teams={overview.availableTeams}
+                      />
+                      <GrantBudgetDialog president={president} />
+                      <RemovePresidentDialog president={president} />
+                    </div>
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {relativeTime(president.joinedAt, now)}
                   </TableCell>
@@ -1477,7 +1401,7 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
               ))}
               {overview.presidents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-muted-foreground">
+                  <TableCell colSpan={7} className="text-sm text-muted-foreground">
                     Todavía no hay Presidentes registrados en el torneo.
                   </TableCell>
                 </TableRow>
@@ -1491,13 +1415,17 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
         <form onSubmit={submit} className="flex flex-col gap-4">
           <p className="text-xs leading-relaxed text-muted-foreground">
             El rol administrativo se asigna a una cuenta existente: la persona debe registrarse
-            primero con ese correo. Puede seguir siendo Presidente de su club.
+            primero con ese correo. Puede seguir siendo Presidente de su club. Para invitar a
+            nuevos <strong>Presidentes</strong> usa el link compartible de arriba.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="adminEmail" className="text-xs">
-                Correo de la cuenta
-              </Label>
+              <FieldLabel
+                htmlFor="adminEmail"
+                tip="Correo con el que esa persona YA tiene cuenta en 11Eleven. Si aún no está registrada, pídele que cree la cuenta con este correo y vuelve a asignarle el rol. Este campo no invita Presidentes: para eso comparte el link."
+              >
+                Correo electrónico de la cuenta
+              </FieldLabel>
               <Input
                 id="adminEmail"
                 type="email"
@@ -1509,9 +1437,12 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="adminRole" className="text-xs">
-                Rol
-              </Label>
+              <FieldLabel
+                htmlFor="adminRole"
+                tip="Administrador principal: control total (reglas, presidentes, resultados, premios y reinicio) y todos los permisos. Co-Administrador: solo los permisos que marques abajo. Ambos roles conviven con la presidencia de un club."
+              >
+                Rol administrativo
+              </FieldLabel>
               <Select
                 value={role}
                 onValueChange={(value) => setRole(value as "principal" | "coAdmin")}
@@ -1533,8 +1464,12 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
 
           {role === "coAdmin" ? (
             <fieldset>
-              <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Permisos del torneo
+              <legend className="mb-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Permisos del Co-Administrador
+                <Tip
+                  side="right"
+                  text="Marca lo que podrá hacer: «Calendario» = cerrar jornadas y registrar resultados detallados; «Presidentes» = cambiar equipos, eliminar presidencias y asignar presupuesto extra; «Configuración» = reglas, competición FC 27, premios y reinicio de liga. Déjalo vacío para un rol de solo lectura."
+                />
               </legend>
               <div className="grid gap-2 sm:grid-cols-3">
                 {Object.entries(PERMISSION_LABELS).map(([key, label]) => {

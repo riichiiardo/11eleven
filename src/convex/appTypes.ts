@@ -43,6 +43,8 @@ export type TournamentView = {
   currentMatchday: number;
   totalMatchdays: number;
   marketOpen: boolean;
+  /** EA SPORTS FC 27 competition this league mirrors (fc27Catalog.ts). */
+  competitionId: string | null;
   nextMatchdayAt: number | null;
 };
 
@@ -57,10 +59,79 @@ export type PresidentView = {
   clubShortName: string;
   clubColors: [string, string];
   budget: number;
+  /** Extra budget granted by Administration (official extra events). */
+  budgetExtra: number;
   joinedAt: number;
   isAdmin: boolean;
   adminRole: "principal" | "coAdmin" | null;
   squadSize: number;
+};
+
+/** Prize configured for a final position of a given phase. */
+export type PrizeView = {
+  id: Id<"prizes">;
+  phase: "todos_contra_todos" | "cuadrangulares" | "fase_siguiente";
+  position: number;
+  label: string;
+  amount: number;
+};
+
+/** Extra budget granted to a president for an official extra event. */
+export type BudgetGrantView = {
+  id: Id<"budgetGrants">;
+  presidentId: Id<"presidents">;
+  presidentNickname: string;
+  concept: string;
+  amount: number;
+  createdAt: number;
+};
+
+/** A team a president can be moved to by Administration. */
+export type AvailableTeamView = {
+  /** Catalogue entry (team not instantiated in this league yet). */
+  catalogTeamId: Id<"teamCatalog"> | null;
+  /** Existing league club without president (already in the calendar). */
+  leagueClubId: Id<"clubs"> | null;
+  name: string;
+  league: string;
+  country: string;
+  colors: [string, string];
+};
+
+export type FixtureReportPlayerView = {
+  playerId: Id<"players">;
+  name: string;
+  position: Position;
+  group: PositionGroup;
+  ovr: number;
+};
+
+export type FixtureReportSideView = {
+  clubId: Id<"clubs">;
+  name: string;
+  players: FixtureReportPlayerView[];
+};
+
+export type FixtureReportEntryView = {
+  clubId: Id<"clubs">;
+  playerId: Id<"players">;
+  name: string;
+};
+
+/** Detailed result form data (score, goals, cards and injuries per club). */
+export type FixtureReportView = {
+  home: FixtureReportSideView;
+  away: FixtureReportSideView;
+  report: {
+    homeGoals: number;
+    awayGoals: number;
+    goals: Array<FixtureReportEntryView & { count: number }>;
+    yellowCards: FixtureReportEntryView[];
+    redCards: FixtureReportEntryView[];
+    injuries: Array<FixtureReportEntryView & { matchdays: number }>;
+    reporterName: string;
+    updatedAt: number;
+  } | null;
 };
 
 export type AdminView = {
@@ -106,6 +177,12 @@ export type AdminOverviewView = {
   admins: AdminView[];
   clubs: ClubView[];
   activity: AuditEntryView[];
+  /** Prize table configured before the league starts. */
+  prizes: PrizeView[];
+  /** Free teams a president can be moved to. */
+  availableTeams: AvailableTeamView[];
+  /** Latest extra-budget grants (official extra events). */
+  grants: BudgetGrantView[];
   market: {
     reserved: OfferView[];
     recent: OfferView[];
@@ -466,7 +543,13 @@ export type LeagueSummaryView = {
  */
 export type NeedsLeagueState = {
   needsLeague: true;
-  user: { id: Id<"users">; name: string; email: string; nickname: string };
+  user: {
+    id: Id<"users">;
+    name: string;
+    email: string;
+    nickname: string;
+    image: string | null;
+  };
   leagues: LeagueSummaryView[];
 };
 
@@ -476,7 +559,13 @@ export type AppStateView = {
   needsLeague: false;
   /** Every league the user belongs to, active one first. */
   leagues: LeagueSummaryView[];
-  user: { id: Id<"users">; name: string; email: string; nickname: string };
+  user: {
+    id: Id<"users">;
+    name: string;
+    email: string;
+    nickname: string;
+    image: string | null;
+  };
   tournament: TournamentView | null;
   rules: TournamentRules | null;
   president: PresidentView | null;

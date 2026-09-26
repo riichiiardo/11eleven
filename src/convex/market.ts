@@ -27,6 +27,7 @@ import {
   type SquadPlayerView,
   type TournamentRules,
 } from "./rulesEngine";
+import { positionValidator } from "./schema";
 import {
   COMMITTED_STATUSES,
   OFFER_STATUS_META,
@@ -171,26 +172,72 @@ const groupArg = v.union(
   v.literal("todos"),
 );
 
+/** Display order of the ten on-pitch positions (for sorting). */
+const POSITION_ORDER: Record<string, number> = {
+  POR: 0,
+  LD: 1,
+  DFC: 2,
+  LI: 3,
+  MCD: 4,
+  MC: 5,
+  MCO: 6,
+  ED: 7,
+  EI: 8,
+  DC: 9,
+};
+
+const sortArg = v.union(
+  v.literal("ovr"),
+  v.literal("value"),
+  v.literal("age"),
+  v.literal("name"),
+  v.literal("position"),
+  v.literal("nationality"),
+);
+
+/** Natural direction of each sort key when the UI does not force one. */
+function defaultSortDir(
+  sort: "ovr" | "value" | "age" | "name" | "position" | "nationality",
+): "asc" | "desc" {
+  return sort === "ovr" || sort === "value" ? "desc" : "asc";
+}
+
 export const browse = query({
   args: {
     scope: v.union(v.literal("todos"), v.literal("libre"), v.literal("clubes")),
     search: v.optional(v.string()),
     group: v.optional(groupArg),
-    minOvr: v.optional(v.number()),
-    sort: v.optional(
+    /** Exact position filter (POR…DC) — "todos" disables it. */
+    position: v.optional(
       v.union(
-        v.literal("ovr"),
-        v.literal("value"),
-        v.literal("age"),
-        v.literal("name"),
+        positionValidator,
+        v.literal("todos"),
       ),
     ),
+    minOvr: v.optional(v.number()),
+    ovrMin: v.optional(v.number()),
+    ovrMax: v.optional(v.number()),
+    ageMin: v.optional(v.number()),
+    ageMax: v.optional(v.number()),
+    /** Players whose value is at most this amount (0 € … maxValue). */
+    maxValue: v.optional(v.number()),
+    /** Exact nationality ("todas" disables it). */
+    nationality: v.optional(v.string()),
+    sort: v.optional(sortArg),
+    sortDir: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
     onlyAffordable: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<MarketPlayerView[]> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    players: MarketPlayerView[];
+    total: number;
+    nationalities: string[];
+  }> => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    if (!userId) return { players: [], total: 0, nationalities: [] };
     const { tournament, president } = await loadMarketContext(ctx, userId);
 
     const ownership = await ownershipRows(ctx, tournament._id);
@@ -249,6 +296,19 @@ export const browse = query({
       if (args.scope === "clubes" && freeAgent) continue;
       if (args.group && args.group !== "todos" && player.group !== args.group) continue;
       if (typeof args.minOvr === "number" && player.ovr < args.minOvr) continue;
+      if (typeof args.ovrMin === "number" && player.ovr < args.ovrMin) continue;
+      if (typeof args.ovrMax === "number" && player.ovr > args.ovrMax) continue;
+      if (typeof args.ageMin === "number" && player.age < args.ageMin) continue;
+      if (typeof args.ageMax === "number" && player.age > args.ageMax) continue;
+      if (args.position && args.position !== "todos" && player.position !== args.position) continue;
+      if (typeof args.maxValue === "number" && player.value > args.maxValue) continue;
+      if (
+        args.nationality &&
+        args.nationality !== "todas" &&
+        player.nationality.trim().toLowerCase() !== args.nationality.trim().toLowerCase()
+      ) {
+        continue;
+      }
 
       const term = args.search?.trim().toLowerCase();
       if (term) {
@@ -318,11 +378,18 @@ export const browse = query({
     }
 
     const sort = args.sort ?? "ovr";
+    const direction = (args.sortDir ?? defaultSortDir(sort)) === "asc" ? 1 : -1;
     rows.sort((a, b) => {
-      if (sort === "value") return b.value - a.value;
-      if (sort === "age") return a.age - b.age;
-      if (sort === "name") return a.name.localeCompare(b.name);
-      return b.ovr - a.ovr;
+      let diff = 0;
+      if (sort === "value") diff = a.value - b.value;
+      else if (sort === "age") diff = a.age - b.age;
+      else if (sort === "name") diff = a.name.localeCompare(b.name);
+      else if (sort === "nationality") diff = a.nationality.localeCompare(b.nationality);
+      else if (sort === "position")
+        diff = (POSITION_ORDER[a.position] ?? 99) - (POSITION_ORDER[b.position] ?? 99);
+      else diff = a.ovr - b.ovr;
+      if (diff === 0) return b.ovr - a.ovr; // stable, meaningful tie-break
+      return diff * direction;
     });
 
     const matches = args.onlyAffordable
@@ -331,7 +398,7 @@ export const browse = query({
     // Presenter fields (nicknames) are hydrated only for the page we return:
     // with a 19k-player catalogue this keeps the query well inside Convex's
     // 1-second user-code budget and its per-transaction read limits.
-    return await Promise.all(
+    const players = await Promise.all(
       matches.slice(0, args.limit ?? 60).map(async (row) => ({
         ...row,
         ownerNickname: row.ownerPresidentId
@@ -339,6 +406,15 @@ export const browse = query({
           : null,
       })),
     );
+
+    // Facets for the filter bar: every nationality present in the catalogue.
+    const nationalities = [...new Set(
+      catalogue
+        .map((player) => player.nationality.trim())
+        .filter((nationality) => nationality.length > 0),
+    )].sort((a, b) => a.localeCompare(b));
+
+    return { players, total: matches.length, nationalities };
   },
 });
 

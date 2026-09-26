@@ -121,6 +121,8 @@ function UserMenu({
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const [leaguesOpen, setLeaguesOpen] = useState(false);
+  const [brokenImage, setBrokenImage] = useState<string | null>(null);
+  const photo = state.user.image;
   const initials = state.user.name
     .split(/\s+/)
     .map((part) => part[0])
@@ -145,9 +147,19 @@ function UserMenu({
               : "text-sidebar-foreground hover:bg-sidebar-accent",
           )}
         >
-          <span className="display flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-brand to-navy text-sm font-bold text-white">
-            {initials || "P"}
-          </span>
+          {photo && brokenImage !== photo ? (
+            <img
+              key={photo}
+              src={photo}
+              alt=""
+              onError={() => setBrokenImage(photo)}
+              className="size-9 rounded-full object-cover ring-1 ring-gold/40"
+            />
+          ) : (
+            <span className="display flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-brand to-navy text-sm font-bold text-white">
+              {initials || "P"}
+            </span>
+          )}
           <span className="hidden flex-col leading-tight sm:flex">
             <span className="truncate text-sm font-semibold">{state.user.name}</span>
             <span className="truncate text-[11px] text-muted-foreground">

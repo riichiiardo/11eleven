@@ -107,6 +107,13 @@ export const fixtureStatusValidator = v.union(
   v.literal("jugado"),
 );
 
+/** Phase a prize row belongs to (round-robin, groups/knockout rounds, next phase). */
+export const prizePhaseValidator = v.union(
+  v.literal("todos_contra_todos"),
+  v.literal("cuadrangulares"),
+  v.literal("fase_siguiente"),
+);
+
 /** Permission keys a co-administrator can be granted. */
 export const PERMISSIONS = [
   "configuracion",
@@ -154,6 +161,12 @@ const schema = defineSchema(
       nextMatchdayAt: v.optional(v.number()),
       /** The President who created the league (Administrador principal). */
       ownerUserId: v.optional(v.id("users")),
+      /**
+       * EA SPORTS FC 27 competition this league mirrors (see fc27Catalog.ts).
+       * The FC27 catalogue is the ONLY source for creating/configuring
+       * tournaments, so both games stay in parity.
+       */
+      competitionId: v.optional(v.string()),
       createdAt: v.number(),
     }).index("by_code", ["code"]),
 
@@ -314,6 +327,8 @@ const schema = defineSchema(
       ovrAtJoin: v.number(),
       valueAtJoin: v.number(),
       joinedAt: v.number(),
+      /** Matchday from which the player is injured (reported match result). */
+      injuredUntilMatchday: v.optional(v.number()),
     })
       .index("by_tournament", ["tournamentId"])
       .index("by_squad", ["squadId"])
@@ -423,6 +438,80 @@ const schema = defineSchema(
       .index("by_draft", ["draftId"])
       .index("by_player", ["playerId"])
       .index("by_president", ["presidentId"]),
+
+    /* ----------------------------------------------------------------
+     * Administration: prizes, extra budgets and detailed match reports
+     * ---------------------------------------------------------------- */
+
+    /**
+     * Prize for a final position, assigned BEFORE the league starts. Each
+     * phase (todos contra todos, cuadrangulares/liguillas, fase siguiente)
+     * carries its own position table.
+     */
+    prizes: defineTable({
+      tournamentId: v.id("tournaments"),
+      phase: prizePhaseValidator,
+      /** 1-based final position (or group place) inside that phase. */
+      position: v.number(),
+      /** Human label shown next to the position ("Campeón", "Descenso"…). */
+      label: v.string(),
+      /** Prize money in euros. */
+      amount: v.number(),
+      updatedAt: v.number(),
+      updatedBy: v.optional(v.id("users")),
+    })
+      .index("by_tournament", ["tournamentId"]),
+
+    /** Extra budget granted by Administration for official extra events. */
+    budgetGrants: defineTable({
+      tournamentId: v.id("tournaments"),
+      presidentId: v.id("presidents"),
+      /** Why the extra budget is granted (official event, bonus, sanction…). */
+      concept: v.string(),
+      amount: v.number(),
+      grantedBy: v.optional(v.id("users")),
+      createdAt: v.number(),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_president", ["presidentId"]),
+
+    /**
+     * Detailed match report entered by an Administrator/Co-Administrator:
+     * score, goals per player, cards per player and injuries with duration.
+     */
+    fixtureReports: defineTable({
+      tournamentId: v.id("tournaments"),
+      fixtureId: v.id("fixtures"),
+      homeGoals: v.number(),
+      awayGoals: v.number(),
+      goals: v.array(
+        v.object({
+          clubId: v.id("clubs"),
+          playerId: v.id("players"),
+          count: v.number(),
+        }),
+      ),
+      yellowCards: v.array(
+        v.object({ clubId: v.id("clubs"), playerId: v.id("players") }),
+      ),
+      redCards: v.array(
+        v.object({ clubId: v.id("clubs"), playerId: v.id("players") }),
+      ),
+      injuries: v.array(
+        v.object({
+          clubId: v.id("clubs"),
+          playerId: v.id("players"),
+          /** How many matchdays the player will be out. */
+          matchdays: v.number(),
+        }),
+      ),
+      reportedBy: v.optional(v.id("users")),
+      reporterName: v.string(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+      .index("by_tournament", ["tournamentId"])
+      .index("by_fixture", ["fixtureId"]),
 
     /* ----------------------------------------------------------------
      * Audit trail — every critical operation leaves a trace

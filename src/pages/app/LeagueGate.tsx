@@ -7,6 +7,10 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { BrandLockup } from "@/components/eleven/Brand";
 import { Crest } from "@/components/eleven/Crest";
+import {
+  CompetitionPicker,
+  DEFAULT_FC27_ID,
+} from "@/components/eleven/CompetitionPicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,13 +43,14 @@ export default function LeagueGate({ state }: { state: NeedsLeagueState }) {
   );
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [competitionId, setCompetitionId] = useState<string>(DEFAULT_FC27_ID);
   const [busy, setBusy] = useState(false);
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = await createLeague({ name });
+      const result = await createLeague({ name, competitionId });
       toast.success(`Liga ${result.name} creada`, {
         description:
           "Eres el Administrador principal. Siguiente paso: configura las reglas de tu liga.",
@@ -168,6 +173,14 @@ export default function LeagueGate({ state }: { state: NeedsLeagueState }) {
             onSubmit={create}
             className="flex flex-col gap-4 rounded-2xl border border-white/12 bg-white/[0.05] p-5"
           >
+            <CompetitionPicker
+              id="leagueCompetition"
+              value={competitionId}
+              onChange={setCompetitionId}
+              dark
+              disabled={busy}
+              hint="Cada liga replica una competición real de EA SPORTS FC 27: así el juego y 11ELEVEN siempre coinciden."
+            />
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="leagueName" className="text-xs text-white/80">
                 Nombre de tu liga

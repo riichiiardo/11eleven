@@ -3,6 +3,8 @@ import type { AppStateView } from "@/convex/appTypes";
 import { api } from "@/convex/_generated/api";
 import { formatMoney } from "@/convex/rulesEngine";
 import { errorMessage, formatDate } from "@/lib/errors";
+import { COACH_AVATARS } from "@/lib/coachAvatars";
+import { fileToAvatarDataUrl } from "@/lib/images";
 import { useAuth } from "@/hooks/use-auth";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
@@ -13,7 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Loader2, LogOut, Shield, ShieldCheck, User } from "lucide-react";
+import { Camera, Crown, Loader2, LogOut, Shield, ShieldCheck, Upload, User, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const PERMISSION_LABELS: Record<string, string> = {
   configuracion: "Configuración",
@@ -32,6 +35,9 @@ export default function Profile() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const updateProfile = useMutation(api.tournament.updateProfile);
+  const updateAvatar = useMutation(api.tournament.updateAvatar);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
 
   const serverNickname = (state.president?.nickname ?? state.user.nickname).replace("@", "");
   const [nickname, setNickname] = useState(serverNickname);
@@ -67,6 +73,66 @@ export default function Profile() {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const photo = state.user.image;
+  const initials =
+    state.user.name
+      .split(/\s+/)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "P";
+
+  const saveAvatar = async (image: string, description: string) => {
+    setAvatarBusy(true);
+    try {
+      await updateAvatar({ image });
+      setBrokenPhoto(null);
+      toast.success("Foto de perfil actualizada", { description });
+    } catch (cause) {
+      toast.error("No se pudo actualizar la foto", {
+        description: errorMessage(cause),
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setAvatarBusy(true);
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      await saveAvatar(
+        dataUrl,
+        "Recortada a 320 px en tu dispositivo y guardada en tu cuenta.",
+      );
+    } catch (cause) {
+      toast.error("No se pudo usar esa imagen", {
+        description: errorMessage(cause),
+      });
+      setAvatarBusy(false);
+    }
+  };
+
+  const clearAvatar = async () => {
+    setAvatarBusy(true);
+    try {
+      await updateAvatar({ image: undefined });
+      setBrokenPhoto(null);
+      toast.success("Foto eliminada", {
+        description: "Vuelves a mostrar tus iniciales.",
+      });
+    } catch (cause) {
+      toast.error("No se pudo quitar la foto", {
+        description: errorMessage(cause),
+      });
+    } finally {
+      setAvatarBusy(false);
+    }
   };
 
   return (
@@ -177,6 +243,131 @@ export default function Profile() {
           </div>
         </SectionCard>
       </div>
+
+      <SectionCard title="Foto de perfil" icon={Camera} bodyClassName="flex flex-col gap-4">
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          Sube una foto desde tu dispositivo (se recorta sola a un círculo) o elige una de la
+          galería de técnicos de fútbol reales. La verás en tu perfil y en el menú de usuario.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-4">
+          {photo && brokenPhoto !== photo ? (
+            <img
+              key={photo}
+              src={photo}
+              alt={`Foto de ${state.user.name}`}
+              onError={() => setBrokenPhoto(photo)}
+              className="size-20 rounded-full object-cover ring-2 ring-gold/50"
+            />
+          ) : (
+            <span className="display flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-brand to-navy text-xl font-bold text-white ring-2 ring-gold/50">
+              {initials}
+            </span>
+          )}
+
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <p className="text-xs text-muted-foreground">
+              Formatos admitidos: JPG, PNG o WEBP. Las imágenes se procesan en tu navegador y
+              solo se envía la versión ya recortada de 320 px.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <label
+                className={cn(
+                  "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90",
+                  avatarBusy && "pointer-events-none opacity-60",
+                )}
+              >
+                <Upload className="size-4" aria-hidden="true" />
+                Subir desde mi dispositivo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => void handleFile(event)}
+                  disabled={avatarBusy}
+                />
+              </label>
+              {photo ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={avatarBusy}
+                  onClick={() => void clearAvatar()}
+                >
+                  <X className="size-4" aria-hidden="true" />
+                  Quitar foto
+                </Button>
+              ) : null}
+              {avatarBusy ? (
+                <span className="inline-flex min-h-11 items-center gap-2 px-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  Guardando…
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <fieldset className="rounded-xl border p-3">
+          <legend className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Galería de técnicos reales
+          </legend>
+          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {COACH_AVATARS.map((coach) => {
+              const selected = photo === coach.photo;
+              const broken = brokenPhoto === coach.photo;
+              return (
+                <li key={coach.id}>
+                  <button
+                    type="button"
+                    disabled={avatarBusy}
+                    aria-pressed={selected}
+                    title={`Usar la foto de ${coach.name}`}
+                    onClick={() =>
+                      void saveAvatar(
+                        coach.photo,
+                        `Ahora usas la foto de ${coach.name} (Wikimedia Commons).`,
+                      )
+                    }
+                    className={cn(
+                      "flex w-full flex-col items-center gap-1.5 rounded-lg border p-2 transition-colors",
+                      selected
+                        ? "border-primary bg-primary/10 ring-1 ring-primary"
+                        : "hover:bg-accent",
+                    )}
+                  >
+                    {broken ? (
+                      <span className="display flex size-12 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                        {coach.name
+                          .split(/\s+/)
+                          .map((part) => part[0])
+                          .slice(0, 2)
+                          .join("")}
+                      </span>
+                    ) : (
+                      <img
+                        src={coach.photo}
+                        alt={coach.name}
+                        loading="lazy"
+                        onError={() => setBrokenPhoto(coach.photo)}
+                        className="size-12 rounded-full bg-muted object-cover"
+                      />
+                    )}
+                    <span className="w-full truncate text-center text-[10px] font-semibold">
+                      {coach.name}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            Fotos de Wikimedia Commons bajo licencias abiertas (CC BY / CC BY-SA / dominio
+            público). Si una imagen no carga, se muestran tus iniciales.
+          </p>
+        </fieldset>
+      </SectionCard>
 
       {state.club && state.president ? (
         <SectionCard title="Presidencia actual" icon={Shield}>

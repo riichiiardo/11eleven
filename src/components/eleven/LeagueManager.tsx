@@ -17,6 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  CompetitionPicker,
+  DEFAULT_FC27_ID,
+} from "@/components/eleven/CompetitionPicker";
 import { ArrowRight, CheckCircle2, Loader2, Plus, Swords } from "lucide-react";
 
 /**
@@ -40,6 +44,7 @@ export function LeagueManagerDialog({
 
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [competitionId, setCompetitionId] = useState<string>(DEFAULT_FC27_ID);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const busy = busyKey !== null;
 
@@ -65,7 +70,7 @@ export function LeagueManagerDialog({
     event.preventDefault();
     setBusyKey("crear");
     try {
-      const result = await createLeague({ name });
+      const result = await createLeague({ name, competitionId });
       toast.success(`Liga ${result.name} creada`, {
         description:
           "Eres el Administrador principal. Siguiente paso: configura las reglas de tu liga.",
@@ -173,6 +178,13 @@ export function LeagueManagerDialog({
           <Label htmlFor="newLeagueName" className="text-xs">
             Crear una liga nueva (prueba limpia)
           </Label>
+          <CompetitionPicker
+            id="newLeagueCompetition"
+            value={competitionId}
+            onChange={setCompetitionId}
+            disabled={busy}
+            hint="La liga replica una competición oficial de EA SPORTS FC 27 (paridad con el juego)."
+          />
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               id="newLeagueName"

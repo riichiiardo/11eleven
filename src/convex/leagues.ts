@@ -25,6 +25,7 @@ import {
 } from "./context";
 import { DEFAULT_RULES } from "./rulesEngine";
 import { PERMISSIONS } from "./schema";
+import { fc27Competition, fc27Matchdays, isValidFc27Id } from "./fc27Catalog";
 import { seedTeamCatalogFallback } from "./tournament";
 
 /** Maximum squads allowed per league — protects the draft/competition engines. */
@@ -167,14 +168,23 @@ export const teamCatalogForMe = query({
 export const createLeague = mutation({
   args: {
     name: v.string(),
+    /** EA SPORTS FC 27 competition this league mirrors (fc27Catalog.ts). */
+    competitionId: v.string(),
     season: v.optional(v.string()),
     budget: v.optional(v.number()),
     squadSize: v.optional(v.number()),
   },
-  handler: async (ctx, { name, season, budget, squadSize }) => {
+  handler: async (ctx, { name, competitionId, season, budget, squadSize }) => {
     const userId = requireAuth(await getAuthUserId(ctx));
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError("No se encontró tu cuenta.");
+
+    if (!isValidFc27Id(competitionId)) {
+      throw new ConvexError(
+        "Las ligas solo pueden crearse con las competiciones oficiales de EA SPORTS FC 27: elige una del catálogo.",
+      );
+    }
+    const competition = fc27Competition(competitionId)!;
 
     const cleanName = name.trim();
     if (cleanName.length < 3 || cleanName.length > 60) {
@@ -203,10 +213,11 @@ export const createLeague = mutation({
       season: seasonLabel,
       status: "configuracion",
       currentMatchday: 1,
-      totalMatchdays: 38,
+      totalMatchdays: fc27Matchdays(competition),
       marketOpen: false,
       nextMatchdayAt: now + WEEK_MS,
       ownerUserId: userId,
+      competitionId,
       createdAt: now,
     });
 
@@ -249,7 +260,7 @@ export const createLeague = mutation({
       action: "Liga creada",
       entity: "tournament",
       entityId: tournamentId,
-      detail: `${cleanName} (${seasonLabel}) · código de invitación ${code} · el creador es Administrador principal`,
+      detail: `${cleanName} (${seasonLabel}) · competición «${competition.name}» (${competition.country}) de EA SPORTS FC 27 · ${fc27Matchdays(competition)} jornadas · código de invitación ${code} · el creador es Administrador principal`,
     });
 
     return { tournamentId, code, name: cleanName };

@@ -81,7 +81,7 @@ function requireAuth(userId: Id<"users"> | null): Id<"users"> {
   return userId;
 }
 
-async function requireAdmin(
+export async function requireAdmin(
   ctx: QueryCtx | MutationCtx,
   tournamentId: Id<"tournaments">,
   userId: Id<"users">,
@@ -310,6 +310,7 @@ export const state = query({
       name: user.name?.trim() || baseNickname.replace("@", ""),
       email,
       nickname: baseNickname,
+      image: user.image ?? null,
     };
 
     const tournament = await getTournament(ctx);
@@ -513,6 +514,13 @@ export const state = query({
         .reduce((sum, offer) => sum + offer.cash, 0),
     };
 
+    // Extra budget granted by Administration (official extra events).
+    const extraGrants = await ctx.db
+      .query("budgetGrants")
+      .withIndex("by_president", (q) => q.eq("presidentId", president._id))
+      .collect();
+    const budgetExtra = extraGrants.reduce((sum, grant) => sum + grant.amount, 0);
+
     return {
       needsClub: false,
       needsLeague: false,
@@ -534,6 +542,7 @@ export const state = query({
           club?.colorSecondary ?? "#0b1a30",
         ],
         budget: president.budget,
+        budgetExtra,
         joinedAt: president.joinedAt,
         isAdmin: Boolean(admin),
         adminRole: admin?.role ?? null,
@@ -871,6 +880,51 @@ export const updateProfile = mutation({
   },
 });
 
+/**
+ * Profile picture: either an URL (the curated pool of real managers) or a
+ * data URL resized on the device before upload (Convex documents cap at 1 MiB).
+ */
+export const updateAvatar = mutation({
+  args: { image: v.optional(v.string()) },
+  handler: async (ctx, { image }) => {
+    const userId = requireAuth(await getAuthUserId(ctx));
+    const tournament = await getTournament(ctx);
+    const trimmed = image?.trim() ?? "";
+
+    if (!trimmed) {
+      await ctx.db.patch(userId, { image: undefined });
+      return { image: null as string | null };
+    }
+
+    const isUrl = /^https:\/\/\S+$/.test(trimmed) && trimmed.length <= 600;
+    const isDataUrl =
+      /^data:image\/(jpeg|png|webp);base64,/.test(trimmed) && trimmed.length <= 900_000;
+    if (!isUrl && !isDataUrl) {
+      throw new ConvexError(
+        "Usa una foto de la galería o sube una imagen JPG/PNG/WEBP de hasta 1 MB (se recorta automáticamente en tu dispositivo).",
+      );
+    }
+
+    await ctx.db.patch(userId, { image: trimmed });
+
+    if (tournament) {
+      await logAudit(ctx, {
+        tournamentId: tournament._id,
+        actorUserId: userId,
+        actorName: (await ctx.db.get(userId))?.name ?? "Presidente",
+        action: "Foto de perfil actualizada",
+        entity: "user",
+        entityId: userId,
+        detail: isUrl
+          ? "Nueva foto tomada de la galería de técnicos"
+          : "Nueva foto subida desde su dispositivo (recortada a 320 px)",
+      });
+    }
+
+    return { image: trimmed };
+  },
+});
+
 /* ------------------------------------------------------------------ *
  * Administration
  * ------------------------------------------------------------------ */
@@ -890,6 +944,48 @@ export const adminOverview = query({
     const admins = await buildAdmins(ctx, tournament._id);
     const clubs = await buildClubViews(ctx, tournament._id);
     const activity = await buildActivity(ctx, tournament._id, 40);
+
+    // Prize table + recent extra-budget grants (admin configuration views).
+    const prizeRows = await ctx.db
+      .query("prizes")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    const grantRows = await ctx.db
+      .query("budgetGrants")
+      .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+      .collect();
+    const presidentById = new Map(presidents.map((row) => [row.id as string, row]));
+
+    // Free teams a president can be moved to: league clubs without president
+    // plus catalogue teams not instantiated in this league yet.
+    const instantiatedCatalogIds = new Set(
+      clubs
+        .filter((club) => club.catalogTeamId)
+        .map((club) => club.catalogTeamId as string),
+    );
+    const catalogTeams = await ctx.db.query("teamCatalog").collect();
+    const availableTeams: AdminOverviewView["availableTeams"] = [
+      ...clubs
+        .filter((club) => !club.presidentNickname)
+        .map((club) => ({
+          catalogTeamId: club.catalogTeamId,
+          leagueClubId: club.id,
+          name: club.name,
+          league: club.league,
+          country: club.country,
+          colors: [club.colorPrimary, club.colorSecondary] as [string, string],
+        })),
+      ...catalogTeams
+        .filter((team) => !instantiatedCatalogIds.has(team._id as string))
+        .map((team) => ({
+          catalogTeamId: team._id,
+          leagueClubId: null,
+          name: team.name,
+          league: team.league,
+          country: team.country,
+          colors: [team.colorPrimary, team.colorSecondary] as [string, string],
+        })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
 
     const squads = await ctx.db
       .query("squads")
@@ -917,6 +1013,30 @@ export const adminOverview = query({
       admins,
       clubs,
       activity,
+      prizes: prizeRows
+        .map((row) => ({
+          id: row._id,
+          phase: row.phase,
+          position: row.position,
+          label: row.label,
+          amount: row.amount,
+        }))
+        .sort((a, b) =>
+          a.phase === b.phase ? a.position - b.position : a.phase.localeCompare(b.phase),
+        ),
+      availableTeams,
+      grants: grantRows
+        .map((row) => ({
+          id: row._id,
+          presidentId: row.presidentId,
+          presidentNickname:
+            presidentById.get(row.presidentId as string)?.nickname ?? "—",
+          concept: row.concept,
+          amount: row.amount,
+          createdAt: row.createdAt,
+        }))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 20),
       market: {
         open: tournament.marketOpen,
         reserved: offerViews.filter(

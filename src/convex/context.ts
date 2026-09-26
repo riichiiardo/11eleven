@@ -116,6 +116,7 @@ export function toTournamentView(doc: Doc<"tournaments">): TournamentView {
     currentMatchday: doc.currentMatchday,
     totalMatchdays: doc.totalMatchdays,
     marketOpen: doc.marketOpen,
+    competitionId: doc.competitionId ?? null,
     nextMatchdayAt: doc.nextMatchdayAt ?? null,
   };
 }
@@ -597,6 +598,19 @@ export async function buildPresidents(
     .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
     .collect();
 
+  // Extra budgets granted by Administration (one read for the whole league).
+  const grants = await ctx.db
+    .query("budgetGrants")
+    .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+    .collect();
+  const extraByPresident = new Map<string, number>();
+  for (const grant of grants) {
+    extraByPresident.set(
+      grant.presidentId as string,
+      (extraByPresident.get(grant.presidentId as string) ?? 0) + grant.amount,
+    );
+  }
+
   const views: PresidentView[] = [];
   for (const president of presidents) {
     const club = await ctx.db.get(president.clubId);
@@ -627,6 +641,7 @@ export async function buildPresidents(
         club?.colorSecondary ?? "#0b1a30",
       ],
       budget: president.budget,
+      budgetExtra: extraByPresident.get(president._id as string) ?? 0,
       joinedAt: president.joinedAt,
       isAdmin: Boolean(admin),
       adminRole: admin?.role ?? null,

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as adminOps from "../adminOps.js";
 import type * as appTypes from "../appTypes.js";
 import type * as auth from "../auth.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
@@ -18,6 +19,7 @@ import type * as context from "../context.js";
 import type * as draft from "../draft.js";
 import type * as draftEngine from "../draftEngine.js";
 import type * as draftSelfTest from "../draftSelfTest.js";
+import type * as fc27Catalog from "../fc27Catalog.js";
 import type * as footballApi from "../footballApi.js";
 import type * as footballData from "../footballData.js";
 import type * as footballSync from "../footballSync.js";
@@ -39,6 +41,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  adminOps: typeof adminOps;
   appTypes: typeof appTypes;
   auth: typeof auth;
   "auth/emailOtp": typeof auth_emailOtp;
@@ -49,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   draft: typeof draft;
   draftEngine: typeof draftEngine;
   draftSelfTest: typeof draftSelfTest;
+  fc27Catalog: typeof fc27Catalog;
   footballApi: typeof footballApi;
   footballData: typeof footballData;
   footballSync: typeof footballSync;
