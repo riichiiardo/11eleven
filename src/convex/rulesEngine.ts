@@ -401,7 +401,7 @@ export const RULE_DESCRIPTORS: RuleDescriptor[] = [
     code: "R-13",
     title: "Formación exportada del FC 27",
     description:
-      "Código de formación seleccionado en el FC 27 y las instrucciones tácticas adicionales del presidente (cambios previstos, rango de minutos, bloqueos de posiciones…). El código se enlaza con los cinco formatos estándar del motor para mantener un XI siempre legal.",
+      "Código de formación seleccionado en el FC 27 y las instrucciones tácticas adicionales del presidente (cambios previstos, rango de minutos, bloqueos de posiciones…). El código se enlaza con los 22 esquemas del menú de tácticas del FC 27 para mantener un XI siempre legal.",
     scope: "Plantilla",
     value: (r) =>
       `${r.fc27FormationCode} · ${r.formationInstructions.length > 60 ? r.formationInstructions.slice(0, 60) + "…" : r.formationInstructions}`,
@@ -704,12 +704,30 @@ export type FormationSlot = {
   y: number;
 };
 
+/** Los 22 esquemas del menú de tácticas del FC 27. */
 export type FormationCode =
-  | "4-2-3-1"
-  | "4-3-3"
-  | "4-4-2"
+  | "3-2-2-3"
+  | "3-4-2-1"
+  | "3-4-3"
   | "3-5-2"
-  | "5-2-3";
+  | "4-1-2-1-2"
+  | "4-1-3-2"
+  | "4-2-1-3"
+  | "4-2-2-2"
+  | "4-2-3-1"
+  | "4-2-4"
+  | "4-3-1-2"
+  | "4-3-2-1"
+  | "4-3-3"
+  | "4-3-3 (2)"
+  | "4-4-1-1"
+  | "4-4-2"
+  | "4-5-1"
+  | "5-1-2-1-2"
+  | "5-2-1-2"
+  | "5-2-3"
+  | "5-3-2"
+  | "5-4-1";
 
 export type FormationDefinition = {
   code: FormationCode;
@@ -749,6 +767,206 @@ function slot(
 }
 
 export const FORMATIONS: Record<FormationCode, FormationDefinition> = {
+  "3-2-2-3": {
+    code: "3-2-2-3",
+    label: "3-2-2-3",
+    shape: "Alemana",
+    description:
+      "Doble contención y doble diez detrás del tridente: el 3-2-2-3 alemán que dominó la última década.",
+    slots: [
+      slot("ei1", "EI", 14, 16),
+      slot("dc1", "DC", 50, 12),
+      slot("ed1", "ED", 86, 16),
+      slot("mco1", "MCO", 28, 32),
+      slot("mco2", "MCO", 72, 32),
+      slot("mcd1", "MCD", 38, 48),
+      slot("mcd2", "MCD", 62, 48),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "3-4-2-1": {
+    code: "3-4-2-1",
+    label: "3-4-2-1",
+    shape: "Bloque medio",
+    description:
+      "Carrileros que dan el ancho, dos mediapuntas entre líneas y una referencia única arriba.",
+    slots: [
+      slot("mco1", "MCO", 30, 30),
+      slot("mco2", "MCO", 70, 30),
+      slot("li1", "LI", 10, 46),
+      slot("mcd1", "MCD", 36, 50),
+      slot("mc1", "MC", 64, 50),
+      slot("ld1", "LD", 90, 46),
+      slot("dc1", "DC", 50, 12),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "3-4-3": {
+    code: "3-4-3",
+    label: "3-4-3",
+    shape: "Atrevida",
+    description:
+      "Línea de tres atrás y medio campo abierto: máxima amplitud con carrileros largos.",
+    slots: [
+      slot("ei1", "EI", 16, 16),
+      slot("dc1", "DC", 50, 12),
+      slot("ed1", "ED", 84, 16),
+      slot("li1", "LI", 10, 46),
+      slot("mcd1", "MCD", 36, 50),
+      slot("mc1", "MC", 64, 50),
+      slot("ld1", "LD", 90, 46),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-1-2-1-2": {
+    code: "4-1-2-1-2",
+    label: "4-1-2-1-2",
+    shape: "Rombo",
+    description:
+      "El rombo clásico: pivote único, interiores abiertos y una dupla letal en el área.",
+    slots: [
+      slot("dc1", "DC", 36, 14),
+      slot("dc2", "DC", 64, 14),
+      slot("mco1", "MCO", 50, 30),
+      slot("mc1", "MC", 26, 38),
+      slot("mc2", "MC", 74, 38),
+      slot("mcd1", "MCD", 50, 52),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-1-3-2": {
+    code: "4-1-3-2",
+    label: "4-1-3-2",
+    shape: "Progresión",
+    description:
+      "Pivote único que arma desde atrás, tres creativos entre líneas y dos puntas móviles.",
+    slots: [
+      slot("dc1", "DC", 36, 13),
+      slot("dc2", "DC", 64, 13),
+      slot("ei1", "EI", 16, 30),
+      slot("mco1", "MCO", 50, 30),
+      slot("ed1", "ED", 84, 30),
+      slot("mcd1", "MCD", 50, 50),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-2-1-3": {
+    code: "4-2-1-3",
+    label: "4-2-1-3",
+    shape: "Vertical",
+    description:
+      "Doble pivote que protege, un enganche que conecta y un tridente que ataca en vertical.",
+    slots: [
+      slot("ei1", "EI", 16, 15),
+      slot("dc1", "DC", 50, 12),
+      slot("ed1", "ED", 84, 15),
+      slot("mco1", "MCO", 50, 32),
+      slot("mcd1", "MCD", 36, 48),
+      slot("mcd2", "MCD", 64, 48),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-2-2-2": {
+    code: "4-2-2-2",
+    label: "4-2-2-2",
+    shape: "Ancha",
+    description:
+      "Doble pivote y dos interiores anchos que asisten a una dupla de ataque permanente.",
+    slots: [
+      slot("dc1", "DC", 36, 13),
+      slot("dc2", "DC", 64, 13),
+      slot("ei1", "EI", 24, 30),
+      slot("ed1", "ED", 76, 30),
+      slot("mcd1", "MCD", 36, 50),
+      slot("mcd2", "MCD", 64, 50),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-2-4": {
+    code: "4-2-4",
+    label: "4-2-4",
+    shape: "Locura ofensiva",
+    description:
+      "Cuatro delanteros sobre un doble pivote: la apuesta extrema para remontar eliminatorias.",
+    slots: [
+      slot("ei1", "EI", 14, 18),
+      slot("dc1", "DC", 38, 12),
+      slot("dc2", "DC", 62, 12),
+      slot("ed1", "ED", 86, 18),
+      slot("mcd1", "MCD", 36, 50),
+      slot("mcd2", "MCD", 64, 50),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-3-1-2": {
+    code: "4-3-1-2",
+    label: "4-3-1-2",
+    shape: "Compacta central",
+    description:
+      "Trivote, un enganche entre líneas y dos puntas: todo el juego pasa por el centro.",
+    slots: [
+      slot("dc1", "DC", 36, 14),
+      slot("dc2", "DC", 64, 14),
+      slot("mco1", "MCO", 50, 32),
+      slot("mcd1", "MCD", 30, 48),
+      slot("mc1", "MC", 50, 52),
+      slot("mc2", "MC", 70, 48),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-3-2-1": {
+    code: "4-3-2-1",
+    label: "4-3-2-1",
+    shape: "Navaja",
+    description:
+      "La navaja clásica: trivote sólido, dos enganches cerrados y un nueve solitario de referencia.",
+    slots: [
+      slot("dc1", "DC", 50, 12),
+      slot("mco1", "MCO", 28, 28),
+      slot("mco2", "MCO", 72, 28),
+      slot("mcd1", "MCD", 30, 48),
+      slot("mc1", "MC", 50, 52),
+      slot("mc2", "MC", 70, 48),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
   "4-2-3-1": {
     code: "4-2-3-1",
     label: "4-2-3-1",
@@ -782,6 +1000,46 @@ export const FORMATIONS: Record<FormationCode, FormationDefinition> = {
       slot("mc1", "MC", 26, 44),
       slot("mcd1", "MCD", 50, 48),
       slot("mc2", "MC", 74, 44),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-3-3 (2)": {
+    code: "4-3-3 (2)",
+    label: "4-3-3 (2)",
+    shape: "Falso 9",
+    description:
+      "La variante del falso nueve: el mediapunta se repliega y abre pasillos para los extremos.",
+    slots: [
+      slot("ei1", "EI", 16, 15),
+      slot("ed1", "ED", 84, 15),
+      slot("mco1", "MCO", 50, 34),
+      slot("mcd1", "MCD", 28, 48),
+      slot("mc1", "MC", 50, 54),
+      slot("mc2", "MC", 72, 48),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "4-4-1-1": {
+    code: "4-4-1-1",
+    label: "4-4-1-1",
+    shape: "Contraataque",
+    description:
+      "Bloque de cuatro en el medio, un diez de apoyo y una referencia: la formación del contraataque.",
+    slots: [
+      slot("dc1", "DC", 50, 12),
+      slot("mco1", "MCO", 50, 26),
+      slot("ei1", "EI", 13, 44),
+      slot("mc1", "MC", 38, 50),
+      slot("mc2", "MC", 62, 50),
+      slot("ed1", "ED", 87, 44),
       slot("li1", "LI", 11, 66),
       slot("dfc1", "DFC", 34, 64),
       slot("dfc2", "DFC", 66, 64),
@@ -829,6 +1087,67 @@ export const FORMATIONS: Record<FormationCode, FormationDefinition> = {
       slot("por1", "POR", 50, 89),
     ],
   },
+  "4-5-1": {
+    code: "4-5-1",
+    label: "4-5-1",
+    shape: "Muro de medio campo",
+    description:
+      "Cuatro defensas y cinco medios para ahogar el centro: la pared que enfrente le sobra espacio.",
+    slots: [
+      slot("dc1", "DC", 50, 13),
+      slot("ei1", "EI", 13, 40),
+      slot("mc1", "MC", 32, 46),
+      slot("mco1", "MCO", 50, 38),
+      slot("mc2", "MC", 68, 46),
+      slot("ed1", "ED", 87, 40),
+      slot("li1", "LI", 11, 66),
+      slot("dfc1", "DFC", 34, 64),
+      slot("dfc2", "DFC", 66, 64),
+      slot("ld1", "LD", 89, 66),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "5-1-2-1-2": {
+    code: "5-1-2-1-2",
+    label: "5-1-2-1-2",
+    shape: "Carrileros densos",
+    description:
+      "Cinco atrás con carrileros, pivote único, dos interiores y un enganche detrás de la dupla.",
+    slots: [
+      slot("dc1", "DC", 36, 12),
+      slot("dc2", "DC", 64, 12),
+      slot("mco1", "MCO", 50, 28),
+      slot("mc1", "MC", 28, 38),
+      slot("mc2", "MC", 72, 38),
+      slot("mcd1", "MCD", 50, 54),
+      slot("li1", "LI", 10, 58),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("ld1", "LD", 90, 58),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "5-2-1-2": {
+    code: "5-2-1-2",
+    label: "5-2-1-2",
+    shape: "Bloque bajo",
+    description:
+      "Bloque bajo de cinco, doble pivote, un enganche y dos puntas para salir al contragolpe.",
+    slots: [
+      slot("dc1", "DC", 36, 13),
+      slot("dc2", "DC", 64, 13),
+      slot("mco1", "MCO", 50, 32),
+      slot("mcd1", "MCD", 36, 50),
+      slot("mcd2", "MCD", 64, 50),
+      slot("li1", "LI", 10, 58),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("ld1", "LD", 90, 58),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
   "5-2-3": {
     code: "5-2-3",
     label: "5-2-3",
@@ -849,9 +1168,73 @@ export const FORMATIONS: Record<FormationCode, FormationDefinition> = {
       slot("por1", "POR", 50, 89),
     ],
   },
+  "5-3-2": {
+    code: "5-3-2",
+    label: "5-3-2",
+    shape: "Cerrado",
+    description:
+      "Cinco atrás y un trivote que tapona el centro: la formación del resultado agónico.",
+    slots: [
+      slot("dc1", "DC", 36, 14),
+      slot("dc2", "DC", 64, 14),
+      slot("mcd1", "MCD", 28, 44),
+      slot("mc1", "MC", 50, 48),
+      slot("mc2", "MC", 72, 44),
+      slot("li1", "LI", 10, 58),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("ld1", "LD", 90, 58),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
+  "5-4-1": {
+    code: "5-4-1",
+    label: "5-4-1",
+    shape: "Repliegue",
+    description:
+      "Cinco atrás, línea de cuatro y un nueve aislado: repliegue total para aguantar ventajas.",
+    slots: [
+      slot("dc1", "DC", 50, 12),
+      slot("ei1", "EI", 14, 36),
+      slot("mc1", "MC", 38, 44),
+      slot("mc2", "MC", 62, 44),
+      slot("ed1", "ED", 86, 36),
+      slot("li1", "LI", 10, 58),
+      slot("dfc1", "DFC", 26, 70),
+      slot("dfc2", "DFC", 50, 72),
+      slot("dfc3", "DFC", 74, 70),
+      slot("ld1", "LD", 90, 58),
+      slot("por1", "POR", 50, 89),
+    ],
+  },
 };
 
-export const FORMATION_CODES = Object.keys(FORMATIONS) as FormationCode[];
+/** Todas las formaciones del FC 27, en el orden del menú de tácticas del juego. */
+export const FORMATION_CODES: FormationCode[] = [
+  "3-2-2-3",
+  "3-4-2-1",
+  "3-4-3",
+  "3-5-2",
+  "4-1-2-1-2",
+  "4-1-3-2",
+  "4-2-1-3",
+  "4-2-2-2",
+  "4-2-3-1",
+  "4-2-4",
+  "4-3-1-2",
+  "4-3-2-1",
+  "4-3-3",
+  "4-3-3 (2)",
+  "4-4-1-1",
+  "4-4-2",
+  "4-5-1",
+  "5-1-2-1-2",
+  "5-2-1-2",
+  "5-2-3",
+  "5-3-2",
+  "5-4-1",
+];
 
 /** Formation every new squad starts with. */
 export const DEFAULT_FORMATION: FormationCode = "4-2-3-1";

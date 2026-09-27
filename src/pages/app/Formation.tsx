@@ -5,6 +5,7 @@ import {
   FORMATIONS,
   FORMATION_CODES,
   evaluateLineup,
+  isFormationCode,
   formatMoney,
   remapLineup,
   autoLineup,
@@ -151,6 +152,12 @@ export default function Formation() {
     setSelectedPlayerId(null);
   };
 
+  /** "Automática": descarta cualquier cambio de esquema pendiente y deja el once tal cual. */
+  const keepAutomaticFormation = () => {
+    setDraft(null);
+    setSelectedPlayerId(null);
+  };
+
   const runAuto = () => {
     setDraft(autoLineup(squad, lineup.formation));
     setSelectedPlayerId(null);
@@ -282,8 +289,24 @@ export default function Formation() {
         <div
           role="radiogroup"
           aria-label="Formación"
-          className="flex flex-wrap gap-2"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
         >
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!isFormationCode(lineup.formation)}
+            onClick={keepAutomaticFormation}
+            title="Mantiene el esquema actual sin fijar un código del FC 27"
+            className={cn(
+              "flex min-h-11 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors",
+              !isFormationCode(lineup.formation)
+                ? "border-primary bg-primary/5 ring-1 ring-primary/40"
+                : "border-border hover:bg-accent",
+            )}
+          >
+            <span className="display text-sm">Automática</span>
+            <span className="text-[11px] text-muted-foreground">Sin código fijo</span>
+          </button>
           {FORMATION_CODES.map((code) => {
             const option = FORMATIONS[code];
             const active = code === lineup.formation;
@@ -295,7 +318,7 @@ export default function Formation() {
                 aria-checked={active}
                 onClick={() => changeFormation(code)}
                 className={cn(
-                  "flex min-h-11 min-w-[128px] flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors",
+                  "flex min-h-11 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors",
                   active
                     ? "border-primary bg-primary/5 ring-1 ring-primary/40"
                     : "border-border hover:bg-accent",
@@ -313,6 +336,10 @@ export default function Formation() {
             ? " Al cambiar de esquema el motor recoloca a los jugadores compatibles y deja libres las posiciones que nadie puede cubrir."
             : ""}
         </p>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          Los 22 esquemas replican el menú de tácticas del FC 27: selecciónalos para fijar el
+          código y recolocar el once, o pulsa «Automática» para dejar el esquema libre.
+        </p>
       </SectionCard>
 
       <SectionCard title="Guión de formación" icon={Shirt} accent="pitch">
@@ -325,13 +352,13 @@ export default function Formation() {
             <Input
               value={fc27Code}
               onChange={(event) => setFc27Code(event.target.value)}
-              placeholder="ej. 4-2-3-1, 4-3-3, 4-4-2, 3-5-2, 5-2-3"
+              placeholder="ej. 4-2-3-1, 3-4-2-1, 4-1-2-1-2, 5-2-1-2…"
               aria-label="Código de formación FC 27"
               className="font-mono"
             />
             <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              El código seleccionado se enlaza con los cinco formatos estándar del motor para
-generar un XI siempre legal. El estado real lo valida el motor de reglas.
+              El código seleccionado se enlaza con los 22 esquemas del menú de tácticas del FC 27
+para generar un XI siempre legal. El estado real lo valida el motor de reglas.
             </p>
           </div>
           <div>
