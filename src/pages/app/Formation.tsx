@@ -15,7 +15,6 @@ import {
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errors";
-export default function Formation() {
 import { useLocation, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
@@ -32,6 +31,7 @@ export default function Formation() {
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
   const autoFill = useMutation(api.squads.autoFillLineup);
+  const updateRules = useMutation(api.tournament.updateRules);
 
   const serverLineup = state.lineup;
   // "Alinear en el XI" from the squad page arrives with the player pre-selected.
@@ -48,8 +48,8 @@ export default function Formation() {
   const rules = state.rules;
   const squad = state.squad;
 
-  const [fc27Code, setFc27Code] = useState(rules.fc27FormationCode);
-  const [instructions, setInstructions] = useState(rules.formationInstructions);
+  const [fc27Code, setFc27Code] = useState(rules?.fc27FormationCode ?? "");
+  const [instructions, setInstructions] = useState(rules?.formationInstructions ?? "");
 
   const evaluation = useMemo(
     () =>
@@ -59,8 +59,10 @@ export default function Formation() {
     [rules, squad, lineup, state.evaluation],
   );
 
-  const assignedIds = new Set();
-    (lineup?.slots ?? []).map((slot) => slot.playerId).filter(Boolean) as string[],
+  const assignedIds = new Set(
+    (lineup?.slots ?? [])
+      .map((slot) => slot.playerId)
+      .filter((id): id is string => Boolean(id)),
   );
   const selectedPlayer = squad.find((player) => player.playerId === selectedPlayerId) ?? null;
   const bench = squad
@@ -165,7 +167,7 @@ export default function Formation() {
         formation: lineup.formation,
         slots: lineup.slots,
       });
-      await api.tournament.updateRules({
+      await updateRules({
         budget: rules.budget,
         squadSize: rules.squadSize,
         gkMin: rules.gkMin,

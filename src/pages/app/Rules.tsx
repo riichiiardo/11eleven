@@ -7,6 +7,7 @@ import { SectionCard } from "@/components/eleven/SectionCard";
 import { RuleCheckList } from "@/components/eleven/RuleCheckList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Link } from "react-router";
 import { BookOpen, Gauge, Info, Scale } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -154,7 +155,10 @@ export default function Rules() {
                       fc27FormationCode: rules.fc27FormationCode,
                       formationInstructions: rules.formationInstructions,
                       u20Min: rules.u20Min,
-                      u20InStartingLineup: value === "ninguno" ? null : value,
+                      u20InStartingLineup:
+                        value === "ninguno"
+                          ? null
+                          : (value as "obligatory" | "substitute"),
                       sameNationalityMin: rules.sameNationalityMin,
                       sameNationalityRule: rules.sameNationalityRule,
                       sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
@@ -183,7 +187,7 @@ export default function Rules() {
                   value={rules.sameNationalityMin}
                   onChange={(event) => {
                     const value = Number(event.target.value);
-                    state.updateRules({
+                    updateRules({
                       budget: rules.budget,
                       squadSize: rules.squadSize,
                       gkMin: rules.gkMin,
@@ -243,7 +247,10 @@ golpe, sin importar quién sea el que juega.
                       u20Min: rules.u20Min,
                       u20InStartingLineup: rules.u20InStartingLineup,
                       sameNationalityMin: rules.sameNationalityMin,
-                      sameNationalityRule: value === "ninguna" ? null : value,
+                      sameNationalityRule:
+                        value === "ninguna"
+                          ? null
+                          : (value as "obligatory" | "changeable"),
                       sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
                     });
                   }}
@@ -304,20 +311,6 @@ golpe, sin importar quién sea el que juega.
               </div>
             </div>
           </SectionCard>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-          <div className="card-soft flex gap-3 p-4 text-xs leading-relaxed text-muted-foreground">
-            <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-            <p>
-              Si una operación no es posible, el sistema explica qué regla se incumple, con qué
-              cifras y qué alternativa tienes. Nunca verás un error sin explicación humana, y
-              cada cambio de reglas queda registrado en la auditoría del torneo.
-            </p>
-          </div>
         </div>
       </div>
     </div>
