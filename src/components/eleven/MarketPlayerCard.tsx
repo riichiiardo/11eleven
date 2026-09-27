@@ -21,6 +21,7 @@ export function MarketPlayerCard({
   budgetAvailable: number;
   onOffer: (player: MarketPlayerView) => void;
   compact?: boolean;
+  showDetail?: boolean;
 }) {
   const isFree = player.kind === "libre";
   // "libre" is not a squad availability flag: free agents have no President to
@@ -85,7 +86,7 @@ export function MarketPlayerCard({
         ) : null}
       </div>
 
-      {!compact ? (
+      {showDetail !== false ? (
         <p
           className={cn(
             "rounded-lg border p-2 text-[11px] leading-relaxed",
