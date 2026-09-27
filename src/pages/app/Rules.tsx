@@ -120,6 +120,7 @@ export default function Rules() {
                       sameNationalityMin: rules.sameNationalityMin,
                       sameNationalityRule: rules.sameNationalityRule,
                       sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                      clubNationalityMin: rules.clubNationalityMin,
                     });
                   }}
                   aria-label="Mínimo de sub-20 en el XI"
@@ -162,6 +163,7 @@ export default function Rules() {
                       sameNationalityMin: rules.sameNationalityMin,
                       sameNationalityRule: rules.sameNationalityRule,
                       sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                      clubNationalityMin: rules.clubNationalityMin,
                     });
                   }}
                 >
@@ -209,6 +211,7 @@ export default function Rules() {
                       sameNationalityMin: value,
                       sameNationalityRule: rules.sameNationalityRule,
                       sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                      clubNationalityMin: rules.clubNationalityMin,
                     });
                   }}
                   aria-label="Mínimo de jugadores de una misma nacionalidad"
@@ -252,6 +255,7 @@ golpe, sin importar quién sea el que juega.
                           ? null
                           : (value as "obligatory" | "changeable"),
                       sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+                      clubNationalityMin: rules.clubNationalityMin,
                     });
                   }}
                 >
@@ -299,6 +303,7 @@ golpe, sin importar quién sea el que juega.
                       sameNationalityMin: rules.sameNationalityMin,
                       sameNationalityRule: rules.sameNationalityRule,
                       sameNationalityMatchDurationMinutes: value,
+                      clubNationalityMin: rules.clubNationalityMin,
                     });
                   }}
                   aria-label="Minutos de permanencia de la regla de nacionalidad"

@@ -63,6 +63,7 @@ export function SquadTable({
                       flag={player.flag}
                       group={player.group}
                       size="xs"
+                      photo={player.photo}
                     />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{player.name}</p>

@@ -674,6 +674,7 @@ export default function Home() {
                   flag={player.flag}
                   group={player.group}
                   size="md"
+                  photo={player.photo}
                 />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold">{player.name}</p>

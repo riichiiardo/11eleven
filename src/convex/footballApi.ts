@@ -75,7 +75,19 @@ export type FetchedPlayer = {
   /** Team name as the source reports it; normalized later against the tournament. */
   realClub: string;
   realLeague: string;
+  /** URL del rostro oficial publicada por la fuente (CDN de EA o de SoFIFA). */
+  photo?: string;
 };
+
+/**
+ * Rostro oficial por ID de jugador de SoFIFA: el CDN sirve el PNG a cualquier
+ * tamaño pedido (`24`, `48`, `120`…). La API JSON trae `id` por fila, así que
+ * las fotos quedan disponibles sin descargar ningún binario durante el sync.
+ */
+export function sofifaPhotoFromId(playerId: number | null): string | undefined {
+  if (!playerId || playerId <= 0) return undefined;
+  return `https://cdn.sofifa.net/players/${String(playerId).slice(0, 2)}/${String(playerId).slice(2)}/120.png`;
+}
 
 export type FetchResult = {
   players: FetchedPlayer[];
@@ -411,6 +423,10 @@ export function parsePlayerRow(
 ): FetchedPlayer | null {
   const name = asString(row.name) ?? asString(row.player) ?? asString(row.long_name);
   if (!name) return null;
+  const photo =
+    asString(row.photo_url) ??
+    asString(row.headshot) ??
+    sofifaPhotoFromId(asNumber(row.id) ?? asNumber(row.player_id));
   const ovr = asNumber(row.ovr) ?? asNumber(row.overall) ?? asNumber(row.rating);
   if (ovr === null || ovr < 40 || ovr > 99) return null;
   const position = positionFrom(
@@ -433,6 +449,7 @@ export function parsePlayerRow(
     flag: flagFrom(nationality),
     realClub: asString(row.team) ?? asString(row.club) ?? "",
     realLeague: asString(row.league) ?? asString(row.competition) ?? leagueFallback,
+    photo,
   };
 }
 
@@ -596,6 +613,11 @@ export function eaPlayerFrom(raw: Record<string, unknown>): FetchedPlayer | null
   const [nationality, flag] = nationOf(asString(asRecord(raw.nationality)?.label));
   const team = asString(asRecord(raw.team)?.label);
   const league = asString(raw.leagueName);
+  const photo =
+    asString(raw.headshotImageUrl) ??
+    asString(raw.headshot) ??
+    asString(raw.playerImage) ??
+    undefined;
 
   return {
     name,
@@ -607,6 +629,7 @@ export function eaPlayerFrom(raw: Record<string, unknown>): FetchedPlayer | null
     flag,
     realClub: team ?? FREE_AGENT_CLUB,
     realLeague: team ? (league ?? "—") : "Sin club",
+    photo,
   };
 }
 

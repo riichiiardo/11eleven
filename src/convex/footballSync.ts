@@ -45,6 +45,8 @@ const catalogPlayerValidator = v.object({
   flag: v.string(),
   realClub: v.string(),
   realLeague: v.string(),
+  /** Rostro oficial de la fuente; se guarda para pintarlo en toda la UI. */
+  photo: v.optional(v.string()),
 });
 
 /**
@@ -84,7 +86,8 @@ export const applyCatalog = internalMutation({
           existing.realLeague !== player.realLeague ||
           existing.nationality !== player.nationality ||
           existing.flag !== player.flag ||
-          existing.fcVersion !== fcVersion;
+          existing.fcVersion !== fcVersion ||
+          (player.photo !== undefined && existing.photo !== player.photo);
         if (changed) {
           await ctx.db.patch(existing._id, {
             ovr: player.ovr,
@@ -95,6 +98,7 @@ export const applyCatalog = internalMutation({
             realClub: player.realClub,
             realLeague: player.realLeague,
             fcVersion,
+            ...(player.photo !== undefined ? { photo: player.photo } : {}),
           });
           updated += 1;
         } else {
@@ -115,6 +119,7 @@ export const applyCatalog = internalMutation({
         realClub: player.realClub,
         realLeague: player.realLeague,
         fcVersion,
+        ...(player.photo !== undefined ? { photo: player.photo } : {}),
       });
       inserted += 1;
     }

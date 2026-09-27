@@ -312,6 +312,7 @@ async function buildPicks(
       age: player.age,
       flag: player.flag,
       realClub: player.realClub,
+      photo: player.photo ?? null,
       price: pick.price,
       presidentId: pick.presidentId,
       nickname: president?.nickname || user?.name || "Presidente",
@@ -553,6 +554,7 @@ export const pool = query({
         realClub: player.realClub,
         realLeague: player.realLeague,
         fcVersion: player.fcVersion,
+        photo: player.photo ?? null,
         price: player.value,
         offerable: evaluation.passed && available,
         blockedReason: evaluation.passed

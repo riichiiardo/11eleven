@@ -196,6 +196,7 @@ export default function Club() {
                     flag={player.flag}
                     group={player.group}
                     size="sm"
+                    photo={player.photo}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{player.name}</span>

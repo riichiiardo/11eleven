@@ -176,6 +176,11 @@ export type TournamentRules = {
   sameNationalityRule: "obligatory" | "changeable" | null;
   /** En minutos de permanencia en campo. `null` = sin regla. */
   sameNationalityMatchDurationMinutes: number;
+  /**
+   * Plazas del XI que deben ser jugadores de la nacionalidad del club presidido
+   * (club.country) al pitido inicial. 0 = sin regla.
+   */
+  clubNationalityMin: number;
 };
 
 export const DEFAULT_RULES: TournamentRules = {
@@ -200,6 +205,7 @@ export const DEFAULT_RULES: TournamentRules = {
   sameNationalityMin: 0,
   sameNationalityRule: null,
   sameNationalityMatchDurationMinutes: 0,
+  clubNationalityMin: 0,
 };
 
 /**
@@ -228,6 +234,7 @@ export const LEGACY_SEEDED_RULES: TournamentRules = {
   sameNationalityMin: 0,
   sameNationalityRule: null,
   sameNationalityMatchDurationMinutes: 0,
+  clubNationalityMin: 0,
 };
 
 export type GroupLimits = { min: number; max: number };
@@ -407,6 +414,18 @@ export const RULE_DESCRIPTORS: RuleDescriptor[] = [
       `${r.fc27FormationCode} · ${r.formationInstructions.length > 60 ? r.formationInstructions.slice(0, 60) + "…" : r.formationInstructions}`,
     field: "fc27FormationCode",
   },
+  {
+    code: "R-14",
+    title: "Jugadores de la nacionalidad del club en el XI",
+    description:
+      "El torneo exige que el XI inicial de cada partido de liga incluya un número mínimo de jugadores con la nacionalidad del club presidido (su país de origen). El motor lo valida al guardar la alineación.",
+    scope: "Competición",
+    value: (r) => (r.clubNationalityMin > 0 ? `${r.clubNationalityMin} del país del club` : "Sin regla"),
+    field: "clubNationalityMin",
+    min: 0,
+    max: 11,
+    step: 1,
+  },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -432,6 +451,8 @@ export type SquadPlayerView = {
   realClub: string;
   realLeague: string;
   fcVersion: string;
+  /** Rostro oficial del catálogo FC 27 (URL); `null` cae a las iniciales. */
+  photo: string | null;
 };
 
 export type SquadStats = {
@@ -1361,6 +1382,8 @@ export function evaluateLineup(
   squad: SquadPlayerView[],
   lineup: Lineup,
   squadEvaluation?: SquadEvaluation,
+  /** País del club presidido, para la regla de nacionalidad del club (R-14). */
+  clubCountry?: string,
 ): LineupEvaluation {
   const def = FORMATIONS[lineup.formation];
   const bySlot = new Map(lineup.slots.map((s) => [s.slotId, s.playerId]));
@@ -1438,6 +1461,44 @@ export function evaluateLineup(
 
   const starterIds = new Set(ids);
   const bench = squad.filter((p) => !starterIds.has(p.playerId));
+
+  // Regla de sub-20 en el XI (R-11 aplicada a la alineación).
+  const u20Starters = starters.filter((p) => p.age <= 20).length;
+  checks.push({
+    id: "lineup-u20",
+    ruleRef: "R-11 · Sub-20 en el XI",
+    label: "Sub-20 titulares",
+    value: `${u20Starters} / ${rules.u20Min}`,
+    passed: u20Starters >= rules.u20Min,
+    detail:
+      rules.u20Min === 0
+        ? "El torneo no exige sub-20 en el once inicial."
+        : u20Starters >= rules.u20Min
+          ? `El once incluye ${u20Starters} jugador(es) de 20 años o menos: cumple el mínimo de ${rules.u20Min}.`
+          : `El torneo exige ${rules.u20Min} sub-20 en el XI inicial y tienes ${u20Starters}. Necesitas alinear ${rules.u20Min - u20Starters} más para guardar.`,
+    action: { label: "Ajustar once", to: "/dashboard/formacion" },
+  });
+
+  // Regla de nacionalidad del club en el XI (R-14): la nacionalidad debe
+  // coincidir con el país del club presidido (club.country).
+  const requiredNation = clubCountry?.trim() ?? "";
+  if (requiredNation && rules.clubNationalityMin > 0) {
+    const nationStarters = starters.filter(
+      (p) => p.nationality.trim().toLowerCase() === requiredNation.toLowerCase(),
+    ).length;
+    checks.push({
+      id: "lineup-club-nation",
+      ruleRef: "R-14 · Nacionalidad del club",
+      label: `Jugadores de ${requiredNation}`,
+      value: `${nationStarters} / ${rules.clubNationalityMin}`,
+      passed: nationStarters >= rules.clubNationalityMin,
+      detail:
+        nationStarters >= rules.clubNationalityMin
+          ? `El XI incluye ${nationStarters} jugador(es) de ${requiredNation}: cumple el mínimo de ${rules.clubNationalityMin}.`
+          : `El torneo exige ${rules.clubNationalityMin} jugador(es) de ${requiredNation} (nacionalidad del club) en el XI inicial y tienes ${nationStarters}.`,
+      action: { label: "Ajustar once", to: "/dashboard/formacion" },
+    });
+  }
 
   return {
     checks,

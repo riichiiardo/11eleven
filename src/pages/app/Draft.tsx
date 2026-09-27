@@ -365,6 +365,7 @@ export default function Draft() {
                     flag={pickRow.flag}
                     group={pickRow.group}
                     size="sm"
+                    photo={pickRow.photo}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
@@ -456,6 +457,7 @@ function PoolCard({
           flag={player.flag}
           group={player.group}
           size="md"
+          photo={player.photo}
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">{player.name}</p>
@@ -526,6 +528,7 @@ function PickDialog({
                 flag={player.flag}
                 group={player.group}
                 size="lg"
+                photo={player.photo}
               />
               <div className="text-right">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">

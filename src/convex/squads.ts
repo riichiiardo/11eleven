@@ -42,7 +42,15 @@ async function loadMySquad(ctx: MutationCtx, userId: Id<"users">) {
   }
   const squadPlayers = await loadSquadPlayers(ctx, squad._id);
   const club = await ctx.db.get(president.clubId);
-  return { tournament, president, squad, squadPlayers, clubName: club?.name };
+  return {
+    tournament,
+    president,
+    squad,
+    squadPlayers,
+    clubName: club?.name,
+    /** País del club presidido: alimenta la regla de nacionalidad del club (R-14). */
+    clubCountry: club?.country,
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -146,7 +154,7 @@ export const saveLineup = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError("Inicia sesión para guardar tu alineación.");
 
-    const { tournament, president, squad, squadPlayers, clubName } =
+    const { tournament, president, squad, squadPlayers, clubName, clubCountry } =
       await loadMySquad(ctx, userId);
     const rules = await loadRules(ctx, tournament._id);
     const squadPlayerIds = new Set(squadPlayers.map((player) => player.playerId));
@@ -163,6 +171,7 @@ export const saveLineup = mutation({
       squadPlayers,
       lineup,
       evaluation,
+      clubCountry,
     );
 
     if (!lineupEvaluation.valid) {
@@ -214,7 +223,7 @@ export const autoFillLineup = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError("Inicia sesión para gestionar tu alineación.");
 
-    const { tournament, president, squad, squadPlayers, clubName } =
+    const { tournament, president, squad, squadPlayers, clubName, clubCountry } =
       await loadMySquad(ctx, userId);
     if (!isFormationCode(formation)) {
       throw new ConvexError(
@@ -230,7 +239,13 @@ export const autoFillLineup = mutation({
       president.budget,
       clubName,
     );
-    const lineupEvaluation = evaluateLineup(rules, squadPlayers, lineup, evaluation);
+    const lineupEvaluation = evaluateLineup(
+      rules,
+      squadPlayers,
+      lineup,
+      evaluation,
+      clubCountry,
+    );
 
     await ctx.db.patch(squad._id, {
       formation,

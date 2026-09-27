@@ -128,6 +128,7 @@ export function PitchView({
                       flag={player.flag}
                       group={player.group}
                       size="sm"
+                      photo={player.photo}
                     />
                     <span
                       className={cn(

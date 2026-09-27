@@ -97,6 +97,7 @@ export default function PlayerStatus() {
                   flag={player.flag}
                   group={player.group}
                   size="sm"
+                  photo={player.photo}
                 />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{player.name}</p>

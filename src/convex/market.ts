@@ -359,6 +359,7 @@ export const browse = query({
         realClub: player.realClub,
         realLeague: player.realLeague,
         fcVersion: player.fcVersion,
+        photo: player.photo ?? null,
         kind,
         ownerClubId: ownerClub?._id ?? null,
         ownerClubName: ownerClub?.name ?? null,

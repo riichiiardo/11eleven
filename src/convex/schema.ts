@@ -193,6 +193,8 @@ const schema = defineSchema(
       sameNationalityMin: v.number(),
       sameNationalityRule: v.union(v.literal("obligatory"), v.literal("changeable"), v.null()),
       sameNationalityMatchDurationMinutes: v.number(),
+      /** Jugadores de la nacionalidad del club exigidos en el XI inicial (R-14). */
+      clubNationalityMin: v.optional(v.number()),
       updatedAt: v.number(),
       updatedBy: v.optional(v.id("users")),
     }).index("by_tournament", ["tournamentId"]),
@@ -286,6 +288,8 @@ const schema = defineSchema(
       realClub: v.string(),
       realLeague: v.string(),
       fcVersion: v.string(),
+      /** URL del rostro oficial (CDN de la fuente); falta en snapshots antiguos. */
+      photo: v.optional(v.string()),
     })
       .index("by_name", ["name"])
       .index("by_real_club", ["realClub"])

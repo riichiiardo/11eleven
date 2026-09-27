@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   AVAILABILITY_META,
@@ -22,6 +23,86 @@ function initialsOf(name: string): string {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+/**
+ * Rostro oficial del jugador. Si el catálogo trae `photo` (CDN de EA o de
+ * SoFIFA, capturado durante la sincronización) se muestra la imagen; si falla
+ * o no existe, cae al monograma con el gradiente del grupo posicional.
+ */
+function PlayerFace({
+  name,
+  photo,
+  group,
+  sizes,
+}: {
+  name: string;
+  photo?: string | null;
+  group: PositionGroup;
+  sizes: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const showPhoto = Boolean(photo) && !broken;
+  return showPhoto ? (
+    <img
+      src={photo ?? undefined}
+      alt=""
+      loading="lazy"
+      onError={() => setBroken(true)}
+      className={cn("rounded-full object-cover object-top", sizes)}
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "display inline-flex items-center justify-center rounded-full bg-gradient-to-br text-white",
+        GROUP_GRADIENT[group],
+        sizes,
+      )}
+    >
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+/**
+ * Bandera nacional nítida (flagcdn) resuelta desde el emoji regional del
+ * snapshot. Si el emoji no mapea a un país (🌍, 🏳️) o el CDN falla, se muestra
+ * el emoji original como fallback. `className` ajusta el tamaño.
+ */
+export function PlayerFlag({ flag, className }: { flag: string; className?: string }) {
+  const [broken, setBroken] = useState(false);
+  const emoji = flag?.match(/\p{Extended_Pictographic}/u)?.[0] ?? "";
+  let code: string | null = null;
+  if (emoji) {
+    const letters = [...emoji]
+      .map((c) => c.codePointAt(0) ?? 0)
+      .filter((n) => n >= 0x1f1e6 && n <= 0x1f1ff)
+      .map((n) => String.fromCharCode(n - 0x1f1e6 + 65));
+    if (letters.length === 2) code = letters.join("").toLowerCase();
+  }
+  if (!code || broken) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "rounded-md bg-white px-1 text-[13px] leading-[18px] ring-1 ring-black/10 dark:bg-card dark:ring-white/10",
+          className,
+        )}
+      >
+        {flag || "🏳️"}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`https://flagcdn.com/w40/${code}.png`}
+      alt=""
+      loading="lazy"
+      onError={() => setBroken(true)}
+      className={cn("h-[18px] rounded-md ring-1 ring-black/10 dark:ring-white/15", className)}
+    />
+  );
+}
+
 const AVATAR_SIZES = {
   xs: "size-8 text-[10px]",
   sm: "size-10 text-xs",
@@ -29,37 +110,38 @@ const AVATAR_SIZES = {
   lg: "size-20 text-xl",
 } as const;
 
+const FLAG_HEIGHTS = {
+  xs: "h-3.5",
+  sm: "h-4",
+  md: "h-5",
+  lg: "h-6",
+} as const;
+
 export function PlayerAvatar({
   name,
   flag,
   group,
   size = "md",
+  photo,
   className,
 }: {
   name: string;
   flag?: string;
   group: PositionGroup;
   size?: keyof typeof AVATAR_SIZES;
+  /** Rostro oficial del catálogo (URL); sin él se muestran las iniciales. */
+  photo?: string | null;
   className?: string;
 }) {
   return (
     <span className={cn("relative inline-flex shrink-0", className)}>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "display inline-flex items-center justify-center rounded-full bg-gradient-to-br text-white ring-2 ring-white dark:ring-white/20",
-          GROUP_GRADIENT[group],
-          AVATAR_SIZES[size],
-        )}
-      >
-        {initialsOf(name)}
-      </span>
+      <PlayerFace name={name} photo={photo} group={group} sizes={AVATAR_SIZES[size]} />
       {flag ? (
         <span
-          className="absolute -bottom-0.5 -left-0.5 rounded-full bg-white px-[2px] text-[10px] leading-none shadow-sm dark:bg-card"
+          className="absolute -bottom-1 -left-1.5 inline-flex overflow-hidden rounded-md shadow-sm ring-1 ring-white dark:ring-white/20"
           aria-hidden="true"
         >
-          {flag}
+          <PlayerFlag flag={flag} className={FLAG_HEIGHTS[size]} />
         </span>
       ) : null}
     </span>

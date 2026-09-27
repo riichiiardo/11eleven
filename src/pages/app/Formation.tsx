@@ -196,6 +196,7 @@ export default function Formation() {
         sameNationalityMin: rules.sameNationalityMin,
         sameNationalityRule: rules.sameNationalityRule,
         sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+        clubNationalityMin: rules.clubNationalityMin,
       });
       setDraft(null);
       toast.success("Alineación guardada", {
@@ -397,6 +398,7 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
                   flag={selectedPlayer.flag}
                   group={selectedPlayer.group}
                   size="sm"
+                  photo={selectedPlayer.photo}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold">
@@ -526,6 +528,7 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
                       flag={player.flag}
                       group={player.group}
                       size="xs"
+                      photo={player.photo}
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold">{player.name}</span>

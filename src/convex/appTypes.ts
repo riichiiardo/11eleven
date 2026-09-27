@@ -216,6 +216,8 @@ export type MarketPlayerView = {
   realClub: string;
   realLeague: string;
   fcVersion: string;
+  /** Rostro oficial del catálogo FC 27 (URL); `null` cae a las iniciales. */
+  photo: string | null;
   /** Where the player comes from right now. */
   kind: "libre" | "club";
   ownerClubId: Id<"clubs"> | null;
@@ -246,6 +248,7 @@ export type OfferPlayerLite = {
   value: number;
   flag: string;
   clubName: string | null;
+  photo: string | null;
 };
 
 export type OfferView = {
@@ -312,6 +315,7 @@ export type DraftPoolPlayerView = {
   realClub: string;
   realLeague: string;
   fcVersion: string;
+  photo: string | null;
   /** What the pick costs: the snapshot valuation. */
   price: number;
   offerable: boolean;
@@ -335,15 +339,15 @@ export type DraftTurnView = {
 export type DraftPickView = {
   id: Id<"draftPicks">;
   pickNumber: number;
-  round: number;
-  playerId: Id<"players">;
-  playerName: string;
-  position: Position;
-  group: PositionGroup;
-  ovr: number;
-  age: number;
-  flag: string;
-  realClub: string;
+  round: number;      playerId: Id<"players">;
+      playerName: string;
+      position: Position;
+      group: PositionGroup;
+      ovr: number;
+      age: number;
+      flag: string;
+      realClub: string;
+      photo: string | null;
   price: number;
   presidentId: Id<"presidents">;
   nickname: string;

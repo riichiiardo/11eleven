@@ -143,12 +143,13 @@ export default function Squad() {
                       onClick={() => setSelected(player)}
                       className="flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors hover:bg-accent"
                     >
-                      <PlayerAvatar
-                        name={player.name}
-                        flag={player.flag}
-                        group={player.group}
-                        size="xs"
-                      />
+                    <PlayerAvatar
+                      name={player.name}
+                      flag={player.flag}
+                      group={player.group}
+                      size="xs"
+                      photo={player.photo}
+                    />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">
                           {player.name}
@@ -196,6 +197,7 @@ export default function Squad() {
                   flag={player.flag}
                   group={player.group}
                   size="xs"
+                  photo={player.photo}
                 />
                 <span className="text-sm font-semibold">{player.name.split(" ").slice(-1)}</span>
                 <PositionPill position={player.position} group={player.group} />

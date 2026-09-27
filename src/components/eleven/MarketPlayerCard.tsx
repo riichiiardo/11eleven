@@ -37,7 +37,13 @@ export function MarketPlayerCard({
       )}
     >
       <div className="flex items-start gap-3">
-        <PlayerAvatar name={player.name} flag={player.flag} group={player.group} size="md" />
+        <PlayerAvatar
+          name={player.name}
+          flag={player.flag}
+          group={player.group}
+          size="md"
+          photo={player.photo}
+        />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-bold">{player.name}</h3>
           <p className="truncate text-[11px] text-muted-foreground">

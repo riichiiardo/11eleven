@@ -106,6 +106,7 @@ export async function loadRules(
     sameNationalityMin: doc.sameNationalityMin ?? DEFAULT_RULES.sameNationalityMin,
     sameNationalityRule: doc.sameNationalityRule ?? DEFAULT_RULES.sameNationalityRule,
     sameNationalityMatchDurationMinutes: doc.sameNationalityMatchDurationMinutes ?? DEFAULT_RULES.sameNationalityMatchDurationMinutes,
+    clubNationalityMin: doc.clubNationalityMin ?? DEFAULT_RULES.clubNationalityMin,
   };
 }
 
@@ -345,6 +346,7 @@ export function toSquadPlayerView(
     realClub: player.realClub,
     realLeague: player.realLeague,
     fcVersion: player.fcVersion,
+    photo: player.photo ?? null,
   };
 }
 
@@ -827,6 +829,7 @@ export async function buildOffers(
       value: player.value,
       flag: player.flag,
       clubName: ownerClub?.name ?? null,
+      photo: player.photo ?? null,
     };
   };
 

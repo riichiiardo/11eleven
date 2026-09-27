@@ -448,7 +448,13 @@ export const state = query({
           }
         : emptyLineup(formation);
 
-    const lineupEvaluation = evaluateLineup(rules, squad, lineup, evaluation);
+    const lineupEvaluation = evaluateLineup(
+      rules,
+      squad,
+      lineup,
+      evaluation,
+      club?.country,
+    );
     const nextEvent = buildNextEvent(
       tournament,
       clubs,
@@ -1093,6 +1099,7 @@ export const updateRules = mutation({
     sameNationalityMin: v.number(),
     sameNationalityRule: v.union(v.literal("obligatory"), v.literal("changeable"), v.null()),
     sameNationalityMatchDurationMinutes: v.number(),
+    clubNationalityMin: v.number(),
   },
   handler: async (ctx, next) => {
     const userId = requireAuth(await getAuthUserId(ctx));
@@ -1141,6 +1148,9 @@ export const updateRules = mutation({
     if (next.sameNationalityMatchDurationMinutes < 0 || next.sameNationalityMatchDurationMinutes > 120) {
       throw new ConvexError("La duración de la regla de nacionalidad debe estar entre 0 y 120 minutos.");
     }
+    if (next.clubNationalityMin < 0 || next.clubNationalityMin > 11) {
+      throw new ConvexError("El mínimo de jugadores de la nacionalidad del club debe estar entre 0 y 11.");
+    }
 
     const changes: string[] = [];
     const formatString = (value: unknown): string => (typeof value === "string" ? value : String(value ?? "ninguno"));
@@ -1180,6 +1190,7 @@ export const updateRules = mutation({
     }
     compare("Nacionalidad mínima", current.sameNationalityMin, next.sameNationalityMin);
     compare("Minutos de nacionalidad", current.sameNationalityMatchDurationMinutes, next.sameNationalityMatchDurationMinutes);
+    compare("Nacionalidad del club en XI", current.clubNationalityMin, next.clubNationalityMin);
 
     if (changes.length === 0) {
       return { changed: 0 };

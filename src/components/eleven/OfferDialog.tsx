@@ -112,7 +112,13 @@ export function OfferDialog({
         </DialogHeader>
 
         <div className="flex items-center gap-3 rounded-xl border bg-gradient-to-br from-navy to-navy-deep p-3.5 text-white">
-          <PlayerAvatar name={player.name} flag={player.flag} group={player.group} size="lg" />
+          <PlayerAvatar
+            name={player.name}
+            flag={player.flag}
+            group={player.group}
+            size="lg"
+            photo={player.photo}
+          />
           <div className="min-w-0 flex-1">
             <p className="display truncate text-base">{player.name}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
