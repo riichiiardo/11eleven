@@ -45,25 +45,25 @@ export function MarketPlayerCard({
           photo={player.photo}
         />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-bold">{player.name}</h3>
-          <p className="truncate text-[11px] text-muted-foreground">
+          <h3 className="truncate text-[12px] font-bold">{player.name}</h3>
+          <p className="truncate text-[10px] text-muted-foreground">
             {player.nationality} · {player.age} años
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1 flex flex-wrap items-center gap-1">
             <PositionPill position={player.position} group={player.group} />
-            <span className="num rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+            <span className="num rounded-md bg-muted px-1 py-0.5 text-[9px] font-bold text-muted-foreground">
               {player.realClub}
             </span>
           </div>
         </div>
-        <OvrBadge ovr={player.ovr} />
+        <OvrBadge ovr={player.ovr} className="!min-w-6 !p-0 !text-[10px]" />
       </div>
 
       <div className="flex items-baseline justify-between gap-2">
-        <span className="num text-lg font-bold text-primary">
+        <span className="num text-base font-bold text-primary">
           {formatMoney(player.value)}
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {isFree ? "Coste de firma" : "Valoración"}
         </span>
       </div>
@@ -72,13 +72,13 @@ export function MarketPlayerCard({
         {squadAvailability ? (
           <AvailabilityBadge availability={squadAvailability} />
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
             <Sparkles className="size-3" aria-hidden="true" />
             AGENTE LIBRE
           </span>
         )}
         {player.ownerClubName ? (
-          <span className="truncate text-[11px] text-muted-foreground">
+          <span className="truncate text-[10px] text-muted-foreground">
             {player.ownerClubName}
             {player.ownerNickname ? ` · ${player.ownerNickname}` : ""}
           </span>
@@ -106,20 +106,20 @@ export function MarketPlayerCard({
         {player.offerable ? (
           <Button
             type="button"
-            className="min-h-11 flex-1"
+            className="min-h-9 flex-1"
             onClick={() => onOffer(player)}
           >
-            {isFree ? "Fichar" : "Hacer oferta"}
+            {isFree ? "Fichar" : "Oferta"}
           </Button>
         ) : (
           <Button
             type="button"
             variant="outline"
             disabled
-            className="min-h-11 flex-1"
+            className="min-h-9 flex-1"
             title={player.blockedReason ?? undefined}
           >
-            <Lock className="size-4" aria-hidden="true" />
+            <Lock className="size-3.5" aria-hidden="true" />
             {player.ownerIsMe ? "Tu jugador" : "No disponible"}
           </Button>
         )}
