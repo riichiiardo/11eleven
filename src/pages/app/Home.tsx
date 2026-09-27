@@ -723,6 +723,7 @@ export default function Home() {
                   player={player}
                   budgetAvailable={state.budget.available}
                   onOffer={(target) => setMarketTarget(target)}
+                  showDetail
                 />
               </li>
             ))}

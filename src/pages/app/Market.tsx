@@ -260,6 +260,7 @@ export default function Market() {
                   player={player}
                   budgetAvailable={state.budget.available}
                   onOffer={(target) => setSelected(target)}
+                  showDetail
                 />
               </li>
             ))}
