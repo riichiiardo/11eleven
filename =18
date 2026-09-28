@@ -1,0 +1,82 @@
+=== deploy.yml ===
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      # src/convex/_generated is committed to the repo (Convex requires it for
+      # typechecking), so no `convex codegen`/auth is needed in CI.
+      - name: Typecheck
+        run: bunx tsc -b
+
+      - name: Build
+        # GitHub Pages serves a project site under /<repo-name>/, so the base
+        # is derived from the repository name at runtime. Hardcoding it broke
+        # the deploy when the repo was renamed (assets resolved to a 404 path
+        # and the page rendered blank).
+        run: bunx vite build --base=/${{ github.event.repository.name }}/
+        env:
+          # Public Convex endpoint (it ships in the client bundle anyway).
+          # Override by setting the VITE_CONVEX_URL secret in the repo.
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL || 'https://valuable-hedgehog-471.convex.cloud' }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+=== convex.json ===
+{
+  "$schema": "https://raw.githubusercontent.com/get-convex/convex-backend/refs/heads/main/npm-packages/convex/schemas/convex.schema.json",
+  "functions": "src/convex/",
+  "aiFiles": {
+    "enabled": false
+  }
+}
+=== dist built ===
+404.html
+assets
+crests
+index.html
+logo.svg
+manifest.webmanifest
+=== dist/assets ===
+84
+=== src/components/eleven/MarketPlayerCard.tsx ===
