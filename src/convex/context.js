@@ -1,0 +1,906 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { CLUBS, FREE_AGENTS, FREE_AGENT_CLUB_NAME, FREE_AGENT_LEAGUE, TOURNAMENT_SEED, toEuros, } from "./footballData";
+import { DEFAULT_FORMATION, DEFAULT_RULES, FC_VERSION, TOURNAMENT_STATUS_META, autoLineup, groupOf, } from "./rulesEngine";
+export const TOURNAMENT_CODE = "11eleven-foundation";
+export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/* ------------------------------------------------------------------ *
+ * Tournament
+ * ------------------------------------------------------------------ */
+/**
+ * Active league of the caller: the last league they created or joined, stored
+ * on the user. All tournament-scoped reads go through this helper, so switching
+ * league instantly re-points every query in the app. `ensureSetup` back-fills
+ * `leagueMembers` for deployments that predate multi-league, so the membership
+ * lookup below is always authoritative.
+ */
+export async function getTournament(ctx) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId)
+        return null;
+    const user = await ctx.db.get(userId);
+    const activeId = user?.activeTournamentId;
+    if (activeId) {
+        const active = await ctx.db.get(activeId);
+        if (active)
+            return active;
+    }
+    // Fall back to the first league this user belongs to.
+    const memberships = await ctx.db
+        .query("leagueMembers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+    if (memberships.length > 0) {
+        const first = await ctx.db.get(memberships[0].tournamentId);
+        if (first)
+            return first;
+    }
+    return null;
+}
+export async function loadRules(ctx, tournamentId) {
+    const doc = await ctx.db
+        .query("tournamentRules")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .first();
+    if (!doc)
+        return DEFAULT_RULES;
+    return {
+        budget: doc.budget,
+        squadSize: doc.squadSize,
+        gkMin: doc.gkMin,
+        gkMax: doc.gkMax,
+        defMin: doc.defMin,
+        defMax: doc.defMax,
+        midMin: doc.midMin,
+        midMax: doc.midMax,
+        fwdMin: doc.fwdMin,
+        fwdMax: doc.fwdMax,
+        maxPerRealClub: doc.maxPerRealClub,
+        minOvr: doc.minOvr,
+        maxU21: doc.maxU21,
+        lineupLockHours: doc.lineupLockHours,
+        fc27FormationCode: doc.fc27FormationCode ?? DEFAULT_RULES.fc27FormationCode,
+        formationInstructions: doc.formationInstructions ?? DEFAULT_RULES.formationInstructions,
+        u20Min: doc.u20Min ?? DEFAULT_RULES.u20Min,
+        u20InStartingLineup: doc.u20InStartingLineup ?? DEFAULT_RULES.u20InStartingLineup,
+        sameNationalityMin: doc.sameNationalityMin ?? DEFAULT_RULES.sameNationalityMin,
+        sameNationalityRule: doc.sameNationalityRule ?? DEFAULT_RULES.sameNationalityRule,
+        sameNationalityMatchDurationMinutes: doc.sameNationalityMatchDurationMinutes ?? DEFAULT_RULES.sameNationalityMatchDurationMinutes,
+        clubNationalityMin: doc.clubNationalityMin ?? DEFAULT_RULES.clubNationalityMin,
+    };
+}
+export function toTournamentView(doc) {
+    const status = doc.status;
+    const meta = TOURNAMENT_STATUS_META[status] ?? TOURNAMENT_STATUS_META.configuracion;
+    return {
+        id: doc._id,
+        code: doc.code,
+        name: doc.name,
+        season: doc.season,
+        status,
+        statusLabel: meta.label,
+        statusHint: meta.hint,
+        currentMatchday: doc.currentMatchday,
+        totalMatchdays: doc.totalMatchdays,
+        marketOpen: doc.marketOpen,
+        competitionId: doc.competitionId ?? null,
+        nextMatchdayAt: doc.nextMatchdayAt ?? null,
+    };
+}
+/** Seeds clubs + the versioned player catalogue. Called once per deployment. */
+export async function seedTournament(ctx) {
+    const now = Date.now();
+    const tournamentId = await ctx.db.insert("tournaments", {
+        code: TOURNAMENT_CODE,
+        name: TOURNAMENT_SEED.name,
+        season: TOURNAMENT_SEED.season,
+        status: "competicion",
+        currentMatchday: TOURNAMENT_SEED.currentMatchday,
+        totalMatchdays: TOURNAMENT_SEED.totalMatchdays,
+        marketOpen: false,
+        nextMatchdayAt: now + 3 * 24 * 60 * 60 * 1000,
+        createdAt: now,
+    });
+    await ctx.db.insert("tournamentRules", {
+        tournamentId,
+        ...DEFAULT_RULES,
+        updatedAt: now,
+    });
+    for (const club of CLUBS) {
+        const clubId = await ctx.db.insert("clubs", {
+            tournamentId,
+            name: club.name,
+            shortName: club.shortName,
+            league: club.league,
+            country: club.country,
+            colorPrimary: club.colors[0],
+            colorSecondary: club.colors[1],
+        });
+        for (const [name, position, ovr, age, valueM, nationality, flag] of club.players) {
+            await ctx.db.insert("players", {
+                name,
+                position,
+                group: groupOf(position),
+                ovr,
+                age,
+                value: toEuros(valueM),
+                nationality,
+                flag,
+                realClub: club.name,
+                realLeague: club.league,
+                fcVersion: FC_VERSION,
+            });
+        }
+        await ctx.db.insert("auditLog", {
+            tournamentId,
+            clubId,
+            actorName: "Administración",
+            action: "Club habilitado",
+            entity: "club",
+            entityId: clubId,
+            detail: `${club.name} (${club.league}) disponible para presidencia · ${club.players.length} jugadores importados`,
+            createdAt: now,
+        });
+    }
+    const freeAgentVersion = await seedFreeAgents(ctx, tournamentId);
+    const importedCount = await rebuildCatalogStats(ctx);
+    await ctx.db.insert("auditLog", {
+        tournamentId,
+        actorName: "Sistema",
+        action: "Torneo creado",
+        entity: "tournament",
+        entityId: tournamentId,
+        detail: `${TOURNAMENT_SEED.name} · ${CLUBS.length} clubes · catálogo de ${importedCount} jugadores ${FC_VERSION} · ${freeAgentVersion} agentes libres · plantillas nacen vacías y se construyen en el draft`,
+        createdAt: now,
+    });
+    return tournamentId;
+}
+/**
+ * Catalogue size WITHOUT scanning the 19k-row `players` table.
+ *
+ * Convex caps a single function execution at 32.000 document reads: `state`
+ * used to scan `players` twice (once directly, once through the draft summary)
+ * and crashed with "Too many documents read". Every count now comes from the
+ * `catalogStats` singleton instead.
+ */
+export async function getCatalogTotal(ctx) {
+    const stats = await ctx.db.query("catalogStats").first();
+    if (stats)
+        return stats.total;
+    // Deployment created before the counter existed: a single fallback scan is
+    // safe (it is the only catalogue scan in the execution) until the next
+    // mutation materialises the row.
+    return (await ctx.db.query("players").collect()).length;
+}
+/** Applies `delta` to the counter, building it from a scan when missing. */
+export async function updateCatalogStats(ctx, delta) {
+    const stats = await ctx.db.query("catalogStats").first();
+    if (!stats) {
+        return await rebuildCatalogStats(ctx);
+    }
+    const total = Math.max(0, stats.total + delta);
+    if (total !== stats.total) {
+        await ctx.db.patch(stats._id, { total, updatedAt: Date.now() });
+    }
+    return total;
+}
+/** Authoritative recount (one bounded scan, mutations only). */
+export async function rebuildCatalogStats(ctx) {
+    const total = (await ctx.db.query("players").collect()).length;
+    const stats = await ctx.db.query("catalogStats").first();
+    if (stats) {
+        if (stats.total !== total) {
+            await ctx.db.patch(stats._id, { total, updatedAt: Date.now() });
+        }
+        return total;
+    }
+    await ctx.db.insert("catalogStats", { total, updatedAt: Date.now() });
+    return total;
+}
+/**
+ * Free agents are part of the versioned snapshot, not of a club. Adding them is
+ * idempotent so an existing deployment can pick them up on the next bootstrap.
+ */
+export async function seedFreeAgents(ctx, tournamentId) {
+    // Membership is checked by NAME against the catalogue: a live sync can
+    // re-attach a former free agent to a real club, and re-inserting it on every
+    // bootstrap would duplicate the row. One index lookup per candidate is also
+    // far cheaper than scanning a 19k-player catalogue.
+    let inserted = 0;
+    for (const [name, position, ovr, age, valueM, nationality, flag] of FREE_AGENTS) {
+        const existing = await ctx.db
+            .query("players")
+            .withIndex("by_name", (q) => q.eq("name", name))
+            .first();
+        if (existing)
+            continue;
+        await ctx.db.insert("players", {
+            name,
+            position,
+            group: groupOf(position),
+            ovr,
+            age,
+            value: toEuros(valueM),
+            nationality,
+            flag,
+            realClub: FREE_AGENT_CLUB_NAME,
+            realLeague: FREE_AGENT_LEAGUE,
+            fcVersion: FC_VERSION,
+        });
+        inserted += 1;
+    }
+    // Keep the catalogue counter in sync so no query has to scan `players`.
+    await updateCatalogStats(ctx, inserted);
+    if (inserted > 0) {
+        await ctx.db.insert("auditLog", {
+            tournamentId,
+            actorName: "Sistema",
+            action: "Agentes libres importados",
+            entity: "player",
+            detail: `${inserted} jugadores sin club incorporados al mercado desde ${FC_VERSION}`,
+            createdAt: Date.now(),
+        });
+    }
+    return inserted;
+}
+/* ------------------------------------------------------------------ *
+ * Admins
+ * ------------------------------------------------------------------ */
+export async function loadAdmin(ctx, tournamentId, userId) {
+    const rows = await ctx.db
+        .query("tournamentAdmins")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+    return rows.find((row) => row.tournamentId === tournamentId) ?? null;
+}
+/* ------------------------------------------------------------------ *
+ * Presidents + squads
+ * ------------------------------------------------------------------ */
+export function toSquadPlayerView(squadPlayer, player) {
+    return {
+        squadPlayerId: squadPlayer._id,
+        playerId: player._id,
+        name: player.name,
+        position: player.position,
+        group: player.group,
+        ovr: player.ovr,
+        age: player.age,
+        value: player.value,
+        nationality: player.nationality,
+        flag: player.flag,
+        availability: squadPlayer.availability,
+        realClub: player.realClub,
+        realLeague: player.realLeague,
+        fcVersion: player.fcVersion,
+        photo: player.photo ?? null,
+    };
+}
+export async function loadSquadPlayers(ctx, squadId) {
+    const rows = await ctx.db
+        .query("squadPlayers")
+        .withIndex("by_squad", (q) => q.eq("squadId", squadId))
+        .collect();
+    const views = [];
+    for (const row of rows) {
+        const player = await ctx.db.get(row.playerId);
+        if (!player)
+            continue;
+        views.push(toSquadPlayerView(row, player));
+    }
+    return views.sort((a, b) => b.ovr - a.ovr);
+}
+export async function loadPresident(ctx, tournamentId, userId) {
+    const rows = await ctx.db
+        .query("presidents")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+    return rows.find((row) => row.tournamentId === tournamentId) ?? null;
+}
+/** Ownership chain: PLAYER -> SQUAD_OWNERSHIP -> PRESIDENT -> TOURNAMENT */
+/**
+ * Every squad is born EMPTY. The catalogue (imported from the SoFIFA/FC 27
+ * snapshot) is the player universe; ownership starts at zero and the squad is
+ * built by the President through the draft and the market. The former behaviour
+ * of pre-filling a squad with the real-world club roster is kept only as the
+ * self-test helper `seedSquadForClub` below.
+ */
+export async function createSquadForClub(ctx, params) {
+    const { tournamentId, clubId, presidentId } = params;
+    const now = Date.now();
+    const squadId = await ctx.db.insert("squads", {
+        tournamentId,
+        clubId,
+        presidentId,
+        formation: DEFAULT_FORMATION,
+        lineup: [],
+        lineupUpdatedAt: now,
+        createdAt: now,
+    });
+    return { squadId, size: 0 };
+}
+/**
+ * Self-test helper: fills a squad with the club's catalogue players exactly as
+ * `createSquadForClub` did before the "empty squads, draft fills them" change.
+ * Production flows must never call this.
+ */
+export async function seedSquadForClub(ctx, params) {
+    const { tournamentId, clubId, presidentId, clubName } = params;
+    const now = Date.now();
+    const catalogue = await ctx.db
+        .query("players")
+        .withIndex("by_real_club", (q) => q.eq("realClub", clubName))
+        .collect();
+    const squadId = await ctx.db.insert("squads", {
+        tournamentId,
+        clubId,
+        presidentId,
+        formation: DEFAULT_FORMATION,
+        lineup: [],
+        lineupUpdatedAt: now,
+        createdAt: now,
+    });
+    const views = [];
+    for (const player of catalogue) {
+        const squadPlayerId = await ctx.db.insert("squadPlayers", {
+            tournamentId,
+            clubId,
+            squadId,
+            playerId: player._id,
+            presidentId,
+            availability: "neutro",
+            ovrAtJoin: player.ovr,
+            valueAtJoin: player.value,
+            joinedAt: now,
+        });
+        views.push(toSquadPlayerView({
+            _id: squadPlayerId,
+            _creationTime: now,
+            tournamentId,
+            clubId,
+            squadId,
+            playerId: player._id,
+            presidentId,
+            availability: "neutro",
+            ovrAtJoin: player.ovr,
+            valueAtJoin: player.value,
+            joinedAt: now,
+        }, player));
+    }
+    const lineup = autoLineup(views.sort((a, b) => b.ovr - a.ovr), DEFAULT_FORMATION);
+    await ctx.db.patch(squadId, { lineup: lineup.slots });
+    return { squadId, size: views.length };
+}
+/* ------------------------------------------------------------------ *
+ * Multi-league views
+ * ------------------------------------------------------------------ */
+/** Every league the user belongs to; `activeId` is pinned to the top. */
+export async function buildMyLeagues(ctx, userId, activeId) {
+    const memberships = await ctx.db
+        .query("leagueMembers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+    const views = [];
+    for (const membership of memberships) {
+        const tournament = await ctx.db.get(membership.tournamentId);
+        if (!tournament)
+            continue;
+        const president = await loadPresident(ctx, tournament._id, userId);
+        const admin = await loadAdmin(ctx, tournament._id, userId);
+        const members = await ctx.db
+            .query("leagueMembers")
+            .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))
+            .collect();
+        let clubName = null;
+        if (president) {
+            const club = await ctx.db.get(president.clubId);
+            clubName = club?.name ?? null;
+        }
+        views.push({
+            id: tournament._id,
+            code: tournament.code,
+            name: tournament.name,
+            season: tournament.season,
+            memberCount: members.length,
+            isAdmin: Boolean(admin) || membership.role === "administrador",
+            myClubName: clubName,
+            active: activeId !== null && tournament._id === activeId,
+            createdAt: tournament.createdAt,
+        });
+    }
+    return views.sort((a, b) => a.active === b.active ? b.createdAt - a.createdAt : a.active ? -1 : 1);
+}
+/* ------------------------------------------------------------------ *
+ * Views for the UI
+ * ------------------------------------------------------------------ */
+export async function buildClubViews(ctx, tournamentId) {
+    const clubs = await ctx.db
+        .query("clubs")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    const presidents = await ctx.db
+        .query("presidents")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    // Squad membership is the source of truth: with the draft-first model every
+    // club starts EMPTY and only players acquired via draft/market count here.
+    const squadRows = await ctx.db
+        .query("squadPlayers")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    const rosterByClub = new Map();
+    for (const row of squadRows) {
+        const player = await ctx.db.get(row.playerId);
+        if (!player)
+            continue;
+        const entry = rosterByClub.get(row.clubId) ?? { size: 0, ovr: 0, value: 0 };
+        entry.size += 1;
+        entry.ovr += player.ovr;
+        entry.value += player.value;
+        rosterByClub.set(row.clubId, entry);
+    }
+    const presidentByClub = new Map(presidents.map((president) => [president.clubId, president]));
+    const views = [];
+    for (const club of clubs) {
+        const president = presidentByClub.get(club._id);
+        const user = president ? await ctx.db.get(president.userId) : null;
+        const roster = rosterByClub.get(club._id) ?? { size: 0, ovr: 0, value: 0 };
+        views.push({
+            id: club._id,
+            name: club.name,
+            shortName: club.shortName,
+            league: club.league,
+            country: club.country,
+            colorPrimary: club.colorPrimary,
+            colorSecondary: club.colorSecondary,
+            rosterSize: roster.size,
+            averageOvr: roster.size ? Math.round((roster.ovr / roster.size) * 10) / 10 : 0,
+            totalValue: roster.value,
+            presidentNickname: president?.nickname ?? null,
+            presidentName: president ? user?.name ?? president.displayName : null,
+            catalogTeamId: club.catalogTeamId ?? null,
+        });
+    }
+    return views.sort((a, b) => a.name.localeCompare(b.name));
+}
+export async function buildPresidents(ctx, tournamentId) {
+    const presidents = await ctx.db
+        .query("presidents")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    // Extra budgets granted by Administration (one read for the whole league).
+    const grants = await ctx.db
+        .query("budgetGrants")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    const extraByPresident = new Map();
+    for (const grant of grants) {
+        extraByPresident.set(grant.presidentId, (extraByPresident.get(grant.presidentId) ?? 0) + grant.amount);
+    }
+    const views = [];
+    for (const president of presidents) {
+        const club = await ctx.db.get(president.clubId);
+        const user = await ctx.db.get(president.userId);
+        const admin = await loadAdmin(ctx, tournamentId, president.userId);
+        const squad = await ctx.db
+            .query("squads")
+            .withIndex("by_president", (q) => q.eq("presidentId", president._id))
+            .first();
+        const squadPlayers = squad
+            ? await ctx.db
+                .query("squadPlayers")
+                .withIndex("by_squad", (q) => q.eq("squadId", squad._id))
+                .collect()
+            : [];
+        views.push({
+            id: president._id,
+            userId: president.userId,
+            nickname: president.nickname,
+            displayName: president.displayName,
+            email: user?.email ?? "—",
+            clubId: president.clubId,
+            clubName: club?.name ?? "Club sin asignar",
+            clubShortName: club?.shortName ?? "—",
+            clubColors: [
+                club?.colorPrimary ?? "#1d4ed8",
+                club?.colorSecondary ?? "#0b1a30",
+            ],
+            budget: president.budget,
+            budgetExtra: extraByPresident.get(president._id) ?? 0,
+            joinedAt: president.joinedAt,
+            isAdmin: Boolean(admin),
+            adminRole: admin?.role ?? null,
+            squadSize: squadPlayers.length,
+        });
+    }
+    return views.sort((a, b) => b.joinedAt - a.joinedAt);
+}
+export async function buildAdmins(ctx, tournamentId) {
+    const admins = await ctx.db
+        .query("tournamentAdmins")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    const views = [];
+    for (const admin of admins) {
+        const user = await ctx.db.get(admin.userId);
+        views.push({
+            id: admin._id,
+            userId: admin.userId,
+            displayName: user?.name ?? "Administrador",
+            email: user?.email ?? "—",
+            role: admin.role,
+            permissions: admin.permissions,
+            createdAt: admin.createdAt,
+        });
+    }
+    return views.sort((a, b) => a.createdAt - b.createdAt);
+}
+export async function buildActivity(ctx, tournamentId, limit = 12, clubId) {
+    const rows = clubId
+        ? await ctx.db
+            .query("auditLog")
+            .withIndex("by_club", (q) => q.eq("clubId", clubId))
+            .collect()
+        : await ctx.db
+            .query("auditLog")
+            .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+            .collect();
+    const sorted = rows.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit);
+    const clubIds = [...new Set(sorted.map((row) => row.clubId).filter(Boolean))];
+    const clubNames = new Map();
+    for (const id of clubIds) {
+        const club = await ctx.db.get(id);
+        if (club)
+            clubNames.set(id, club.name);
+    }
+    return sorted.map((row) => ({
+        id: row._id,
+        action: row.action,
+        actorName: row.actorName,
+        detail: row.detail,
+        entity: row.entity,
+        clubName: row.clubId ? clubNames.get(row.clubId) ?? null : null,
+        createdAt: row.createdAt,
+    }));
+}
+export async function logAudit(ctx, entry) {
+    await ctx.db.insert("auditLog", {
+        ...entry,
+        createdAt: Date.now(),
+    });
+}
+/* ------------------------------------------------------------------ *
+ * Market views
+ * ------------------------------------------------------------------ */
+export async function loadTournamentOffers(ctx, tournamentId) {
+    const rows = await ctx.db
+        .query("offers")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    return rows.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+/**
+ * Turns raw offer rows into the view the UI reasons about: which side the
+ * President is on, what can be done next, and why a reserved agreement is not
+ * executable yet.
+ */
+export async function buildOffers(ctx, params) {
+    const { tournamentId, offers, viewerPresidentId, tournamentAllowsOperations, marketOpen } = params;
+    const clubCache = new Map();
+    const presidentCache = new Map();
+    const userCache = new Map();
+    const playerCache = new Map();
+    const ownershipCache = new Map();
+    const getClub = async (id) => {
+        if (!id)
+            return null;
+        if (!clubCache.has(id))
+            clubCache.set(id, await ctx.db.get(id));
+        return clubCache.get(id) ?? null;
+    };
+    const getPresident = async (id) => {
+        if (!id)
+            return null;
+        if (!presidentCache.has(id))
+            presidentCache.set(id, await ctx.db.get(id));
+        return presidentCache.get(id) ?? null;
+    };
+    const getPresidentName = async (id) => {
+        const president = await getPresident(id);
+        if (!president)
+            return "—";
+        if (!userCache.has(president.userId)) {
+            const user = await ctx.db.get(president.userId);
+            userCache.set(president.userId, user?.name ?? president.displayName);
+        }
+        return userCache.get(president.userId) ?? president.displayName;
+    };
+    const getPlayer = async (id) => {
+        if (!playerCache.has(id))
+            playerCache.set(id, await ctx.db.get(id));
+        return playerCache.get(id) ?? null;
+    };
+    // Ownership is the key of every market decision.
+    const squadPlayers = await ctx.db
+        .query("squadPlayers")
+        .withIndex("by_tournament", (q) => q.eq("tournamentId", tournamentId))
+        .collect();
+    for (const row of squadPlayers)
+        ownershipCache.set(row.playerId, row);
+    const playerLite = async (playerId) => {
+        const player = await getPlayer(playerId);
+        if (!player)
+            return null;
+        const ownership = ownershipCache.get(playerId) ?? null;
+        const ownerClub = ownership ? await getClub(ownership.clubId) : null;
+        return {
+            playerId: player._id,
+            name: player.name,
+            position: player.position,
+            group: player.group,
+            ovr: player.ovr,
+            age: player.age,
+            value: player.value,
+            flag: player.flag,
+            clubName: ownerClub?.name ?? null,
+            photo: player.photo ?? null,
+        };
+    };
+    const views = [];
+    for (const offer of offers) {
+        const bidderClub = await getClub(offer.bidderClubId);
+        const sellerClub = await getClub(offer.sellerClubId);
+        const requested = (await Promise.all(offer.requestedPlayerIds.map((id) => playerLite(id)))).filter((player) => Boolean(player));
+        const offered = (await Promise.all(offer.offeredPlayerIds.map((id) => playerLite(id)))).filter((player) => Boolean(player));
+        const side = viewerPresidentId === null
+            ? "sistema"
+            : offer.bidderPresidentId === viewerPresidentId
+                ? "enviada"
+                : offer.sellerPresidentId === viewerPresidentId
+                    ? "recibida"
+                    : "sistema";
+        const blockers = [];
+        if (offer.status === "reservada" || offer.status === "aceptada") {
+            if (!tournamentAllowsOperations) {
+                blockers.push("El torneo está suspendido o cancelado: ninguna operación se ejecuta en esta fase.");
+            }
+            if (!marketOpen) {
+                blockers.push("La ventana de mercado está cerrada. La operación espera a que Administración la abra para ejecutarse.");
+            }
+            for (const player of requested) {
+                const ownership = ownershipCache.get(player.playerId) ?? null;
+                const stillWithSeller = ownership
+                    ? offer.sellerClubId
+                        ? ownership.clubId === offer.sellerClubId
+                        : false
+                    : true;
+                if (!stillWithSeller) {
+                    blockers.push(`${player.name} ya no pertenece a ${sellerClub?.name ?? "la lista de agentes libres"}: la operación quedó sin efecto.`);
+                }
+            }
+            for (const player of offered) {
+                const ownership = ownershipCache.get(player.playerId) ?? null;
+                if (!ownership || ownership.clubId !== offer.bidderClubId) {
+                    blockers.push(`${player.name} ya no está en la plantilla de ${bidderClub?.name ?? "tu club"}.`);
+                }
+            }
+        }
+        views.push({
+            id: offer._id,
+            type: offer.type,
+            status: offer.status,
+            cash: offer.cash,
+            message: offer.message ?? null,
+            createdAt: offer.createdAt,
+            updatedAt: offer.updatedAt,
+            agreedAt: offer.agreedAt ?? null,
+            executedAt: offer.executedAt ?? null,
+            side,
+            bidderNickname: (await getPresident(offer.bidderPresidentId))?.nickname ?? "—",
+            bidderClubName: bidderClub?.name ?? "Club sin asignar",
+            bidderClubColors: [
+                bidderClub?.colorPrimary ?? "#1d4ed8",
+                bidderClub?.colorSecondary ?? "#0b1a30",
+            ],
+            bidderIsMe: Boolean(viewerPresidentId && offer.bidderPresidentId === viewerPresidentId),
+            sellerNickname: offer.sellerPresidentId
+                ? (await getPresident(offer.sellerPresidentId))?.nickname ?? "—"
+                : null,
+            sellerClubName: sellerClub?.name ?? null,
+            sellerClubColors: sellerClub
+                ? [sellerClub.colorPrimary, sellerClub.colorSecondary]
+                : null,
+            requested,
+            offered,
+            canRespond: side === "recibida" && (offer.status === "enviada" || offer.status === "negociacion"),
+            canCancel: (side === "enviada" || side === "recibida") &&
+                ["enviada", "negociacion", "reservada", "aceptada"].includes(offer.status),
+            blockers,
+            invalidReason: offer.invalidReason ?? null,
+        });
+    }
+    void getPresidentName;
+    return views;
+}
+/* ------------------------------------------------------------------ *
+ * Deadlines + "qué debo hacer"
+ * ------------------------------------------------------------------ */
+/**
+ * Fixtures arrive with the competition module. Until then the control room
+ * still needs an honest deadline: the next matchday and its lineup lock.
+ */
+export function buildNextEvent(tournament, allClubs, myClubId, rules) {
+    if (!tournament.nextMatchdayAt)
+        return null;
+    const now = Date.now();
+    // Roll the weekly window forward so a stale demo never shows a dead countdown.
+    let kickoffAt = tournament.nextMatchdayAt;
+    while (kickoffAt < now)
+        kickoffAt += WEEK_MS;
+    const lockAt = kickoffAt - rules.lineupLockHours * 60 * 60 * 1000;
+    const index = allClubs.findIndex((club) => club.id === myClubId);
+    const rivals = allClubs.filter((club) => club.id !== myClubId);
+    const rival = index >= 0 && rivals.length > 0
+        ? rivals[(tournament.currentMatchday + index) % rivals.length]
+        : null;
+    return {
+        matchday: tournament.currentMatchday,
+        kickoffAt,
+        lockAt,
+        locked: now >= lockAt,
+        rivalName: rival?.name ?? null,
+        rivalShortName: rival?.shortName ?? null,
+        rivalColors: rival ? [rival.colorPrimary, rival.colorSecondary] : null,
+    };
+}
+/** "Qué debo hacer" — derived, never a generic news block. */
+export function buildActions(params) {
+    const actions = [];
+    const { isAdmin, squadSize, availability, violations, lineupValid, lineupComplete, lockAt, rules, market, competition, draft, } = params;
+    if (competition.myFixture) {
+        actions.push({
+            id: "matchday",
+            tone: "info",
+            title: `Jornada en curso · vs ${competition.myFixture.rivalName}`,
+            description: competition.previousResult
+                ? `El cierre de jornada confirma los resultados. Tu última cita sumó ${competition.previousResult.myPoints}–${competition.previousResult.rivalPoints} puntos fantasy frente al rival.`
+                : "Cuando Administración cierre la jornada, tus 11 titulares puntúan y la tabla se actualiza.",
+            action: { label: "Ir a resultados", to: "/dashboard/competicion" },
+        });
+    }
+    if (draft.isMyTurn) {
+        actions.push({
+            id: "draft-my-turn",
+            tone: "positive",
+            title: "¡Es tu turno en el draft!",
+            description: `Ronda ${draft.round} de ${draft.totalRounds}. Tienes ${draft.poolSize} jugadores disponibles y el turno avanza solo cuando fichas o se agota el tiempo.`,
+            action: { label: "Fichar ahora", to: "/dashboard/draft" },
+        });
+    }
+    else if (draft.status === "en_curso" && draft.currentNickname) {
+        actions.push({
+            id: "draft-waiting",
+            tone: "info",
+            title: `El draft está en curso · turno de ${draft.currentNickname}`,
+            description: `Ronda ${draft.round} de ${draft.totalRounds}. Tu turno es el ${draft.myPosition || "—"} del orden. Puedes dejar tu plantilla lista mientras esperas.`,
+            action: { label: "Ver el draft", to: "/dashboard/draft" },
+        });
+    }
+    else if (draft.status === "borrador") {
+        actions.push({
+            id: "draft-prepared",
+            tone: "info",
+            title: "El draft está preparado",
+            description: `${draft.totalRounds} rondas previstas y ${draft.poolSize} jugadores sin dueño en el torneo. En cuanto Administración lo abra, las operaciones acordadas se ejecutan y empiezan los turnos.`,
+            action: { label: "Ver el draft", to: "/dashboard/draft" },
+        });
+    }
+    else if (draft.status === "pausado") {
+        actions.push({
+            id: "draft-paused",
+            tone: "warning",
+            title: "El draft está en pausa",
+            description: "Administración detuvo el reloj. Puedes seguir preparando ofertas: se reservan y se validan al reanudar.",
+            action: { label: "Ver el draft", to: "/dashboard/draft" },
+        });
+    }
+    if (market.received > 0) {
+        actions.push({
+            id: "offers-received",
+            tone: "warning",
+            title: market.received === 1
+                ? "Tienes una oferta sin responder"
+                : `Tienes ${market.received} ofertas sin responder`,
+            description: "Otros Presidentes quieren operar contigo. Puedes aceptar, rechazar o enviar una contraoferta desde el panel de negociaciones.",
+            action: { label: "Ver ofertas", to: "/dashboard/mercado/negociaciones" },
+        });
+    }
+    if (market.reserved > 0) {
+        actions.push({
+            id: "offers-reserved",
+            tone: "info",
+            title: market.reserved === 1
+                ? "Una operación acordada está reservada"
+                : `${market.reserved} operaciones acordadas reservadas`,
+            description: "Los jugadores implicados quedan comprometidos: se ejecutarán en la validación final, cuando Administración abra el mercado.",
+            action: { label: "Ver operaciones", to: "/dashboard/mercado/negociaciones" },
+        });
+    }
+    const slotsFree = rules.squadSize - squadSize;
+    if (squadSize === 0) {
+        actions.push({
+            id: "squad-empty",
+            tone: draft.status === "en_curso" ? "positive" : "warning",
+            title: "Tu plantilla está vacía · todo se decide en el primer draft",
+            description: draft.status === "en_curso"
+                ? "Es el momento de construir tu equipo: cada ficha se valida contra presupuesto, cupos por posición y sub-21 antes de confirmarse."
+                : "Ningún club arranca con jugadores. Administración abrirá el draft y cada Presidente construirá su equipo fichando del catálogo FC 27 con su presupuesto.",
+            action: { label: "Ir al draft", to: "/dashboard/draft" },
+        });
+    }
+    else if (market.open && slotsFree > 0) {
+        actions.push({
+            id: "market-open",
+            tone: "info",
+            title: `Mercado abierto · ${slotsFree} plaza(s) libres`,
+            description: "Puedes incorporar jugadores: el motor de reglas valida presupuesto, cupos por posición y sub-21 antes de enviar cualquier oferta.",
+            action: { label: "Ir al mercado", to: "/dashboard/mercado" },
+        });
+    }
+    const lockIn = lockAt ? lockAt - Date.now() : null;
+    if (lockIn !== null && lockIn > 0 && lockIn < 12 * 60 * 60 * 1000) {
+        actions.push({
+            id: "lock",
+            tone: lockIn < 3 * 60 * 60 * 1000 ? "danger" : "warning",
+            title: "Cierre de alineación",
+            description: lineupValid
+                ? `Tu once ya es válido. La formación queda bloqueada ${rules.lineupLockHours} h antes del inicio de la jornada.`
+                : `Revisa tu once: queda menos de ${Math.max(1, Math.round(lockIn / 3600000))} h y la alineación aún no cumple todas las reglas.`,
+            action: { label: "Revisar once", to: "/dashboard/formacion" },
+        });
+    }
+    if (!lineupComplete) {
+        actions.push({
+            id: "lineup-empty",
+            tone: "warning",
+            title: "Completa tu once titular",
+            description: "Faltan jugadores por asignar en la formación activa. El motor valida cada posición mientras la construyes.",
+            action: { label: "Ir a formación", to: "/dashboard/formacion" },
+        });
+    }
+    if (!lineupValid && lineupComplete) {
+        actions.push({
+            id: "lineup-invalid",
+            tone: "warning",
+            title: "Tu alineación incumple una regla",
+            description: "Puedes guardar la plantilla, pero la alineación no quedará fijada hasta que sea válida.",
+            action: { label: "Ver qué falla", to: "/dashboard/formacion" },
+        });
+    }
+    for (const violation of violations.slice(0, 2)) {
+        actions.push({
+            id: `rule-${violation.id}`,
+            tone: "warning",
+            title: "Regla del torneo incumplida",
+            description: violation.detail,
+            action: { label: "Ver reglas", to: "/dashboard/reglas" },
+        });
+    }
+    if (availability.transferible + availability.negociacion === 0 && squadSize > 0) {
+        actions.push({
+            id: "availability",
+            tone: "info",
+            title: "Define la situación de tu plantilla",
+            description: "Ningún jugador está marcado como transferible o en negociación. En el mercado nadie podrá ofertar por tu plantilla si todo está neutro.",
+            action: { label: "Estado de jugadores", to: "/dashboard/club/estado" },
+        });
+    }
+    if (isAdmin) {
+        actions.push({
+            id: "admin",
+            tone: "info",
+            title: "Eres Administrador del torneo",
+            description: "Revisa reglas, presidentes y la auditoría del torneo desde el panel de administración.",
+            action: { label: "Abrir administración", to: "/dashboard/admin" },
+        });
+    }
+    return actions.slice(0, 4);
+}

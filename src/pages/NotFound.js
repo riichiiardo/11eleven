@@ -1,0 +1,9 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { motion } from "framer-motion";
+import { Link } from "react-router";
+import { BrandLockup } from "@/components/eleven/Brand";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, LayoutDashboard, Search } from "lucide-react";
+export default function NotFound() {
+    return (_jsx(motion.div, { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.4 }, className: "rail-surface flex min-h-screen flex-col items-center justify-center px-4 py-12 text-white", children: _jsxs("div", { className: "w-full max-w-lg text-center", children: [_jsx("div", { className: "flex justify-center", children: _jsx(BrandLockup, {}) }), _jsx("p", { className: "display mt-8 text-6xl text-white/90", children: "404" }), _jsx("h1", { className: "display mt-2 text-2xl", children: "Esta jugada no existe" }), _jsx("p", { className: "mt-3 text-sm leading-relaxed text-white/70", children: "La direcci\u00F3n que buscas no forma parte del centro de control. Puedes volver al inicio o entrar directamente a la gesti\u00F3n de tu club." }), _jsxs("div", { className: "mt-8 flex flex-wrap justify-center gap-3", children: [_jsx(Button, { asChild: true, className: "min-h-11", children: _jsxs(Link, { to: "/dashboard", children: [_jsx(LayoutDashboard, { className: "size-4", "aria-hidden": "true" }), "Ir a mi club"] }) }), _jsx(Button, { asChild: true, variant: "outline", className: "min-h-11 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white", children: _jsxs(Link, { to: "/", children: [_jsx(ArrowLeft, { className: "size-4", "aria-hidden": "true" }), "Volver al inicio"] }) }), _jsx(Button, { asChild: true, variant: "ghost", className: "min-h-11 text-white hover:bg-white/10 hover:text-white", children: _jsxs(Link, { to: "/dashboard/club/plantilla", children: [_jsx(Search, { className: "size-4", "aria-hidden": "true" }), "Ver plantilla"] }) })] })] }) }));
+}
