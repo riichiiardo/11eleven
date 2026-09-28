@@ -16,6 +16,7 @@ export function MarketPlayerCard({
   budgetAvailable,
   onOffer,
   compact = false,
+  showDetail = false,
 }: {
   player: MarketPlayerView;
   budgetAvailable: number;
@@ -86,7 +87,7 @@ export function MarketPlayerCard({
         ) : null}
       </div>
 
-      {showDetail !== false ? (
+      {showDetail ? (
         <p
           className={cn(
             "rounded-lg border p-2 text-[11px] leading-relaxed",
