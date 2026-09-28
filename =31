@@ -1,0 +1,23 @@
+=== Files in src/components/eleven/ ===
+src/components/eleven/AppShell.tsx
+src/components/eleven/Brand.tsx
+src/components/eleven/CompetitionPicker.tsx
+src/components/eleven/Crest.tsx
+src/components/eleven/DraftBits.tsx
+src/components/eleven/LeagueManager.tsx
+src/components/eleven/MarketPlayerCard.tsx
+src/components/eleven/MatchBits.tsx
+src/components/eleven/OfferBits.tsx
+src/components/eleven/OfferCard.tsx
+src/components/eleven/OfferDialog.tsx
+src/components/eleven/PitchView.tsx
+src/components/eleven/PlayerBits.tsx
+src/components/eleven/PlayerDialog.tsx
+src/components/eleven/RuleCheckList.tsx
+src/components/eleven/SectionCard.tsx
+src/components/eleven/SquadTable.tsx
+
+=== PlayerFace usage ===
+src/components/eleven/PlayerBits.tsx
+
+=== PlayerFace code ===
