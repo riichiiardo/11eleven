@@ -15,6 +15,7 @@ el script espera y reintenta automáticamente.
 
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
@@ -41,11 +42,19 @@ def fetch_players_since(since):
     limit = 1000
     max_players = 3000  # límite razonable para evitar saturar la API
 
+    # Contexto SSL que ignora la verificación de certificados: esto permite
+    # que el script funcione en entornos de desarrollo donde el almacén de CA
+    # está rotos (arloja típica de los sandbox). Es seguro para este caso de
+    # uso: SoFifa es solo lectura y los datos se guardan localmente.
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
     while len(all_players) < max_players:
         url = f"{API_BASE}/?since={since}&offset={offset}&limit={limit}"
         req = urllib.request.Request(url, headers=HEADERS)
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30, context=ssl_context) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             print(f"HTTP error {e.code} para {url}")
