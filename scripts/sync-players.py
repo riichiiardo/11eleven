@@ -1,141 +1,192 @@
 #!/usr/bin/env python3
 """
-11Eleven — sincroniza los jugadores de Sofifa a public/players.json.
+11Eleven · SoFIFA → Supabase (staging del catálogo).
+
+Baja el catálogo de jugadores de SoFIFA desde tu Mac (IP residencial: Cloudflare
+pasa sin challenge) y sube cada página a Supabase (Postgres) con upsert por
+`sofifa_id`. La app luego importa desde Supabase con la acción
+`footballApi.syncCatalog` fuente `supabase`.
+
+Requisitos:
+  pip install requests supabase
 
 Uso:
-    python3 scripts/sync-players.py fetch
+  # 1) Env de Supabase (opcional: sin él, solo imprime lo que subiría)
+  export SUPABASE_URL="https://TU-PROYECTO.supabase.co"
+  export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOi..."   # service_role, NO la anon
 
-La fuente es la API pública de Sofifa (https://api.sofifa.com/). Los datos
-descargados se escriben en `public/players.json` para que el backend de Convex
-pueda importarlos.
+  # 2) Descarga y sube a Supabase
+  python3 scripts/sync-players.py fetch
 
-Nota: Si la API de Sofifa devuelve errores (p. ej. 429 Too Many Requests),
-el script espera y reintenta automáticamente.
+Notas:
+  · La API JSON interna de SoFIFA es https://sofifa.com/api/players (60 por página).
+  · Entre páginas hay una pausa de ~1.2 s para no disparar rate limits.
+  · El upsert es idempotente: correr el script dos veces no duplica filas.
 """
 
 import json
 import os
-import ssl
 import sys
 import time
-import urllib.error
+import urllib.parse
 import urllib.request
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT = os.path.join(ROOT, "public", "players.json")
-API_BASE = "https://api.sofifa.com/v1/player"
-HEADERS = {
-    "User-Agent": "11Eleven-Sync/1.0 (fantasy-football-manager)",
-    "Accept": "application/json",
+import requests
+
+SOFIFA_URL = "https://sofifa.com/api/players"
+PAGE_SIZE = 60            # SoFIFA devuelve 60 filas por página
+PAGE_STEP = 60            # offset avanza de 60 en 60
+MAX_PAGES = 400           # tope de seguridad (~24.000 jugadores)
+PAUSE_SECONDS = 1.2
+
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json,text/plain,*/*",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
-# Fecha desde la cual descargar (año real; puedes ajustarlo a la temporada
-# actual que necesites). El campo `since` de la API de Sofifa corresponde a un
-# timestamp y `2024` funciona para obtener jugadores de esa época.
-SINCE = 2024
+SUPABASE_TABLE = "sofifa_players"
 
 
-def fetch_players_since(since):
-    """Obtiene los jugadores de Sofifa desde una fecha dada, en lotes."""
-    all_players = []
-    offset = 0
-    limit = 1000
-    max_players = 3000  # límite razonable para evitar saturar la API
-
-    # Contexto SSL que ignora la verificación de certificados: esto permite
-    # que el script funcione en entornos de desarrollo donde el almacén de CA
-    # está rotos (arloja típica de los sandbox). Es seguro para este caso de
-    # uso: SoFifa es solo lectura y los datos se guardan localmente.
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-
-    while len(all_players) < max_players:
-        url = f"{API_BASE}/?since={since}&offset={offset}&limit={limit}"
-        req = urllib.request.Request(url, headers=HEADERS)
-        try:
-            with urllib.request.urlopen(req, timeout=30, context=ssl_context) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            print(f"HTTP error {e.code} para {url}")
-            if e.code == 429:
-                print("Demasiadas solicitudes. Esperando 5 segundos...")
-                time.sleep(5)
-                continue
-            raise
-
-        batch = data.get("players", [])
-        if not batch:
-            print("No se encontraron más jugadores.")
-            break
-
-        all_players.extend(batch)
-        offset += limit
-        time.sleep(0.1)  # delay para evitar 429
-
-    return all_players
+def env(name: str) -> str | None:
+    value = os.environ.get(name)
+    return value.strip() if value and value.strip() else None
 
 
-def clean_player(p):
-    """Normaliza un jugador desde la respuesta de la API de Sofifa."""
+def supabase_client():
+    url = env("SUPABASE_URL")
+    key = env("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        return None
+    try:
+        from supabase import create_client
+    except ImportError:
+        sys.exit(
+            "Falta el paquete de Supabase. Instálalo con:\n"
+            "  pip install supabase"
+        )
+    return create_client(url, key)
+
+
+def fetch_page(offset: int, r: str = "270025") -> list[dict]:
+    """Descarga una página de SoFIFA y devuelve las filas crudas."""
+    params = {
+        "r": r,
+        "unit": "EUR",
+        "offset": str(offset),
+    }
+    request = urllib.request.Request(
+        f"{SOFIFA_URL}?{urllib.parse.urlencode(params)}", headers=BROWSER_HEADERS
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in ("players", "data", "results", "items"):
+            inner = payload.get(key)
+            if isinstance(inner, list):
+                return inner
+    return []
+
+
+def to_row(raw: dict, r: str) -> dict | None:
+    """Mapea una fila cruda de SoFIFA al shape de la tabla de staging."""
+    sofifa_id = raw.get("id") or raw.get("player_id")
+    name = raw.get("name") or raw.get("player") or raw.get("long_name")
+    if not sofifa_id or not name:
+        return None
+
+    age = raw.get("age")
+    if isinstance(age, str) and age.strip().isdigit():
+        age = int(age)
+    if not isinstance(age, (int, float)):
+        age = None
+
+    value = raw.get("value") or raw.get("value_eur") or raw.get("market_value") or 0
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = 0
+
+    club = raw.get("team") or raw.get("club") or raw.get("club_name") or ""
+
     return {
-        "id": p.get("id"),
-        "name": p.get("name"),
-        "short_name": p.get("short_name"),
-        "nationality": p.get("nationality"),
-        "date_of_birth": p.get("date_of_birth"),
-        "club_name": p.get("club_name"),
-        "club_country": p.get("club_country"),
-        "club_short_name": p.get("club_short_name"),
-        "position": p.get("position"),
-        "position_short": p.get("position_short"),
-        "photo": p.get("photo"),
-        "height": p.get("height"),
-        "weight": p.get("weight"),
-        "age": p.get("age"),
-        "ovr": p.get("ovr"),
-        "potential": p.get("potential"),
-        "skills": p.get("skills"),
-        "weak_foot": p.get("weak_foot"),
-        "international_reputation": p.get("international_reputation"),
-        "pace": p.get("pace"),
-        "shooting": p.get("shooting"),
-        "passing": p.get("passing"),
-        "dribbling": p.get("dribbling"),
-        "defending": p.get("defending"),
-        "physic": p.get("physic"),
-        "gk_diving": p.get("gk_diving"),
-        "gk_handling": p.get("gk_handling"),
-        "gk_kicking": p.get("gk_kicking"),
-        "gk_reflexes": p.get("gk_reflexes"),
-        "gk_speed": p.get("gk_speed"),
-        "createdAt": int(time.time() * 1000),
-        "updatedAt": int(time.time() * 1000),
+        "sofifa_id": int(sofifa_id),
+        "name": str(name).strip(),
+        "position": raw.get("position") or raw.get("best_position") or None,
+        "ovr": raw.get("ovr") or raw.get("overall") or raw.get("rating") or None,
+        "potential": raw.get("potential") or raw.get("pot") or None,
+        "age": age,
+        "value_eur": value,
+        "nationality": raw.get("nationality") or raw.get("nation") or None,
+        "club": club,
+        "club_country": raw.get("club_country") or None,
+        "league": raw.get("league") or raw.get("competition") or None,
+        "photo_url": raw.get("photo_url") or raw.get("headshot") or None,
+        "r": r,
     }
 
 
-def main():
-    if len(sys.argv) < 2 or sys.argv[1] != "fetch":
-        print("Uso: python3 scripts/sync-players.py fetch")
-        sys.exit(1)
+def upsert_batch(client, rows: list[dict]) -> None:
+    """Upsert idempotente en Supabase (conflicto por sofifa_id)."""
+    if not client:
+        return
+    response = (
+        client.table(SUPABASE_TABLE)
+        .upsert(rows, on_conflict="sofifa_id")
+        .execute()
+    )
+    if getattr(response, "error", None):
+        raise RuntimeError(f"Supabase devolvió un error: {response.error}")
 
-    os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
 
-    print(f"Descargando jugadores de Sofifa desde {SINCE}...")
-    players = fetch_players_since(SINCE)
-    print(f"Descargados {len(players)} jugadores.")
+def fetch(r: str) -> None:
+    client = supabase_client()
+    mode = "Supabase" if client else "SOLO IMPRESIÓN (define SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY)"
+    print(f"Descargando jugadores de SoFIFA → {mode} …")
 
-    if not players:
-        print("Advertencia: no se encontraron jugadores. Verifica la API.")
-        sys.exit(1)
+    total = 0
+    for page in range(MAX_PAGES):
+        offset = page * PAGE_STEP
+        try:
+            raws = fetch_page(offset, r)
+        except Exception as cause:  # noqa: BLE001
+            print(f"  página {page + 1}: error de red ({cause}); se reintenta en 5 s…")
+            time.sleep(5)
+            try:
+                raws = fetch_page(offset, r)
+            except Exception as cause2:  # noqa: BLE001
+                print(f"  página {page + 1}: falló de nuevo ({cause2}); se detiene aquí.")
+                break
 
-    cleaned = [clean_player(p) for p in players]
+        rows = [row for raw in raws if (row := to_row(raw, r))]
+        if not rows:
+            print(f"  página {page + 1}: sin filas válidas; fin del catálogo.")
+            break
 
-    with open(OUTPUT, "w", encoding="utf-8") as f:
-        json.dump(cleaned, f, ensure_ascii=False, indent=2)
+        if client:
+            upsert_batch(client, rows)
+        total += len(rows)
+        print(
+            f"  página {page + 1}: {len(rows)} filas "
+            f"(total {total}, offset {offset})"
+        )
+        time.sleep(PAUSE_SECONDS)
 
-    size = os.path.getsize(OUTPUT)
-    print(f"Datos guardados en {OUTPUT} ({size} bytes).")
+    print(f"Listo: {total} filas procesadas desde SoFIFA.")
+
+
+def main() -> None:
+    command = sys.argv[1] if len(sys.argv) > 1 else "fetch"
+    if command == "fetch":
+        fetch(r="270025")
+    else:
+        print(f"Comando desconocido: {command}. Usa: fetch")
 
 
 if __name__ == "__main__":

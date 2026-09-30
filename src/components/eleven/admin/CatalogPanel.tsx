@@ -25,7 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 
-type CatalogSource = "ea" | "sofifa" | "snapshot";
+type CatalogSource = "ea" | "sofifa" | "supabase" | "snapshot";
 
 const SOURCE_META: Record<CatalogSource, { label: string; hint: string }> = {
   ea: {
@@ -35,6 +35,10 @@ const SOURCE_META: Record<CatalogSource, { label: string; hint: string }> = {
   sofifa: {
     label: "SoFIFA · API pública (requiere proxy)",
     hint: "SoFIFA responde 403 (Cloudflare) a las IPs de datacenter. Solo funciona si defines SOFIFA_PROXY_URL (http://usuario:clave@host:puerto) en Convex → Settings → Environment Variables.",
+  },
+  supabase: {
+    label: "Supabase · staging SoFIFA (tu suscripción)",
+    hint: "Lee la tabla sofifa_players de tu proyecto Supabase, llenada por scripts/sync-players.py desde tu Mac. Requiere SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY (service_role, no anon) en Convex → Settings → Environment Variables.",
   },
   snapshot: {
     label: "Snapshot local versionado (respaldo)",
@@ -72,8 +76,8 @@ export function CatalogPanel() {
         return;
       }
 
-      // EA pages are 1-based; SoFIFA cursors count full pages from 0.
-      let page = source === "sofifa" ? 0 : 1;
+      // EA pages are 1-based; SoFIFA and Supabase cursors count from 0.
+      let page = source === "ea" ? 1 : 0;
       let totalPages = 0;
       let fetched = 0;
       let inserted = 0;
@@ -96,7 +100,7 @@ export function CatalogPanel() {
         if (result.note) note = result.note;
         setProgress({ page, totalPages, fetched, inserted, updated });
         if (result.fallback) {
-          toast.warning(source === "sofifa" ? "SoFIFA no accesible" : "Fuente no accesible", {
+          toast.warning("Fuente no accesible", {
             description: result.note ?? undefined,
           });
           return;
@@ -131,8 +135,8 @@ export function CatalogPanel() {
     >
       <p className="text-sm text-muted-foreground">
         El catálogo es la base de jugadores de la que beben el draft y el mercado. Sincroniza los
-        ratings oficiales de EA SPORTS FC 27 (más de 19.000 jugadores) o, si prefieres, la API de
-        SoFIFA con proxy. La importación avanza por lotes y nunca toca las plantillas ni la
+        ratings oficiales de EA SPORTS FC 27 (más de 19.000 jugadores) o los datos de SoFIFA
+        guardados en tu Supabase. La importación avanza por lotes y nunca toca las plantillas ni la
         propiedad de los jugadores: solo se actualiza la tabla de jugadores.
       </p>
 

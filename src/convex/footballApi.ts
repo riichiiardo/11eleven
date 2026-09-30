@@ -32,6 +32,9 @@ import { FREE_AGENT_CLUB, type Position } from "./rulesEngine";
 
 export const SYNC_SOURCE = "SoFIFA";
 export const EA_SOURCE = "EA Ratings";
+export const SUPABASE_SOURCE = "Supabase (SoFIFA)";
+/** Filas por llamada a la REST API de Supabase (tope del servidor: 1.000). */
+export const SB_BATCH = 1_000;
 /** English Premier League on SoFIFA; the sync accepts any league id. */
 export const DEFAULT_LEAGUE_ID = 13;
 export const MAX_PAGES = 30;
@@ -465,6 +468,104 @@ function rowsOf(data: unknown): Record<string, unknown>[] {
   return [];
 }
 
+/* ------------------------------------------------------------------ *
+ * Supabase · staging del catálogo (recomendada)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Staging en Supabase (Postgres): tu Mac baja el catálogo de SoFIFA (IP
+ * residencial, sin Cloudflare de por medio) y sube cada página con upsert a la
+ * tabla `sofifa_players` (ver `supabase/catalog.sql`). La action lee esa tabla
+ * por bloques con la service role key — conexión servidor-a-servidor, sin
+ * Cloudflare de por medio — y hace el upsert idempotente en `players`.
+ */
+export type SupabaseRow = {
+  sofifa_id: number;
+  name: string;
+  position: string | null;
+  ovr: number | null;
+  age: number | null;
+  value_eur: number | null;
+  nationality: string | null;
+  club: string | null;
+  league: string | null;
+  photo_url: string | null;
+};
+
+function supabaseConfig(): { url: string; key: string } {
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !key) {
+    throw new ConvexError(
+      "Falta la configuración de Supabase. Define SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Convex → Settings → Environment Variables (la URL termina en .supabase.co y la clave es la service_role, NO la anon).",
+    );
+  }
+  return { url: url.replace(/\/$/, ""), key };
+}
+
+/**
+ * Lee un bloque de la tabla de staging `sofifa_players` ordenado por OVR
+ * descendente (lo que el draft y el mercado consumen primero). Devuelve las
+ * filas ya mapeadas al shape del catálogo; la exhaustividad la decide el
+ * llamador comparando contra el total devuelto por la propia tabla.
+ */
+export async function fetchSupabaseBatch(start: number, limit: number): Promise<{
+  players: FetchedPlayer[];
+  total: number;
+}> {
+  const { url, key } = supabaseConfig();
+  const endpoint =
+    `${url}/rest/v1/sofifa_players` +
+    `?select=sofifa_id,name,position,ovr,age,value_eur,nationality,club,league,photo_url` +
+    `&ovr=not.is.null&order=ovr.desc.nullslast,sofifa_id.asc`;
+
+  let response;
+  try {
+    response = await axios.get(endpoint, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Range: `${start}-${start + limit - 1}`,
+        Prefer: "count=exact",
+        Accept: "application/json",
+      },
+      timeout: 25_000,
+      responseType: "json",
+    });
+  } catch (cause) {
+    const status = axios.isAxiosError(cause) ? cause.response?.status : undefined;
+    throw new ConvexError(
+      `No se pudo leer la tabla de staging en Supabase${status ? ` (HTTP ${status})` : ""}. ` +
+        "Verifica SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY, y que ejecutaste supabase/catalog.sql en tu proyecto.",
+    );
+  }
+
+  const rows = Array.isArray(response.data) ? (response.data as SupabaseRow[]) : [];
+  const contentRange = String(response.headers["content-range"] ?? "");
+  const total = Number(contentRange.split("/")[1]) || rows.length + start;
+
+  const players: FetchedPlayer[] = [];
+  for (const row of rows) {
+    const mapped = parsePlayerRow(
+      {
+        id: row.sofifa_id,
+        name: row.name,
+        position: row.position,
+        ovr: row.ovr,
+        age: row.age,
+        value: row.value_eur,
+        nationality: row.nationality,
+        team: row.club,
+        league: row.league,
+        photo_url: row.photo_url,
+      },
+      "SoFIFA",
+    );
+    if (mapped) players.push(mapped);
+  }
+  return { players, total };
+}
+
 function sofifaUrl(params: {
   teamId?: number;
   leagueId?: number;
@@ -804,12 +905,19 @@ type SyncOutcome = {
   note: string | null;
 };
 
-function versionLabel(source: "ea" | "sofifa"): string {
+function versionLabel(source: "ea" | "sofifa" | "supabase"): string {
   const now = new Date();
   const stamp = `${String(now.getDate()).padStart(2, "0")}/${String(
     now.getMonth() + 1,
   ).padStart(2, "0")}/${now.getFullYear()}`;
   return source === "ea" ? `FC 27 · EA Ratings ${stamp}` : `FC 27 · SoFIFA ${stamp}`;
+}
+
+/** Etiqueta de auditoría según la fuente de descarga. */
+function sourceLabel(source: "ea" | "sofifa" | "supabase"): string {
+  if (source === "ea") return EA_SOURCE;
+  if (source === "supabase") return SUPABASE_SOURCE;
+  return SYNC_SOURCE;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -825,6 +933,8 @@ function chunk<T>(items: T[], size: number): T[][] {
  *
  * - `source: "ea"` descarga N páginas de los ratings oficiales de EA (100
  *   jugadores por página) y devuelve el cursor de la siguiente.
+ * - `source: "supabase"` lee la tabla de staging `sofifa_players` en Supabase
+ *   (llenada por `scripts/sync-players.py` desde tu Mac); 1.000 filas por lote.
  * - `source: "sofifa"` hace lo propio con la API de SoFIFA (60 por página) y
  *   solo tiene éxito detrás de `SOFIFA_PROXY_URL`.
  * - `source: "snapshot"` reimporta el snapshot local versionado.
@@ -835,7 +945,14 @@ function chunk<T>(items: T[], size: number): T[][] {
  */
 export const syncCatalog = action({
   args: {
-    source: v.optional(v.union(v.literal("ea"), v.literal("sofifa"), v.literal("snapshot"))),
+    source: v.optional(
+      v.union(
+        v.literal("ea"),
+        v.literal("sofifa"),
+        v.literal("supabase"),
+        v.literal("snapshot"),
+      ),
+    ),
     page: v.optional(v.number()),
     pages: v.optional(v.number()),
     teamId: v.optional(v.number()),
@@ -878,7 +995,22 @@ export const syncCatalog = action({
       let done = false;
       let note: string | null = null;
 
-      if (source === "ea") {
+      if (source === "supabase") {
+        const start = Math.max(0, Math.floor(args.page ?? 0));
+        const batch = await fetchSupabaseBatch(start, SB_BATCH);
+        if (batch.players.length === 0) {
+          throw new ConvexError(
+            start === 0
+              ? "La tabla de staging en Supabase está vacía. Ejecuta `python3 scripts/sync-players.py fetch` desde tu Mac y vuelve a intentarlo."
+              : "Supabase no devolvió más filas para este cursor.",
+          );
+        }
+        players = batch.players;
+        fetched = batch.players.length;
+        nextPage = start + batch.players.length;
+        totalPages = batch.total > 0 ? Math.ceil(batch.total / SB_BATCH) : 0;
+        done = batch.total > 0 ? nextPage >= batch.total : true;
+      } else if (source === "ea") {
         const batch = await fetchEaBatch(
           Math.max(1, Math.floor(args.page ?? 1)),
           Math.max(1, Math.min(args.pages ?? EA_BATCH_PAGES, EA_MAX_BATCH)),
@@ -923,7 +1055,7 @@ export const syncCatalog = action({
         const summary = await ctx.runMutation(internal.footballSync.applyCatalog, {
           players: part,
           fcVersion,
-          source: source === "ea" ? EA_SOURCE : SYNC_SOURCE,
+          source: sourceLabel(source),
           log: false,
         });
         inserted += summary.inserted;
@@ -934,7 +1066,7 @@ export const syncCatalog = action({
       if (players.length > 0) {
         await ctx.runMutation(internal.footballSync.logSyncSuccess, {
           actorName,
-          source: source === "ea" ? EA_SOURCE : SYNC_SOURCE,
+          source: sourceLabel(source),
           summary: { inserted, updated, unchanged, fcVersion },
           note:
             note ??
@@ -943,7 +1075,7 @@ export const syncCatalog = action({
       }
 
       return {
-        source: source === "ea" ? EA_SOURCE : SYNC_SOURCE,
+        source: sourceLabel(source),
         fallback: false,
         done,
         page: nextPage,
