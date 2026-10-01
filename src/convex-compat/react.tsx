@@ -1,0 +1,371 @@
+/**
+ * 11Eleven — capa de compatibilidad: `convex/react` shim.
+ *
+ * Reimplementa los hooks de Convex sobre Supabase. El mapeo de lecturas y
+ * mutaciones vive en la función resolve; las páginas no cambian.
+ */
+import { adaptDraft, adaptMarketOverview, adaptTournamentState } from "@/lib/supabase/adapters";
+import { rpc, supabase } from "@/lib/supabase/client";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+
+/* ------------------------------------------------------------------ *
+ * Auth context (reemplaza @convex-dev/auth/react)
+ * ------------------------------------------------------------------ */
+
+export type CompatUser = {
+  id: string;
+  name: string;
+  email: string;
+  nickname: string;
+  image: string | null;
+};
+
+type AuthValue = {
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  user: CompatUser | null;
+  signIn: (...args: unknown[]) => Promise<unknown>;
+  signOut: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthValue | null>(null);
+
+export function ConvexAuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<{ user?: { id: string; email?: string } } | null>(null);
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session as unknown as { user?: { id: string; email?: string } } | null);
+      setIsLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s as unknown as { user?: { id: string; email?: string } } | null);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const uid = session?.user?.id;
+    if (!uid) {
+      setProfile(null);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", uid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setProfile((data as Record<string, unknown>) ?? null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
+
+  const value = useMemo<AuthValue>(() => {
+    const u = session?.user;
+    return {
+      isLoading,
+      isAuthenticated: Boolean(session),
+      user: u
+        ? {
+            id: u.id,
+            name: (profile?.name as string) ?? u.email?.split("@")[0] ?? "Usuario",
+            email: u.email ?? "",
+            nickname:
+              (profile?.nickname as string) ?? (profile?.name as string) ?? u.email?.split("@")[0] ?? "Presidente",
+            image: (profile?.image as string) ?? null,
+          }
+        : null,
+      // Firma posicional de Convex: signIn("email-otp", formData) o signIn("anonymous").
+      signIn: async (...signInArgs: unknown[]) => {
+        const [flowArg, payloadArg] = signInArgs;
+        const flow = typeof flowArg === "string" ? flowArg : "email-otp";
+        const formData =
+          payloadArg instanceof FormData
+            ? payloadArg
+            : ((payloadArg as { formData?: FormData } | undefined)?.formData ?? undefined);
+        if (flow === "anonymous") {
+          const { error } = await supabase.auth.signInAnonymously();
+          if (error) throw new Error(error.message);
+          return;
+        }
+        const email = String(formData?.get("email") ?? "");
+        if (!email) throw new Error("Falta el correo.");
+        const code = String(formData?.get("code") ?? "");
+        if (code) {
+          const { error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+          if (error) throw new Error(error.message);
+          return;
+        }
+        const { error } = await supabase.auth.signInWithOtp({ email });
+        if (error) throw new Error(error.message);
+      },
+      signOut: async () => {
+        await supabase.auth.signOut();
+      },
+    };
+  }, [session, profile, isLoading]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useConvexAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useConvexAuth debe usarse dentro de <ConvexAuthProvider>.");
+  return { isLoading: ctx.isLoading, isAuthenticated: ctx.isAuthenticated };
+}
+
+export function useAuthActions() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuthActions debe usarse dentro de <ConvexAuthProvider>.");
+  return { signIn: ctx.signIn, signOut: ctx.signOut };
+}
+
+/* ------------------------------------------------------------------ *
+ * useQuery / useMutation
+ * ------------------------------------------------------------------ */
+
+const REFRESH_MS = 15_000;
+const cache = new Map<string, unknown>();
+const timers = new Map<string, number>();
+
+/** Mapeo lectura Convex → RPC/tabla Supabase. */
+function resolveRead(ref: string, args: Record<string, unknown> | undefined): Promise<unknown> {
+  switch (ref) {
+    case "users.currentUser": {
+      return supabase.auth.getUser().then(({ data }) => {
+        if (!data.user) return null;
+        return supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .maybeSingle()
+          .then(({ data: row }) => row ?? null);
+      });
+    }
+    case "tournament.state":
+      return rpc<Record<string, unknown> | null>("tournament_state").then(adaptTournamentState);
+    case "market.browse":
+      return rpc<Record<string, unknown>>("market_browse", {
+        p_scope: args?.scope ?? "todos",
+        p_sort: args?.sort ?? "ovr",
+        p_only_affordable: args?.onlyAffordable ?? false,
+        p_limit: args?.limit ?? 24,
+        p_offset: args?.offset ?? 0,
+      });
+    case "market.overview":
+      return rpc<Record<string, unknown> | null>("market_overview").then(adaptMarketOverview);
+    case "draft.check":
+    case "draft.control":
+      return rpc<Record<string, unknown> | null>("draft_check").then(adaptDraft);
+    case "draft.pool":
+      return rpc<Record<string, unknown>>("draft_pool", {
+        p_position: args?.position ?? null,
+        p_search: args?.search ?? null,
+        p_limit: args?.limit ?? 50,
+        p_offset: args?.offset ?? 0,
+      });
+    case "teams.squadOf":
+      return rpc<Record<string, unknown> | null>("team_squad", { p_club_id: args?.clubId });
+    case "footballSync.catalogState":
+      return rpc<Record<string, unknown>>("catalog_state");
+    case "tournament.adminOverview":
+      return rpc<Record<string, unknown>>("admin_overview");
+    case "market.validateOffer":
+    case "market.guidance":
+      return Promise.resolve(null);
+    default:
+      return Promise.reject(new Error(`Lectura no soportada: ${ref}`));
+  }
+}
+
+function refOf(fnRef: unknown): string {
+  const r = fnRef as { __ref?: string } | string;
+  return typeof r === "string" ? r : (r.__ref ?? String(r));
+}
+
+export function useQuery<T = unknown>(
+  fnRef: unknown,
+  args?: Record<string, unknown>,
+): T | undefined | null {
+  const ref = refOf(fnRef);
+  const key = `${ref}:${JSON.stringify(args ?? {})}`;
+  const [value, setValue] = useState<unknown>(() => cache.get(key));
+  const [tick, setTick] = useState(0);
+
+  const load = useCallback(
+    async (force: boolean) => {
+      if (timers.has(key)) return;
+      if (!force && cache.has(key)) {
+        const at = (cache.get(`${key}:at`) as number) ?? 0;
+        if (Date.now() - at < REFRESH_MS) return;
+      }
+      const timer = window.setTimeout(async () => {
+        timers.delete(key);
+        try {
+          const data = await resolveRead(ref, args);
+          cache.set(key, data);
+          cache.set(`${key}:at`, Date.now());
+          setTick((t) => t + 1);
+        } catch (cause) {
+          console.warn(`[11Eleven] ${ref}:`, cause instanceof Error ? cause.message : cause);
+        }
+      }, 10);
+      timers.set(key, timer);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, ref, JSON.stringify(args ?? {})],
+  );
+
+  useEffect(() => {
+    void load(false);
+    const interval = window.setInterval(() => void load(true), REFRESH_MS);
+    return () => window.clearInterval(interval);
+  }, [load]);
+
+  // Re-render cuando el cache cambia (cualquier mutación o refresco).
+  useEffect(() => {
+    const next = cache.get(key);
+    if (next !== undefined && next !== value) setValue(next);
+  }, [tick, key, value]);
+
+  return (cache.has(key) ? cache.get(key) : undefined) as T | undefined | null;
+}
+
+/** useMutation: ejecuta un RPC security definer y refresca los caches. */
+export function useMutation() {
+  return useCallback(async (fnRef: unknown, args: Record<string, unknown> = {}) => {
+    const ref = refOf(fnRef);
+    const fn = resolveMutation(ref);
+    const result = await fn(args);
+    cache.clear(); // invalidate-all: las lecturas se refrescan al siguiente tick
+    return result;
+  }, []);
+}
+
+function resolveMutation(ref: string): (args: Record<string, unknown>) => Promise<unknown> {
+  const map: Record<string, (a: Record<string, unknown>) => Promise<unknown>> = {
+    "tournament.ensureSetup": () => rpc("ensure_setup"),
+    "tournament.grantAdmin": (a) => rpc("grant_admin", { p_user_id: a.userId, p_role: a.role ?? "coAdmin" }),
+    "tournament.revokeAdmin": (a) => rpc("revoke_admin", { p_user_id: a.userId }),
+    "tournament.setTournamentStatus": (a) => rpc("set_tournament_status", { p_status: a.status }),
+    "tournament.updateRules": (a) => rpc("update_rules", { p_rules: a.rules }),
+    "tournament.chooseCatalogTeam": (a) => rpc("choose_catalog_team", { p_team_catalog_id: a.teamCatalogId }),
+    "tournament.ensureTeamCatalog": () => Promise.resolve(0),
+    "tournament.updateProfile": (a) =>
+      rpc("update_profile", { p_name: a.name ?? "", p_nickname: a.nickname ?? "", p_image: a.image ?? null }),
+    "tournament.updateAvatar": (a) => rpc("update_profile", { p_name: "", p_nickname: "", p_image: a.image }),
+    "leagues.createLeague": (a) => rpc("create_league", { p_name: a.name, p_season: a.season, p_code: a.code }),
+    "leagues.joinLeague": (a) => rpc("join_league", { p_code: a.code }),
+    "leagues.activateLeague": (a) => rpc("activate_league", { p_tournament_id: a.tournamentId }),
+    "squads.setAvailability": (a) => rpc("set_availability", { p_squad_player_id: a.squadPlayerId, p_availability: a.availability }),
+    "squads.saveLineup": (a) => rpc("save_lineup", { p_formation: a.formation, p_slots: a.slots }),
+    "squads.autoFillLineup": async (a) => {
+      // El solver vive en el cliente; guarda el XI calculado con los slots del squad.
+      const slots = (a.slots ?? []) as Array<{ slotId: string; accepts?: string[]; label?: string }>;
+      const squad = (a.squad ?? []) as Array<{ playerId: string; position: string; ovr: number }>;
+      const used = new Set<string>();
+      const assignment = new Map<string, string>();
+      const pending = [...slots];
+      while (pending.length > 0) {
+        let best: { slot: (typeof slots)[number]; player: (typeof squad)[number] } | null = null;
+        let bestScarcity = Number.POSITIVE_INFINITY;
+        for (const slot of pending) {
+          const accepts = slot.accepts ?? (slot.label ? [slot.label] : []);
+          const candidates = squad.filter((p) => !used.has(p.playerId) && accepts.includes(p.position));
+          if (candidates.length === 0 || candidates.length >= bestScarcity) continue;
+          bestScarcity = candidates.length;
+          best = { slot, player: [...candidates].sort((x, y) => y.ovr - x.ovr)[0]! };
+        }
+        if (!best) break;
+        used.add(best.player.playerId);
+        assignment.set(best.slot.slotId, best.player.playerId);
+        pending.splice(pending.indexOf(best.slot), 1);
+      }
+      const filled = slots.map((s) => ({ slotId: s.slotId, playerId: assignment.get(s.slotId) ?? null }));
+      await rpc("save_lineup", { p_formation: a.formation, p_slots: filled });
+      return { lineup: filled };
+    },
+    "market.createOffer": (a) =>
+      rpc<string>("create_offer", {
+        p_type: a.type ?? (Array.isArray(a.offeredPlayerIds) && a.offeredPlayerIds.length > 0 ? "trade" : "cash"),
+        p_requested: a.requestedPlayerIds ?? [],
+        p_offered: a.offeredPlayerIds ?? [],
+        p_cash: a.cash ?? 0,
+        p_message: a.message ?? null,
+      }),
+    "market.respondOffer": (a) => rpc("respond_offer", { p_offer_id: a.offerId, p_action: a.action }),
+    "market.cancelOffer": (a) => rpc("respond_offer", { p_offer_id: a.offerId, p_action: "cancelar" }),
+    "market.executeReserved": () => rpc("respond_offer_execute_reserved"),
+    "draft.prepare": (a) => rpc("draft_prepare", { p_total_rounds: a.totalRounds, p_pick_seconds: a.pickSeconds, p_snake: a.snake }),
+    "draft.open": () => rpc("draft_set_status", { p_status: "en_curso" }),
+    "draft.pause": () => rpc("draft_set_status", { p_status: "pausado" }),
+    "draft.resume": () => rpc("draft_set_status", { p_status: "en_curso" }),
+    "draft.close": () => rpc("draft_set_status", { p_status: "cerrado" }),
+    "draft.skipTurn": () => rpc("draft_skip_turn"),
+    "draft.pick": (a) => rpc("draft_pick", { p_player_id: a.playerId }),
+    "adminOps.setPrizes": (a) => rpc("set_prizes", { p_prizes: a.prizes }),
+    "adminOps.grantBudget": (a) => rpc("grant_budget", { p_president_id: a.presidentId, p_amount: a.amount, p_concept: a.concept }),
+    "adminOps.changePresidentClub": (a) =>
+      rpc("change_president_club", { p_president_id: a.presidentId, p_team_catalog_id: a.teamCatalogId, p_league_club_id: a.leagueClubId }),
+    "adminOps.removePresident": (a) => rpc("remove_president", { p_president_id: a.presidentId }),
+    "adminOps.resetLeague": () => rpc("reset_league"),
+    "adminOps.setCompetition": (a) => rpc("set_competition", { p_competition_id: a.competitionId }),
+    "adminOps.reportFixture": (a) =>
+      rpc("report_fixture", {
+        p_fixture_id: a.fixtureId, p_home_goals: a.homeGoals, p_away_goals: a.awayGoals,
+        p_goals: a.goals ?? [], p_yellow: a.yellowCards ?? [], p_red: a.redCards ?? [], p_injuries: a.injuries ?? [],
+      }),
+    "adminOps.fixtureReport": (a) =>
+      rpc("report_fixture", {
+        p_fixture_id: a.fixtureId, p_home_goals: a.homeGoals, p_away_goals: a.awayGoals,
+        p_goals: a.goals ?? [], p_yellow: a.yellowCards ?? [], p_red: a.redCards ?? [], p_injuries: a.injuries ?? [],
+      }),
+    "competition.closeMatchday": () => rpc("close_matchday"),
+    "competition.syncCompetition": () => rpc("generate_calendar"),
+    "footballApi.syncCatalog": async (a) => {
+      let offset = a.page ?? 0;
+      let applied = 0;
+      let done = false;
+      let guard = 0;
+      while (!done && guard < 30) {
+        guard += 1;
+        const res = await rpc<{ applied: number; nextOffset: number; done: boolean }>(
+          "sync_catalog_from_staging",
+          { p_limit: 1000, p_offset: offset },
+        );
+        applied += res.applied;
+        offset = res.nextOffset;
+        done = res.done;
+      }
+      return { fetched: applied, inserted: applied, updated: 0, unchanged: 0, done: true, page: offset, totalPages: 0, fallback: false, note: null, source: "Supabase (SoFIFA)" };
+    },
+  };
+  const fn = map[ref];
+  if (!fn) {
+    return async () => {
+      throw new Error(`Mutación no soportada: ${ref}`);
+    };
+  }
+  return fn;
+}
+
+

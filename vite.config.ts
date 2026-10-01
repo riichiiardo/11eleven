@@ -8,9 +8,16 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react(), vlyPlugin(), tailwindcss()],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    alias: [
+      // Migración a Supabase: los imports de la era Convex resuelven a la
+      // capa de compatibilidad. Declarados ANTES del alias genérico "@"
+      // para que la coincidencia exacta gane.
+      { find: "@/convex/_generated/api", replacement: path.resolve(__dirname, "./src/convex-compat/api.ts") },
+      { find: "@/convex/_generated/dataModel", replacement: path.resolve(__dirname, "./src/convex-compat/dataModel.ts") },
+      { find: "convex/react", replacement: path.resolve(__dirname, "./src/convex-compat/react.tsx") },
+      { find: "@convex-dev/auth/react", replacement: path.resolve(__dirname, "./src/convex-compat/react.tsx") },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
     // Force a single copy of React across all packages (including vlyPlugin).
     // Without this, @vly-ai/integrations can resolve its own React copy, which
     // triggers "Invalid hook call" errors at runtime.
@@ -26,7 +33,7 @@ export default defineConfig({
         manualChunks: {
           // Vendor chunks for large libraries
           'react-vendor': ['react', 'react-dom', 'react-router'],
-          'convex-vendor': ['convex'],
+          'supabase-vendor': ['@supabase/supabase-js'],
           // Large UI library chunks
           'radix-ui': [
             '@radix-ui/react-accordion',

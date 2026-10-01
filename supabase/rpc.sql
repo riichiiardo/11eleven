@@ -703,3 +703,120 @@ begin
   where id = v_tid;
   perform public.audit(v_tid, 'jornada.cerrada', 'tournaments', 'Jornada cerrada y avanzada.');
 end $$;
+
+-- ============================================================
+-- Compatibilidad con el frontend (usadas por la capa convex-compat)
+-- ============================================================
+
+-- Ejecuta los acuerdos reservados cuando la ventana de draft está abierta.
+create or replace function public.respond_offer_execute_reserved()
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_tid uuid := (select active_tournament_id from public.profiles where id = auth.uid());
+  v_open boolean; v_o record; v_executed int := 0; v_invalid int := 0;
+begin
+  if v_tid is null then raise exception 'Sin liga activa.'; end if;
+  select market_open into v_open from public.tournaments where id = v_tid;
+  if not coalesce(v_open, false) then raise exception 'La ventana de ejecución está cerrada.'; end if;
+
+  for v_o in select * from public.offers where tournament_id = v_tid and status = 'reservada' loop
+    begin
+      -- Transferencias: mover propiedad + presupuesto entre clubes.
+      update public.squad_players sp
+      set club_id = v_o.bidder_club_id,
+          president_id = v_o.bidder_president_id,
+          squad_id = (select s.id from public.squads s where s.club_id = v_o.bidder_club_id)
+      where sp.tournament_id = v_tid
+        and sp.player_id = any(coalesce(v_o.requested_player_ids, '{}'))
+        and sp.president_id = v_o.seller_president_id;
+
+      insert into public.squad_players (tournament_id, club_id, squad_id, player_id, president_id, ovr_at_join, value_at_join)
+      select v_tid, v_o.bidder_club_id, s.id, pl.id, v_o.bidder_president_id, pl.ovr, pl.value
+      from public.players pl
+      join public.squads s on s.club_id = v_o.bidder_club_id
+      where pl.id = any(coalesce(v_o.requested_player_ids, '{}'))
+        and not exists (select 1 from public.squad_players sp
+                        where sp.tournament_id = v_tid and sp.player_id = pl.id)
+      on conflict (squad_id, player_id) do nothing;
+
+      update public.presidents set budget = budget - v_o.cash where id = v_o.bidder_president_id;
+      update public.presidents set budget = budget + v_o.cash where id = v_o.seller_president_id;
+      update public.squad_players sp set president_id = v_o.bidder_president_id, club_id = v_o.bidder_club_id,
+        squad_id = (select s.id from public.squads s where s.club_id = v_o.bidder_club_id)
+      where sp.tournament_id = v_tid and sp.player_id = any(coalesce(v_o.offered_player_ids, '{}'))
+        and sp.president_id = v_o.bidder_president_id;
+
+      update public.offers set status = 'ejecutada', executed_at = now(), updated_at = now() where id = v_o.id;
+      perform public.audit(v_tid, 'oferta.ejecutada', 'offers', 'Operación reservada ejecutada en la ventana.');
+      v_executed := v_executed + 1;
+    exception when others then
+      update public.offers set status = 'invalidada', invalid_reason = sqlerrm, updated_at = now() where id = v_o.id;
+      v_invalid := v_invalid + 1;
+    end;
+  end loop;
+  return jsonb_build_object('executed', v_executed, 'invalidated', v_invalid);
+end $$;
+
+-- Mueve a un presidente a otro club (catálogo nuevo o club libre de la liga).
+create or replace function public.change_president_club(
+  p_president_id uuid, p_team_catalog_id uuid default null, p_league_club_id uuid default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_tid uuid := (select active_tournament_id from public.profiles where id = auth.uid());
+  v_new_club uuid; v_old_club uuid;
+begin
+  if not public.is_admin(v_tid) then raise exception 'Solo Administración cambia el club de un presidente.'; end if;
+  select club_id into v_old_club from public.presidents where id = p_president_id and tournament_id = v_tid;
+  if v_old_club is null then raise exception 'El presidente no existe.'; end if;
+
+  if p_league_club_id is not null then
+    if exists (select 1 from public.presidents p where p.club_id = p_league_club_id and p.id <> p_president_id) then
+      raise exception 'Ese club ya tiene presidente.';
+    end if;
+    v_new_club := p_league_club_id;
+  else
+    insert into public.clubs (tournament_id, name, short_name, league, country, color_primary, color_secondary, catalog_team_id)
+    select v_tid, t.name, split_part(t.name, ' ', 1), t.league, t.country, t.color_primary, t.color_secondary, t.id
+    from public.team_catalog t where t.id = p_team_catalog_id
+    returning id into v_new_club;
+  end if;
+  if v_new_club is null then raise exception 'Club de destino no válido.'; end if;
+
+  update public.presidents set club_id = v_new_club where id = p_president_id;
+  insert into public.squads (tournament_id, club_id, president_id)
+  values (v_tid, v_new_club, p_president_id)
+  on conflict (club_id) do update set president_id = excluded.president_id;
+  perform public.audit(v_tid, 'presidente.movido', 'presidents', 'Cambio de club administrado por Administración.', v_new_club);
+end $$;
+
+-- Libera un club: el presidente pierde la plantilla y vuelve a la puerta.
+create or replace function public.remove_president(p_president_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_tid uuid := (select active_tournament_id from public.profiles where id = auth.uid());
+begin
+  if not public.is_admin(v_tid) then raise exception 'Solo Administración puede liberar un club.'; end if;
+  delete from public.squad_players where president_id = p_president_id and tournament_id = v_tid;
+  update public.presidents set club_id = null where id = p_president_id and tournament_id = v_tid;
+  perform public.audit(v_tid, 'presidente.libre', 'presidents', 'Club liberado: la plantilla vuelve al mercado.');
+end $$;
+
+-- Reinicio total de la liga: plantillas, ofertas, draft y competición.
+create or replace function public.reset_league()
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_tid uuid := (select active_tournament_id from public.profiles where id = auth.uid());
+begin
+  if not public.is_admin(v_tid) then raise exception 'Solo Administración puede reiniciar la liga.'; end if;
+  delete from public.draft_picks where tournament_id = v_tid;
+  delete from public.drafts where tournament_id = v_tid;
+  delete from public.offers where tournament_id = v_tid;
+  delete from public.squad_players where tournament_id = v_tid;
+  delete from public.fixtures where tournament_id = v_tid;
+  delete from public.fixture_reports where tournament_id = v_tid;
+  update public.presidents set club_id = null, budget = (select budget from public.tournament_rules where tournament_id = v_tid) where tournament_id = v_tid;
+  update public.tournaments set status = 'configuracion', current_matchday = 1 where id = v_tid;
+  perform public.audit(v_tid, 'liga.reiniciada', 'tournaments', 'La liga volvió a su estado inicial.');
+end $$;
