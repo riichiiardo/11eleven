@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/input-otp";
 
 import { useAuth } from "@/hooks/use-auth";
-import { supabaseConfigError, supabaseUrl } from "@/lib/supabase/client";
+import { saveSupabaseConfig, supabaseConfigError, supabaseUrl } from "@/lib/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
 import { ArrowRight, Loader2, Mail, ShieldCheck, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
@@ -47,6 +47,26 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Configuración manual de Supabase (fallback si la plataforma no inyecta las claves).
+  const [cfgUrl, setCfgUrl] = useState("");
+  const [cfgKey, setCfgKey] = useState("");
+  const [cfgError, setCfgError] = useState<string | null>(null);
+
+  const handleManualConnect = () => {
+    const u = cfgUrl.trim();
+    const k = cfgKey.trim();
+    if (!u || !k) {
+      setCfgError("Pega la Project URL y la anon key.");
+      return;
+    }
+    if (!/^https?:\/\//i.test(u) || !u.includes(".")) {
+      setCfgError("La URL debe ser algo como https://xxxx.supabase.co");
+      return;
+    }
+    setCfgError(null);
+    saveSupabaseConfig(u, k);
+  };
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -129,9 +149,42 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         </button>
 
         {supabaseConfigError ? (
-          <p className="w-full rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-center text-xs leading-relaxed text-amber-200">
-            ⚠️ {supabaseConfigError}
-          </p>
+          <div className="w-full space-y-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3">
+            <p className="text-center text-xs leading-relaxed text-amber-200">⚠️ {supabaseConfigError}</p>
+            <details className="text-xs">
+              <summary className="cursor-pointer select-none text-center font-medium text-amber-200 underline decoration-dotted underline-offset-4">
+                Conectar manualmente (Project URL + anon key)
+              </summary>
+              <div className="mt-3 space-y-2">
+                <Input
+                  value={cfgUrl}
+                  onChange={(e) => setCfgUrl(e.target.value)}
+                  placeholder="https://xxxx.supabase.co"
+                  aria-label="Project URL de Supabase"
+                  className="h-9 bg-card text-foreground"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <Input
+                  value={cfgKey}
+                  onChange={(e) => setCfgKey(e.target.value)}
+                  type="password"
+                  placeholder="eyJ… (anon public)"
+                  aria-label="Anon public key de Supabase"
+                  className="h-9 bg-card font-mono text-[11px] text-foreground"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {cfgError && <p className="text-[11px] text-red-300">{cfgError}</p>}
+                <Button type="button" size="sm" className="w-full" onClick={handleManualConnect}>
+                  Guardar y conectar
+                </Button>
+                <p className="text-center text-[10px] leading-relaxed text-amber-200/70">
+                  Se guardan solo en este navegador. La anon key es pública; la seguridad la aplican RLS y las RPC.
+                </p>
+              </div>
+            </details>
+          </div>
         ) : (
           <p className="flex w-full items-center justify-center gap-1.5 text-[11px] text-white/50">
             <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-emerald-400" />

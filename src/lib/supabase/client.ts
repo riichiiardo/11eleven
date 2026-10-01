@@ -11,8 +11,39 @@ import { createClient, type SupabaseClient, type Session } from "@supabase/supab
 // Normaliza los valores: quita comillas envolventes, espacios, y a la URL le
 // añade https:// si falta y le quita la barra final.
 const clean = (v: string) => v.trim().replace(/^["']+/, "").replace(/["',;]+$/, "");
-const rawUrl = clean((import.meta.env.VITE_SUPABASE_URL ?? "") as string);
-const anonKey = clean((import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string);
+
+// Variables inyectadas por la plataforma (vía Keys / API keys).
+const envUrl = clean((import.meta.env.VITE_SUPABASE_URL ?? "") as string);
+const envKey = clean((import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string);
+
+// Fallback manual: si la plataforma no inyectó las variables, se permite pegar
+// la Project URL y la anon key en pantalla (se guardan en localStorage). URL y
+// anon key son credenciales públicas del navegador; la seguridad la aportan
+// RLS y las RPC security definer.
+const LS_URL = "11eleven.supabase.url";
+const LS_KEY = "11eleven.supabase.anonKey";
+
+function lsGet(name: string): string {
+  try {
+    return localStorage.getItem(name) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+const rawUrl = envUrl || clean(lsGet(LS_URL));
+const anonKey = envKey || clean(lsGet(LS_KEY));
+
+/** Guarda la configuración manual y recarga la app para reinicializar el cliente. */
+export function saveSupabaseConfig(projectUrl: string, anonKeyValue: string): void {
+  try {
+    localStorage.setItem(LS_URL, clean(projectUrl));
+    localStorage.setItem(LS_KEY, clean(anonKeyValue));
+    window.location.reload();
+  } catch {
+    // Sin localStorage disponible no se puede configurar manualmente.
+  }
+}
 
 const url = rawUrl
   ? (/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`).replace(/\/+$/, "")
@@ -23,7 +54,7 @@ export const supabaseConfigError: string | null =
   !url || !anonKey
     ? `Faltan las claves de Supabase (${[!url && "VITE_SUPABASE_URL", !anonKey && "VITE_SUPABASE_ANON_KEY"]
         .filter(Boolean)
-        .join(" y ")}). Pégalas en Keys / API keys y recarga la vista previa.`
+        .join(" y ")}). Pégalas en Keys / API keys — o conéctalas ahora en el panel de aquí abajo.`
     : null;
 
 if (supabaseConfigError) {
