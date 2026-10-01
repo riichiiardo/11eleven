@@ -59,6 +59,33 @@ export function clearSupabaseConfig(): void {
   }
 }
 
+/** Health-check real de Auth contra el proyecto dado (o el actual). */
+export async function testSupabaseConnection(
+  projectUrl?: string,
+  anonKeyValue?: string,
+): Promise<{ ok: boolean; detail: string }> {
+  const base = projectUrl ? normalizeProjectUrl(projectUrl) : supabaseUrl;
+  const key = anonKeyValue || anonKey;
+  const host = base.replace(/^https?:\/\//, "");
+  if (!/^https:\/\//i.test(base)) {
+    return { ok: false, detail: "Sin Project URL configurada todavía." };
+  }
+  if (!key) {
+    return { ok: false, detail: "Falta la anon key." };
+  }
+  try {
+    const res = await fetch(`${base}/auth/v1/health`, { headers: { apikey: key } });
+    if (res.ok) return { ok: true, detail: `${host} responde correctamente.` };
+    const text = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} desde ${host}: ${text.slice(0, 160)}` };
+  } catch (cause) {
+    return {
+      ok: false,
+      detail: `No se pudo conectar con ${host}: ${cause instanceof Error ? cause.message : "error de red"}`,
+    };
+  }
+}
+
 /** Normaliza la Project URL: comillas/espacios fuera, https://, sin barra final.
  *  Si se pegó el link del dashboard o una ruta interna del API, la reduce a la
  *  raíz del proyecto: https://<ref>.supabase.co */

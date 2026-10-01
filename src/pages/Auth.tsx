@@ -20,6 +20,7 @@ import {
   saveSupabaseConfig,
   supabaseConfigError,
   supabaseUrl,
+  testSupabaseConnection,
   usingManualSupabaseConfig,
 } from "@/lib/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
@@ -58,20 +59,37 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [cfgUrl, setCfgUrl] = useState("");
   const [cfgKey, setCfgKey] = useState("");
   const [cfgError, setCfgError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   const handleManualConnect = () => {
-    const u = cfgUrl.trim();
+    const u = cfgUrl.trim().replace(/\/+$/, "");
     const k = cfgKey.trim();
     if (!u || !k) {
       setCfgError("Pega la Project URL y la anon key.");
       return;
     }
-    if (!/^https?:\/\//i.test(u) || !u.includes(".")) {
-      setCfgError("La URL debe ser algo como https://xxxx.supabase.co");
+    // La Project URL debe ser la raíz del proyecto: https://<ref>.supabase.co
+    if (!/^https:\/\/[a-z0-9][a-z0-9-]*\.supabase\.(co|in)(:\d+)?$/i.test(u)) {
+      setCfgError(
+        "No parece una Project URL de Supabase. Debe verse así: https://abcdefghij.supabase.co — cópiala desde Project Settings → API.",
+      );
       return;
     }
     setCfgError(null);
     saveSupabaseConfig(u, k);
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    const hasTyped = Boolean(cfgUrl.trim() && cfgKey.trim());
+    const result = await testSupabaseConnection(
+      hasTyped ? cfgUrl : undefined,
+      hasTyped ? cfgKey : undefined,
+    );
+    setTesting(false);
+    setTestResult(`${result.ok ? "✅" : "❌"} ${result.detail}`);
   };
 
   useEffect(() => {
@@ -187,9 +205,24 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   spellCheck={false}
                 />
                 {cfgError && <p className="text-[11px] text-red-300">{cfgError}</p>}
-                <Button type="button" size="sm" className="w-full" onClick={handleManualConnect}>
-                  Guardar y conectar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleTestConnection}
+                    disabled={testing}
+                  >
+                    {testing ? "Probando…" : "Probar conexión"}
+                  </Button>
+                  <Button type="button" size="sm" className="flex-1" onClick={handleManualConnect}>
+                    Guardar y conectar
+                  </Button>
+                </div>
+                {testResult && (
+                  <p className="text-center text-[11px] leading-relaxed text-amber-100">{testResult}</p>
+                )}
                 <p className="text-center text-[10px] leading-relaxed text-amber-200/70">
                   Se guardan solo en este navegador. La anon key es pública; la seguridad la aplican RLS y las RPC.
                 </p>
