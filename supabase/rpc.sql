@@ -476,15 +476,34 @@ returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare v_applied int; v_total bigint; v_next_offset int;
 begin
+  with mapped as (
+    select s.*,
+      -- SoFIFA guarda códigos ingleses (GK/RB/CB/LB/CDM/CM/CAM/RW/LW/ST);
+      -- el juego usa POR/LD/DFC/LI/MCD/MC/MCO/ED/EI/DC. Se aceptan ambos.
+      case s.position
+        when 'POR' then 'POR' when 'GK' then 'POR'
+        when 'RB'  then 'LD'  when 'LD' then 'LD'
+        when 'CB'  then 'DFC' when 'DFC' then 'DFC'
+        when 'LB'  then 'LI'  when 'LI' then 'LI'
+        when 'CDM' then 'MCD' when 'MCD' then 'MCD'
+        when 'CM'  then 'MC'  when 'MC' then 'MC'
+        when 'CAM' then 'MCO' when 'MCO' then 'MCO'
+        when 'RW'  then 'ED'  when 'ED' then 'ED'
+        when 'LW'  then 'EI'  when 'EI' then 'EI'
+        when 'ST'  then 'DC'  when 'DC' then 'DC'
+        else 'MC' end as es_position
+    from public.sofifa_players s
+    where s.ovr is not null and s.position is not null
+  )
   insert into public.players (name, position, "group", ovr, age, value, nationality, flag, real_club, real_league, fc_version, photo)
-  select s.name, s.position,
-         case s.position when 'POR' then 'GK' when 'LD' then 'DEF' when 'DFC' then 'DEF' when 'LI' then 'DEF'
+  select m.name, m.es_position,
+         case m.es_position when 'POR' then 'GK' when 'LD' then 'DEF' when 'DFC' then 'DEF' when 'LI' then 'DEF'
               when 'MCD' then 'MID' when 'MC' then 'MID' when 'MCO' then 'MID' when 'ED' then 'FWD' when 'EI' then 'FWD' when 'DC' then 'FWD' end,
-         s.ovr, s.age, s.value_eur, s.nationality, '🏳️',
-         coalesce(s.club, ''), coalesce(s.league, 'SoFIFA'), 'FC 27 · SoFIFA ' || to_char(now(), 'DD/MM/YYYY'), s.photo_url
-  from public.sofifa_players s
-  where s.ovr is not null and s.position in ('POR','LD','DFC','LI','MCD','MC','MCO','ED','EI','DC')
-  order by s.ovr desc nulls last, s.sofifa_id asc
+         m.ovr, m.age, m.value_eur, coalesce(m.nationality, '—'), '🏳️',
+         coalesce(nullif(m.club, ''), 'Agente libre'), coalesce(nullif(m.league, ''), 'SoFIFA'),
+         'FC 27 · SoFIFA ' || to_char(now(), 'DD/MM/YYYY'), m.photo_url
+  from mapped m
+  order by m.ovr desc nulls last, m.sofifa_id asc
   limit p_limit offset p_offset
   on conflict (name) do update set
     ovr = excluded.ovr, age = excluded.age, value = excluded.value, photo = coalesce(excluded.photo, players.photo),
