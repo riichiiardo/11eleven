@@ -8,14 +8,27 @@ import { createClient, type SupabaseClient, type Session } from "@supabase/supab
  * exclusivamente por RPCs security definer (supabase/rpc.sql).
  */
 
-const url = (import.meta.env.VITE_SUPABASE_URL ?? "") as string;
-const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string;
+// Normaliza la URL: recorta espacios, añade https:// si falta y quita la barra final.
+const rawUrl = ((import.meta.env.VITE_SUPABASE_URL ?? "") as string).trim();
+const anonKey = ((import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string).trim();
 
-if (!url || !anonKey) {
+const url = rawUrl
+  ? (/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`).replace(/\/+$/, "")
+  : "";
+
+/** Motivo por el que Supabase no está listo, o null si la configuración es correcta. */
+export const supabaseConfigError: string | null =
+  !url || !anonKey
+    ? `Faltan las claves de Supabase (${[!url && "VITE_SUPABASE_URL", !anonKey && "VITE_SUPABASE_ANON_KEY"]
+        .filter(Boolean)
+        .join(" y ")}). Pégalas en Keys / API keys y recarga la vista previa.`
+    : null;
+
+if (supabaseConfigError) {
   // En preview sin variables, no romper el render: los hooks devolverán error.
-  console.warn(
-    "[11Eleven] Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. Configúralas en el proyecto.",
-  );
+  console.warn(`[11Eleven] ${supabaseConfigError}`);
+} else {
+  console.info(`[11Eleven] Supabase conectado a ${url}`);
 }
 
 export const supabase: SupabaseClient = createClient(
@@ -29,6 +42,9 @@ export const supabase: SupabaseClient = createClient(
     },
   },
 );
+
+/** URL efectiva que usa el cliente (para diagnóstico). */
+export const supabaseUrl = url || "http://localhost:54321";
 
 /* ------------------------------------------------------------------ *
  * Tipos mínimos del esquema (shape PostgREST camelCase aliasado)

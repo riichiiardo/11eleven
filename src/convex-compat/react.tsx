@@ -5,7 +5,7 @@
  * mutaciones vive en la función resolve; las páginas no cambian.
  */
 import { adaptDraft, adaptMarketOverview, adaptTournamentState } from "@/lib/supabase/adapters";
-import { rpc, supabase } from "@/lib/supabase/client";
+import { rpc, supabase, supabaseConfigError, supabaseUrl } from "@/lib/supabase/client";
 import {
   createContext,
   useCallback,
@@ -15,6 +15,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
+
+/** Envuelve fallos de red en un mensaje accionable con la URL real usada. */
+function throwNetwork(cause: unknown): never {
+  if (cause instanceof TypeError && /fetch/i.test(cause.message)) {
+    throw new Error(
+      `No se pudo conectar con Supabase (${supabaseUrl}). Comprueba tu conexión o que la URL del proyecto sea correcta.`,
+    );
+  }
+  throw cause;
+}
 
 /* ------------------------------------------------------------------ *
  * Auth context (reemplaza @convex-dev/auth/react)
@@ -96,6 +106,7 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
         : null,
       // Firma posicional de Convex: signIn("email-otp", formData) o signIn("anonymous").
       signIn: async (...signInArgs: unknown[]) => {
+        if (supabaseConfigError) throw new Error(supabaseConfigError);
         const [flowArg, payloadArg] = signInArgs;
         const flow = typeof flowArg === "string" ? flowArg : "email-otp";
         const formData =
@@ -103,7 +114,7 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
             ? payloadArg
             : ((payloadArg as { formData?: FormData } | undefined)?.formData ?? undefined);
         if (flow === "anonymous") {
-          const { error } = await supabase.auth.signInAnonymously();
+          const { error } = await supabase.auth.signInAnonymously().catch(throwNetwork);
           if (error) throw new Error(error.message);
           return;
         }
@@ -111,11 +122,11 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
         if (!email) throw new Error("Falta el correo.");
         const code = String(formData?.get("code") ?? "");
         if (code) {
-          const { error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+          const { error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" }).catch(throwNetwork);
           if (error) throw new Error(error.message);
           return;
         }
-        const { error } = await supabase.auth.signInWithOtp({ email });
+        const { error } = await supabase.auth.signInWithOtp({ email }).catch(throwNetwork);
         if (error) throw new Error(error.message);
       },
       signOut: async () => {
@@ -206,6 +217,10 @@ export function useQuery<T = unknown>(
   fnRef: unknown,
   args?: Record<string, unknown>,
 ): T | undefined | null {
+  if (supabaseConfigError) {
+    console.warn(`[11Eleven] useQuery(${refOf(fnRef)}) sin ejecutar: ${supabaseConfigError}`);
+    return undefined as T | undefined | null;
+  }
   const ref = refOf(fnRef);
   const key = `${ref}:${JSON.stringify(args ?? {})}`;
   const [value, setValue] = useState<unknown>(() => cache.get(key));
@@ -226,7 +241,11 @@ export function useQuery<T = unknown>(
           cache.set(`${key}:at`, Date.now());
           setTick((t) => t + 1);
         } catch (cause) {
-          console.warn(`[11Eleven] ${ref}:`, cause instanceof Error ? cause.message : cause);
+          const message = cause instanceof Error ? cause.message : String(cause);
+          console.warn(`[11Eleven] ${ref}: ${message}`);
+          if (/Failed to fetch|NetworkError|Load failed/i.test(message)) {
+            console.warn(`[11Eleven] URL en uso: ${supabaseUrl}. ¿Es correcta la Project URL de Supabase y tienes internet?`);
+          }
         }
       }, 10);
       timers.set(key, timer);
@@ -253,11 +272,16 @@ export function useQuery<T = unknown>(
 /** useMutation: ejecuta un RPC security definer y refresca los caches. */
 export function useMutation() {
   return useCallback(async (fnRef: unknown, args: Record<string, unknown> = {}) => {
+    if (supabaseConfigError) throw new Error(supabaseConfigError);
     const ref = refOf(fnRef);
     const fn = resolveMutation(ref);
-    const result = await fn(args);
-    cache.clear(); // invalidate-all: las lecturas se refrescan al siguiente tick
-    return result;
+    try {
+      const result = await fn(args);
+      cache.clear(); // invalidate-all: las lecturas se refrescan al siguiente tick
+      return result;
+    } catch (cause) {
+      throwNetwork(cause);
+    }
   }, []);
 }
 
