@@ -45,9 +45,36 @@ export function saveSupabaseConfig(projectUrl: string, anonKeyValue: string): vo
   }
 }
 
-const url = rawUrl
-  ? (/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`).replace(/\/+$/, "")
-  : "";
+/** ¿La configuración activa viene del fallback manual (localStorage)? */
+export const usingManualSupabaseConfig = Boolean(!envUrl || !envKey) && Boolean(rawUrl);
+
+/** Borra la configuración manual guardada y recarga la app. */
+export function clearSupabaseConfig(): void {
+  try {
+    localStorage.removeItem(LS_URL);
+    localStorage.removeItem(LS_KEY);
+    window.location.reload();
+  } catch {
+    // Sin localStorage no hay nada que borrar.
+  }
+}
+
+/** Normaliza la Project URL: comillas/espacios fuera, https://, sin barra final.
+ *  Si se pegó el link del dashboard o una ruta interna del API, la reduce a la
+ *  raíz del proyecto: https://<ref>.supabase.co */
+function normalizeProjectUrl(raw: string): string {
+  let u = clean(raw);
+  if (!u) return "";
+  // Link del dashboard (https://supabase.com/dashboard/project/<ref>) → ref.
+  const dash = u.match(/^https?:\/\/[^/]*supabase\.com\/(?:dashboard\/)?project\/([a-z0-9]+)/i);
+  if (dash) return `https://${dash[1]}.supabase.co`;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  // Rutas internas pegadas por error (/rest/v1, /auth/v1, ...).
+  u = u.replace(/\/(?:rest|auth|realtime|storage|functions)\/v1$/i, "");
+  return u.replace(/\/+$/, "");
+}
+
+const url = normalizeProjectUrl(rawUrl);
 
 /** Motivo por el que Supabase no está listo, o null si la configuración es correcta. */
 export const supabaseConfigError: string | null =

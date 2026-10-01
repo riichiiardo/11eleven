@@ -15,7 +15,13 @@ import {
 } from "@/components/ui/input-otp";
 
 import { useAuth } from "@/hooks/use-auth";
-import { saveSupabaseConfig, supabaseConfigError, supabaseUrl } from "@/lib/supabase/client";
+import {
+  clearSupabaseConfig,
+  saveSupabaseConfig,
+  supabaseConfigError,
+  supabaseUrl,
+  usingManualSupabaseConfig,
+} from "@/lib/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
 import { ArrowRight, Loader2, Mail, ShieldCheck, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
@@ -118,11 +124,16 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       navigate(redirect);
     } catch (error) {
       console.error("Guest login error:", error);
-      setError(
-        `No se pudo entrar como invitado: ${
-          error instanceof Error ? error.message : "error desconocido"
-        }`,
-      );
+      const message = error instanceof Error ? error.message : "error desconocido";
+      let hint = "";
+      if (/invalid path|request url/i.test(message)) {
+        hint = " La URL guardada no parece una Project URL válida (debe ser https://xxxx.supabase.co). Cámbiala con el botón ✎ bajo el logo.";
+      } else if (/anonymous sign-?ins?|Anonymous provider/i.test(message)) {
+        hint = " Activa el proveedor anónimo: Supabase → Authentication → Providers → Anonymous → Enable → Save.";
+      } else if (/invalid api key|api key/i.test(message)) {
+        hint = " La anon key parece incorrecta (debe ser la anon public del mismo proyecto).";
+      }
+      setError(`No se pudo entrar como invitado: ${message}.${hint}`);
       setIsLoading(false);
     }
   };
@@ -189,6 +200,16 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           <p className="flex w-full items-center justify-center gap-1.5 text-[11px] text-white/50">
             <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-emerald-400" />
             Conectado a Supabase · {supabaseUrl.replace(/^https?:\/\//, "")}
+            {usingManualSupabaseConfig && (
+              <button
+                type="button"
+                onClick={clearSupabaseConfig}
+                title="Borrar la conexión guardada y volver a configurar"
+                className="rounded px-1 text-[10px] text-white/60 underline decoration-dotted underline-offset-2 transition-colors hover:text-white"
+              >
+                ✎ cambiar
+              </button>
+            )}
           </p>
         )}
 
