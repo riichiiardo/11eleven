@@ -10,6 +10,11 @@
 -- ---------------------------------------------------------------------------
 create schema if not exists app;
 
+-- Los roles de PostgREST necesitan USAGE sobre app para resolver/llamar los
+-- helpers (app.my_uid, app.is_admin, ...) desde contextos invoker-rights.
+grant usage on schema app to anon, authenticated;
+grant execute on all functions in schema app to anon, authenticated;
+
 create or replace function app.my_uid() returns uuid
 language sql stable security definer set search_path = public as $$
   select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid;
