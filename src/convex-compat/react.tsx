@@ -312,7 +312,7 @@ function resolveMutation(ref: string): (args: Record<string, unknown>) => Promis
     "tournament.setTournamentStatus": (a) => rpc("set_tournament_status", { p_status: a.status }),
     "tournament.updateRules": (a) => rpc("update_rules", { p_rules: a.rules }),
     "tournament.chooseCatalogTeam": (a) => rpc("choose_catalog_team", { p_team_catalog_id: a.teamCatalogId }),
-    "tournament.ensureTeamCatalog": () => Promise.resolve(0),
+    "tournament.ensureTeamCatalog": () => rpc<number>("ensure_team_catalog"),
     "tournament.updateProfile": (a) =>
       rpc("update_profile", { p_name: a.name ?? "", p_nickname: a.nickname ?? "", p_image: a.image ?? null }),
     "tournament.updateAvatar": (a) => rpc("update_profile", { p_name: "", p_nickname: "", p_image: a.image }),

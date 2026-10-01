@@ -105,12 +105,87 @@ end $$;
 -- Selección de club y presidentes
 -- ============================================================
 
--- Siembra el catálogo de equipos si está vacío (la carga inicial de los 115
--- clubes del FC 27 se hace con supabase/seed.sql desde el snapshot local).
+-- Siembra el catálogo de equipos si está vacío. La carga completa de los 115
+-- clubes del FC 27 vive en supabase/seed.sql; esta función SIEMBRA un catálogo
+-- base (clubes de las 5 grandes ligas) si la tabla está vacía, para que la app
+-- funcione sin pasos manuales.
 create or replace function public.ensure_team_catalog() returns integer
-language sql security definer set search_path = public as $$
-  select count(*)::int from public.team_catalog
-$$;
+language plpgsql security definer set search_path = public as $$
+declare v_count int;
+begin
+  select count(*)::int into v_count from public.team_catalog;
+  if v_count = 0 then
+    insert into public.team_catalog (name, league, country, color_primary, color_secondary) values
+      -- Premier League (Inglaterra)
+      ('Manchester City','Premier League','Inglaterra','#6CABDD','#1C2C5B'),
+      ('Arsenal FC','Premier League','Inglaterra','#EF0107','#063672'),
+      ('Liverpool FC','Premier League','Inglaterra','#C8102E','#00B2A9'),
+      ('Aston Villa','Premier League','Inglaterra','#670E36','#95BFE5'),
+      ('Tottenham Hotspur','Premier League','Inglaterra','#132257','#FFFFFF'),
+      ('Chelsea FC','Premier League','Inglaterra','#034694','#DBA111'),
+      ('Newcastle United','Premier League','Inglaterra','#241F20','#FFFFFF'),
+      ('Manchester United','Premier League','Inglaterra','#DA291C','#FBE122'),
+      ('West Ham United','Premier League','Inglaterra','#7A263A','#1BB1E7'),
+      ('Brighton & Hove Albion','Premier League','Inglaterra','#0057B8','#FFFFFF'),
+      ('Wolverhampton','Premier League','Inglaterra','#FDB913','#231F20'),
+      ('Fulham FC','Premier League','Inglaterra','#000000','#FFFFFF'),
+      ('Bournemouth','Premier League','Inglaterra','#DA291C','#000000'),
+      ('Brentford FC','Premier League','Inglaterra','#E30613','#FFB81C'),
+      ('Crystal Palace','Premier League','Inglaterra','#1B458F','#C4122E'),
+      ('Nottingham Forest','Premier League','Inglaterra','#DD0000','#FFFFFF'),
+      ('Everton FC','Premier League','Inglaterra','#003399','#FFFFFF'),
+      -- LaLiga (España)
+      ('Real Madrid CF','LaLiga','España','#FEBE10','#00529F'),
+      ('FC Barcelona','LaLiga','España','#A50044','#004D98'),
+      ('Atlético Madrid','LaLiga','España','#CE3524','#FFFFFF'),
+      ('Athletic Bilbao','LaLiga','España','#EE2523','#FFFFFF'),
+      ('Real Sociedad','LaLiga','España','#0067B1','#FFFFFF'),
+      ('Real Betis','LaLiga','España','#00954C','#FFFFFF'),
+      ('Villarreal CF','LaLiga','España','#FFE667','#005187'),
+      ('Valencia CF','LaLiga','España','#F4A300','#000000'),
+      ('Sevilla FC','LaLiga','España','#D90429','#FFFFFF'),
+      ('Girona FC','LaLiga','España','#CD2534','#FFFFFF'),
+      ('Celta de Vigo','LaLiga','España','#8AC3EE','#FFFFFF'),
+      ('Rayo Vallecano','LaLiga','España','#E53027','#FFFFFF'),
+      ('Osasuna','LaLiga','España','#0A346F','#D91A21'),
+      ('Getafe CF','LaLiga','España','#005999','#FFFFFF'),
+      ('Mallorca','LaLiga','España','#E20613','#000000'),
+      ('UD Las Palmas','LaLiga','España','#FFE400','#004B87'),
+      ('Deportivo Alavés','LaLiga','España','#0761AF','#FFFFFF'),
+      ('CD Leganés','LaLiga','España','#005BA9','#FFFFFF'),
+      ('Real Valladolid','LaLiga','España','#5F259F','#FFFFFF'),
+      -- Serie A (Italia)
+      ('Inter','Serie A','Italia','#0068A8','#000000'),
+      ('AC Milan','Serie A','Italia','#FB090B','#000000'),
+      ('Juventus','Serie A','Italia','#000000','#FFFFFF'),
+      ('Napoli','Serie A','Italia','#12A0D7','#FFFFFF'),
+      ('AS Roma','Serie A','Italia','#8E1F2F','#F0BC42'),
+      ('Lazio','Serie A','Italia','#87D8F7','#FFFFFF'),
+      ('Atalanta','Serie A','Italia','#1D5EA8','#000000'),
+      ('Fiorentina','Serie A','Italia','#592C82','#FFFFFF'),
+      ('Bologna','Serie A','Italia','#A81E2C','#1A2F4B'),
+      ('Torino','Serie A','Italia','#881010','#FFFFFF'),
+      -- Bundesliga (Alemania)
+      ('Bayern München','Bundesliga','Alemania','#DC052D','#0066B2'),
+      ('Bayer Leverkusen','Bundesliga','Alemania','#E32221','#000000'),
+      ('RB Leipzig','Bundesliga','Alemania','#DD0741','#001F47'),
+      ('Borussia Dortmund','Bundesliga','Alemania','#FDE100','#000000'),
+      ('VfB Stuttgart','Bundesliga','Alemania','#E32219','#FFFFFF'),
+      ('Eintracht Frankfurt','Bundesliga','Alemania','#E1000F','#000000'),
+      ('TSG Hoffenheim','Bundesliga','Alemania','#1C63B7','#FFFFFF'),
+      -- Ligue 1 (Francia)
+      ('Paris Saint-Germain','Ligue 1','Francia','#004170','#DA291C'),
+      ('AS Monaco','Ligue 1','Francia','#E63946','#FFFFFF'),
+      ('Olympique Lyonnais','Ligue 1','Francia','#1B4297','#DA291C'),
+      ('Olympique de Marseille','Ligue 1','Francia','#2FAEE0','#FFFFFF'),
+      ('LOSC Lille','Ligue 1','Francia','#E01E13','#FFFFFF'),
+      ('OGC Nice','Ligue 1','Francia','#C8102E','#000000'),
+      ('Stade Rennais','Ligue 1','Francia','#E23D28','#000000'),
+      ('RC Lens','Ligue 1','Francia','#FFE500','#D50032');
+    v_count := 57;
+  end if;
+  return v_count;
+end $$;
 
 create or replace function public.choose_catalog_team(p_team_catalog_id uuid)
 returns uuid
