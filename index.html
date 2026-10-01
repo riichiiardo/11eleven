@@ -38,6 +38,39 @@
 
 <body>
   <div id="root"></div>
+  <!-- Red de seguridad: si la app no monta (JS/React roto o JS deshabilitado),
+       mostramos el error EN PANTALLA en vez de una página en blanco. -->
+  <div id="boot-fail" hidden></div>
+  <script type="module">
+    window.setTimeout(function () {
+      var root = document.getElementById("root");
+      var fail = document.getElementById("boot-fail");
+      if (root && !root.hasChildNodes() && fail) {
+        fail.hidden = false;
+        fail.innerHTML =
+          '<div style="font-family:system-ui;padding:2rem;color:#e2e8f0;background:#0b1a30;min-height:100vh">' +
+          '<h2 style="color:#fca5a5">La aplicación no arrancó</h2>';
+        window.addEventListener("error", function (e) {
+          if (fail) {
+            fail.innerHTML +=
+              '<pre style="white-space:pre-wrap;color:#93c5fd;font-size:12px">' +
+              String(e.message || "") + "\n" + String(e.filename || "") + ":" + String(e.lineno || "") +
+              "</pre>";
+          }
+        });
+      }
+      // Además, desde el primer momento: cualquier error no capturado se muestra.
+      window.addEventListener("error", function (e) {
+        var f = document.getElementById("boot-fail");
+        if (f && !f.hidden) {
+          f.innerHTML +=
+            '<pre style="white-space:pre-wrap;color:#93c5fd;font-size:12px">' +
+            String(e.message || "") + "\n" + String(e.filename || "") + ":" + String(e.lineno || "") +
+            "</pre>";
+        }
+      });
+    }, 3500);
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

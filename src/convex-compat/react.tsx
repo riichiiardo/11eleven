@@ -217,10 +217,8 @@ export function useQuery<T = unknown>(
   fnRef: unknown,
   args?: Record<string, unknown>,
 ): T | undefined | null {
-  if (supabaseConfigError) {
-    console.warn(`[11Eleven] useQuery(${refOf(fnRef)}) sin ejecutar: ${supabaseConfigError}`);
-    return undefined as T | undefined | null;
-  }
+  // OJO: los hooks van SIEMPRE primero (reglas de React). El guard de
+  // configuración vive dentro de `load`, no como early-return.
   const ref = refOf(fnRef);
   const key = `${ref}:${JSON.stringify(args ?? {})}`;
   const [value, setValue] = useState<unknown>(() => cache.get(key));
@@ -228,6 +226,10 @@ export function useQuery<T = unknown>(
 
   const load = useCallback(
     async (force: boolean) => {
+      if (supabaseConfigError) {
+        console.warn(`[11Eleven] useQuery(${ref}) sin ejecutar: ${supabaseConfigError}`);
+        return;
+      }
       if (timers.has(key)) return;
       if (!force && cache.has(key)) {
         const at = (cache.get(`${key}:at`) as number) ?? 0;
