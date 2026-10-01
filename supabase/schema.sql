@@ -16,19 +16,28 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function app.is_admin(tid uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+-- plpgsql (no sql): los cuerpos plpgsql no se validan al crear la función, lo
+-- que permite definirla ANTES de las tablas que consulta.
+language plpgsql stable security definer set search_path = public as $$
+declare v_ok boolean;
+begin
   select exists (
     select 1 from tournament_admins a
     where a.tournament_id = tid and a.user_id = app.my_uid()
-  );
-$$;
+  ) into v_ok;
+  return v_ok;
+end $$;
 
 create or replace function app.is_member(tid uuid) returns boolean
-language sql stable security definer set search_path = public as $$
-  select app.is_admin(tid) or exists (
+-- plpgsql por el mismo motivo que app.is_admin.
+language plpgsql stable security definer set search_path = public as $$
+declare v_ok boolean;
+begin
+  select (app.is_admin(tid) or exists (
     select 1 from league_members m where m.tournament_id = tid and m.user_id = app.my_uid()
-  );
-$$;
+  )) into v_ok;
+  return v_ok;
+end $$;
 
 -- Los mismos helpers en PUBLIC: rpc.sql y views.sql los llaman como
 -- public.is_admin / public.is_member / public.my_president_id.
@@ -49,11 +58,15 @@ $$;
 
 -- Presidencia del usuario actual dentro de una liga (null si no preside nada).
 create or replace function public.my_president_id(tid uuid) returns uuid
-language sql stable security definer set search_path = public as $$
-  select p.id from presidents p
+-- plpgsql: referencia la tabla presidents creada más abajo en este mismo script.
+language plpgsql stable security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  select p.id into v_id from presidents p
   where p.tournament_id = tid and p.user_id = app.my_uid()
   limit 1;
-$$;
+  return v_id;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 1) Perfiles (1 fila por cuenta; la crea el trigger al registrarse)

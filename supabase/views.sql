@@ -196,13 +196,8 @@ begin
     left join public.clubs c on c.id = sp.club_id
     left join public.presidents p on p.id = sp.president_id
     where not exists (select 1 from public.draft_picks dp where dp.tournament_id = v_tid and dp.player_id = pl.id)
-  )
-  select
-    coalesce(jsonb_agg(row order by (row->>'ovr')::int desc offset p_offset limit least(p_limit, 50)), '[]'::jsonb),
-    count(*),
-    coalesce((select jsonb_agg(distinct nationality order by nationality) from pool), '[]'::jsonb)
-  into v_rows, v_total, v_nations
-  from (
+  ),
+  filtered as (
     select jsonb_build_object(
       'playerId', pl.id, 'name', pl.name, 'position', pl.position, 'group', pl."group",
       'ovr', pl.ovr, 'age', pl.age, 'value', pl.value, 'nationality', pl.nationality, 'flag', pl.flag,
@@ -219,13 +214,33 @@ begin
                             else null end,
       'committedOfferId', null, 'withinBudget', pl.value <= v_me.budget,
       'minimumCash', pl.value
-    ) as row
+    ) as item
     from pool
-    where (p_scope = 'todos')
-       or (p_scope = 'libres' and sp.president_id is null)
-       or (p_scope = 'clubes' and sp.president_id is not null)
-       or (p_scope = 'mios' and sp.president_id = v_me.id)
-  ) sub;
+    where ((p_scope = 'todos')
+        or (p_scope = 'libres' and sp.president_id is null)
+        or (p_scope = 'clubes' and sp.president_id is not null)
+        or (p_scope = 'mios' and sp.president_id = v_me.id))
+      and (not p_only_affordable or pl.value <= v_me.budget)
+  ),
+  paged as (
+    select row_number() over (
+      order by
+        case
+          when p_sort in ('value','valor','precio') then (item->>'value')::numeric
+          when p_sort in ('age','edad') then (item->>'age')::numeric
+          else (item->>'ovr')::numeric
+        end desc,
+        (item->>'name') asc
+    ) as ord,
+    item
+    from filtered
+    limit least(p_limit, 50) offset p_offset
+  )
+  select
+    coalesce((select jsonb_agg(item order by ord) from paged), '[]'::jsonb),
+    (select count(*) from filtered),
+    coalesce((select jsonb_agg(distinct nationality order by nationality) from pool), '[]'::jsonb)
+  into v_rows, v_total, v_nations;
 
   return jsonb_build_object('players', v_rows, 'total', v_total, 'nationalities', v_nations);
 end $$;
@@ -305,21 +320,28 @@ begin
   if v_tid is null then return jsonb_build_object('players', '[]'::jsonb, 'total', 0); end if;
   select * into v_me from public.presidents where user_id = v_uid and tournament_id = v_tid;
 
-  select coalesce(jsonb_agg(row order by (row->>'ovr')::int desc offset p_offset limit least(p_limit, 100)), '[]'::jsonb), count(*)
-  into v_rows, v_total
-  from (
+  with pool as (
     select jsonb_build_object(
       'playerId', pl.id, 'name', pl.name, 'position', pl.position, 'group', pl."group",
       'ovr', pl.ovr, 'age', pl.age, 'value', pl.value, 'nationality', pl.nationality, 'flag', pl.flag,
       'realClub', pl.real_club, 'realLeague', pl.real_league, 'fcVersion', pl.fc_version, 'photo', pl.photo,
       'price', pl.value,
       'offerable', true, 'blockedReason', null
-    ) as row
+    ) as item
     from public.players pl
     where not exists (select 1 from public.squad_players sp where sp.player_id = pl.id and sp.tournament_id = v_tid)
       and (p_position is null or pl.position = p_position)
       and (p_search is null or pl.name ilike '%' || p_search || '%')
-  ) sub;
+  ),
+  paged as (
+    select row_number() over (order by (item->>'ovr')::int desc, (item->>'name') asc) as ord, item
+    from pool
+    limit least(p_limit, 100) offset p_offset
+  )
+  select
+    coalesce((select jsonb_agg(item order by ord) from paged), '[]'::jsonb),
+    (select count(*) from pool)
+  into v_rows, v_total;
 
   return jsonb_build_object('players', v_rows, 'total', v_total);
 end $$;
@@ -351,10 +373,10 @@ returns jsonb
 language sql security definer set search_path = public as $$
   select jsonb_build_object(
     'total', (select total from public.catalog_stats where id = 1),
-    'lastSync', (select jsonb_build_object('source', source, 'at', extract(epoch from created_at)*1000, 'note', note)
-                 from public.sync_log where status = 'ok' order by created_at desc limit 1),
-    'lastError', (select jsonb_build_object('message', note, 'at', extract(epoch from created_at)*1000)
-                  from public.sync_log where status = 'error' order by created_at desc limit 1)
+    'lastSync', (select jsonb_build_object('source', source, 'at', extract(epoch from started_at)*1000, 'note', note)
+                 from public.sync_log where status = 'ok' order by started_at desc limit 1),
+    'lastError', (select jsonb_build_object('message', note, 'at', extract(epoch from started_at)*1000)
+                  from public.sync_log where status = 'error' order by started_at desc limit 1)
   )
 $$;
 
@@ -750,10 +772,14 @@ begin
 end $$;
 
 create or replace function public.offers_json(v_tid uuid, v_me uuid)
-returns jsonb language sql stable as $$
-  select coalesce(jsonb_agg(public.offer_json(o)), '[]'::jsonb)
-  from public.offers o where o.tournament_id = v_tid
-$$;
+-- plpgsql: public.offer_json se define más abajo en este mismo script.
+returns jsonb language plpgsql stable as $$
+begin
+  return coalesce((
+    select jsonb_agg(public.offer_json(o))
+    from public.offers o where o.tournament_id = v_tid
+  ), '[]'::jsonb);
+end $$;
 
 create or replace function public.offer_json(o public.offers)
 returns jsonb language sql stable as $$
