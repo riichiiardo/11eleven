@@ -299,8 +299,19 @@ function resolveMutation(ref: string): (args: Record<string, unknown>) => Promis
     "tournament.updateProfile": (a) =>
       rpc("update_profile", { p_name: a.name ?? "", p_nickname: a.nickname ?? "", p_image: a.image ?? null }),
     "tournament.updateAvatar": (a) => rpc("update_profile", { p_name: "", p_nickname: "", p_image: a.image }),
-    "leagues.createLeague": (a) => rpc("create_league", { p_name: a.name, p_season: a.season, p_code: a.code }),
-    "leagues.joinLeague": (a) => rpc("join_league", { p_code: a.code }),
+    "leagues.createLeague": async (a) => {
+      const tid = await rpc<string>("create_league", {
+        p_name: a.name,
+        p_season: a.season ?? String(new Date().getFullYear() + 1),
+        p_code: a.code,
+      });
+      // La página espera { name } como en Convex; la RPC devuelve solo el uuid.
+      return { id: tid, name: a.name };
+    },
+    "leagues.joinLeague": async (a) => {
+      const tid = await rpc<string>("join_league", { p_code: a.code });
+      return { id: tid, name: a.code };
+    },
     "leagues.activateLeague": (a) => rpc("activate_league", { p_tournament_id: a.tournamentId }),
     "squads.setAvailability": (a) => rpc("set_availability", { p_squad_player_id: a.squadPlayerId, p_availability: a.availability }),
     "squads.saveLineup": (a) => rpc("save_lineup", { p_formation: a.formation, p_slots: a.slots }),
