@@ -8,9 +8,11 @@ import { createClient, type SupabaseClient, type Session } from "@supabase/supab
  * exclusivamente por RPCs security definer (supabase/rpc.sql).
  */
 
-// Normaliza la URL: recorta espacios, añade https:// si falta y quita la barra final.
-const rawUrl = ((import.meta.env.VITE_SUPABASE_URL ?? "") as string).trim();
-const anonKey = ((import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string).trim();
+// Normaliza los valores: quita comillas envolventes, espacios, y a la URL le
+// añade https:// si falta y le quita la barra final.
+const clean = (v: string) => v.trim().replace(/^["']+/, "").replace(/["',;]+$/, "");
+const rawUrl = clean((import.meta.env.VITE_SUPABASE_URL ?? "") as string);
+const anonKey = clean((import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string);
 
 const url = rawUrl
   ? (/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`).replace(/\/+$/, "")

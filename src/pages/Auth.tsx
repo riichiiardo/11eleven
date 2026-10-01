@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/input-otp";
 
 import { useAuth } from "@/hooks/use-auth";
+import { supabaseConfigError, supabaseUrl } from "@/lib/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
 import { ArrowRight, Loader2, Mail, ShieldCheck, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
@@ -126,6 +127,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         >
           <BrandLockup />
         </button>
+
+        {supabaseConfigError ? (
+          <p className="w-full rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-center text-xs leading-relaxed text-amber-200">
+            ⚠️ {supabaseConfigError}
+          </p>
+        ) : (
+          <p className="flex w-full items-center justify-center gap-1.5 text-[11px] text-white/50">
+            <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-emerald-400" />
+            Conectado a Supabase · {supabaseUrl.replace(/^https?:\/\//, "")}
+          </p>
+        )}
 
         <Card className="w-full border-white/10 bg-card pb-0 shadow-2xl">
           {step === "signIn" ? (
