@@ -271,11 +271,28 @@ export function useQuery<T = unknown>(
   return (cache.has(key) ? cache.get(key) : undefined) as T | undefined | null;
 }
 
-/** useMutation: ejecuta un RPC security definer y refresca los caches. */
-export function useMutation() {
-  return useCallback(async (fnRef: unknown, args: Record<string, unknown> = {}) => {
+/** useMutation: ejecuta un RPC security definer y refresca los caches.
+ *  Soporta las dos firmas que usan las páginas:
+ *    · Estilo con ref explícito:  const m = useMutation();  m(api.leagues.createLeague, { name })
+ *    · Estilo Convex (ref en el hook): const m = useMutation(api.leagues.createLeague); m({ name })
+ */
+export function useMutation(hookRef?: unknown) {
+  const hookRefStr = hookRef === undefined ? undefined : refOf(hookRef);
+  return useCallback(async (a?: unknown, b: Record<string, unknown> = {}) => {
     if (supabaseConfigError) throw new Error(supabaseConfigError);
-    const ref = refOf(fnRef);
+    let ref: string;
+    let args: Record<string, unknown>;
+    const looksLikeRef =
+      typeof a === "string" || (a !== null && typeof a === "object" && "__ref" in (a as object));
+    if (looksLikeRef) {
+      ref = refOf(a);
+      args = b;
+    } else if (hookRefStr) {
+      ref = hookRefStr;
+      args = (a as Record<string, unknown>) ?? {};
+    } else {
+      throw new Error("Mutación sin referencia: usa mut(api.mod.fn, args) o crea el hook con mut(api.mod.fn).");
+    }
     const fn = resolveMutation(ref);
     try {
       const result = await fn(args);
@@ -284,7 +301,7 @@ export function useMutation() {
     } catch (cause) {
       throwNetwork(cause);
     }
-  }, []);
+  }, [hookRefStr]);
 }
 
 function resolveMutation(ref: string): (args: Record<string, unknown>) => Promise<unknown> {
