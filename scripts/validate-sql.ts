@@ -71,6 +71,7 @@ await run(
 await run(readFileSync("supabase/schema.sql", "utf8"), "schema.sql");
 await run(readFileSync("supabase/rpc.sql", "utf8"), "rpc.sql");
 await run(readFileSync("supabase/views.sql", "utf8"), "views.sql");
+await run(readFileSync("supabase/seed.sql", "utf8"), "seed.sql");
 
 // --- Smoke tests ligeros ----------------------------------------------------
 const smoke = await db.query<{ ok_uid: boolean; ok_admin: boolean; ok_president: boolean }>(
