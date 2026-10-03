@@ -33,9 +33,14 @@ jobs:
         run: bunx tsc -b
 
       - name: Convex regression tests
+        if: ${{ secrets.CONVEX_DEPLOYMENT != '' }}
         run: bun run test:convex
         env:
           CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
+
+      - name: Convex regression tests skipped
+        if: ${{ secrets.CONVEX_DEPLOYMENT == '' }}
+        run: echo "CONVEX_DEPLOYMENT is not configured; skipping deployed Convex self-tests."
 
       - name: Build
         # GitHub Pages serves a project site under /<repo-name>/, so the base
