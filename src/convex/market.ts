@@ -241,7 +241,13 @@ export const browse = query({
     const { tournament, president } = await loadMarketContext(ctx, userId);
 
     const ownership = await ownershipRows(ctx, tournament._id);
-    const catalogue = await ctx.db.query("players").collect();
+    const effectiveMinOvr = Math.max(args.minOvr ?? 0, args.ovrMin ?? 0);
+    const catalogueQuery = ctx.db.query("players");
+    const catalogue = effectiveMinOvr > 0
+      ? await catalogueQuery
+          .withIndex("by_ovr", (q) => q.gte("ovr", effectiveMinOvr))
+          .collect()
+      : await catalogueQuery.collect();
     const clubs = await ctx.db
       .query("clubs")
       .withIndex("by_tournament", (q) => q.eq("tournamentId", tournament._id))

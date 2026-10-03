@@ -15,13 +15,11 @@ export function MarketPlayerCard({
   player,
   budgetAvailable,
   onOffer,
-  compact = false,
   showDetail = false,
 }: {
   player: MarketPlayerView;
   budgetAvailable: number;
   onOffer: (player: MarketPlayerView) => void;
-  compact?: boolean;
   showDetail?: boolean;
 }) {
   const isFree = player.kind === "libre";

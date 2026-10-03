@@ -293,7 +293,8 @@ const schema = defineSchema(
     })
       .index("by_name", ["name"])
       .index("by_real_club", ["realClub"])
-      .index("by_position", ["position"]),
+      .index("by_position", ["position"])
+      .index("by_ovr", ["ovr"]),
 
     /**
      * Singleton counter for the global catalogue. Reading `players` twice in a
