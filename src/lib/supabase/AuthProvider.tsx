@@ -12,9 +12,9 @@ import { supabase, type DbProfile } from "@/lib/supabase/client";
  * 11Eleven — Auth con Supabase (reemplaza Convex Auth).
  *
  * Mantiene la misma superficie que el hook anterior (`useAuth`): isLoading,
- * isAuthenticated, user, signIn, signOut. `signIn` acepta email/contraseña y,
- * sin contraseña, envía el enlace mágico. El proveedor escucha los cambios de
- * sesión para re-renderizar la app al entrar/salir.
+ * isAuthenticated, user, signIn, signUp, signOut. La autenticación usa
+ * exclusivamente correo y contraseña; la recuperación usa el enlace seguro
+ * de Supabase para que un usuario existente pueda definir su contraseña.
  */
 
 export type AppUser = {
@@ -31,15 +31,23 @@ type AuthContextValue = {
   user: AppUser | null;
   profile: DbProfile | null;
   signIn: (credentials: { email: string; password?: string }) => Promise<void>;
+  signUp: (credentials: { email: string; password: string }) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  isRecovery: boolean;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>(null);
+  const [session, setSession] =
+    useState<
+      Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
+    >(null);
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -50,9 +58,12 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        setSession(newSession);
+        setIsRecovery(event === "PASSWORD_RECOVERY");
+      },
+    );
 
     return () => {
       active = false;
@@ -90,32 +101,53 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
             id: u.id,
             name: profile?.name ?? u.email?.split("@")[0] ?? "Usuario",
             email: u.email ?? "",
-            nickname: profile?.nickname ?? profile?.name ?? u.email?.split("@")[0] ?? "Presidente",
+            nickname:
+              profile?.nickname ??
+              profile?.name ??
+              u.email?.split("@")[0] ??
+              "Presidente",
             image: profile?.image ?? null,
           }
         : null,
       profile,
       signIn: async ({ email, password }) => {
-        if (password) {
-          const { error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) throw new Error(error.message);
-        } else {
-          const { error } = await supabase.auth.signInWithOtp({ email });
-          if (error) throw new Error(error.message);
-        }
+        if (!password) throw new Error("Escribe tu contraseña para continuar.");
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw new Error(error.message);
       },
+      signUp: async ({ email, password }) => {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw new Error(error.message);
+      },
+      requestPasswordReset: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw new Error(error.message);
+      },
+      updatePassword: async (password) => {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw new Error(error.message);
+      },
+      isRecovery,
       signOut: async () => {
         await supabase.auth.signOut();
       },
     };
-  }, [session, profile, isLoading]);
+  }, [session, profile, isLoading, isRecovery]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuthContext(): AuthContextValue {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuthContext debe usarse dentro de <SupabaseAuthProvider>.");
+  if (!ctx)
+    throw new Error(
+      "useAuthContext debe usarse dentro de <SupabaseAuthProvider>.",
+    );
   return ctx;
 }
 

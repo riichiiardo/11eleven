@@ -8,19 +8,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
-
 import { useAuth } from "@/hooks/use-auth";
 import {
   supabaseConfigError,
   testSupabaseConnection,
 } from "@/lib/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
-import { ArrowRight, Loader2, Mail, ShieldCheck, UserX } from "lucide-react";
+import { ArrowRight, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -39,19 +33,33 @@ function resolveRedirectAfterAuth(
 }
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
-  const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const {
+    isLoading: authLoading,
+    isAuthenticated,
+    signIn,
+    signUp,
+    requestPasswordReset,
+    updatePassword,
+    isRecovery,
+  } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveRedirectAfterAuth(
     searchParams.get("returnTo"),
     redirectAfterAuth,
   );
-  const [step, setStep] = useState<"signIn" | { email: string }>("signIn");
-  const [otp, setOtp] = useState("");
+  const [mode, setMode] = useState<
+    "signIn" | "signUp" | "reset" | "setPassword"
+  >(isRecovery ? "setPassword" : "signIn");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const [connectionError, setConnectionError] = useState(false);
+
+  useEffect(() => {
+    if (isRecovery) setMode("setPassword");
+  }, [isRecovery]);
 
   useEffect(() => {
     let active = true;
@@ -64,74 +72,77 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (!authLoading && isAuthenticated && mode !== "setPassword") {
       navigate(redirect);
     }
-  }, [authLoading, isAuthenticated, navigate, redirect]);
+  }, [authLoading, isAuthenticated, mode, navigate, redirect]);
 
-  const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
     try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string });
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Email sign-in error:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "No se pudo enviar el código de verificación. Inténtalo de nuevo.",
-      );
-      setIsLoading(false);
-    }
-  };
-
-  const handleOtpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-      navigate(redirect);
-    } catch (error) {
-      console.error("OTP verification error:", error);
-      setError(
-        "El código de verificación no es correcto. Vuelve a intentarlo.",
-      );
-      setIsLoading(false);
-      setOtp("");
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await signIn("anonymous");
-      navigate(redirect);
-    } catch (error) {
-      console.error("Guest login error:", error);
-      const message =
-        error instanceof Error ? error.message : "error desconocido";
-      let hint = "";
-      if (/invalid path|request url/i.test(message)) {
-        hint =
-          " La URL guardada no parece una Project URL válida (debe ser https://xxxx.supabase.co). Cámbiala con el botón ✎ bajo el logo.";
-      } else if (/anonymous sign-?ins?|Anonymous provider/i.test(message)) {
-        hint =
-          " Activa el proveedor anónimo: Supabase → Authentication → Providers → Anonymous → Enable → Save.";
-      } else if (/invalid api key|api key/i.test(message)) {
-        hint =
-          " La anon key parece incorrecta (debe ser la anon public del mismo proyecto).";
+      if (mode === "reset") {
+        await requestPasswordReset(email);
+        setMessage(
+          "Si existe una cuenta con ese correo, recibirás un enlace para definir tu contraseña.",
+        );
+      } else if (mode === "setPassword") {
+        if (password.length < 8)
+          throw new Error("La contraseña debe tener al menos 8 caracteres.");
+        await updatePassword(password);
+        navigate(redirect);
+      } else if (mode === "signUp") {
+        if (password.length < 8)
+          throw new Error("La contraseña debe tener al menos 8 caracteres.");
+        await signUp({ email, password });
+        setMessage(
+          "Cuenta creada. Ya puedes entrar con tu correo y contraseña.",
+        );
+        setMode("signIn");
+      } else {
+        await signIn({ email, password });
+        navigate(redirect);
       }
-      setError(`No se pudo entrar como invitado: ${message}.${hint}`);
+    } catch (cause) {
+      const raw =
+        cause instanceof Error
+          ? cause.message
+          : "No se pudo completar la operación.";
+      if (/invalid login credentials|invalid password/i.test(raw)) {
+        setError(
+          "El correo o la contraseña no son correctos. Si aún no tienes contraseña, usa «Definir contraseña».",
+        );
+      } else if (/already registered|already exists|user already/i.test(raw)) {
+        setError(
+          "Ya existe una cuenta con ese correo. Usa «Definir contraseña» si todavía no tienes una.",
+        );
+      } else {
+        setError(raw);
+      }
+    } finally {
       setIsLoading(false);
     }
   };
+
+  const isPasswordSetup = mode === "setPassword";
+  const title = isPasswordSetup
+    ? "Define tu contraseña"
+    : mode === "reset"
+      ? "Recupera tu acceso"
+      : mode === "signUp"
+        ? "Crea tu cuenta"
+        : "Entra al centro de control";
+  const description = isPasswordSetup
+    ? "Crea una contraseña de al menos 8 caracteres para tus siguientes accesos."
+    : mode === "reset"
+      ? "Te enviaremos un enlace seguro para definir o cambiar tu contraseña."
+      : mode === "signUp"
+        ? "Registra tu correo y una contraseña para entrar al torneo."
+        : "Ingresa con tu correo y contraseña.";
 
   return (
     <div className="rail-surface relative flex min-h-screen flex-col items-center justify-center px-4 py-10 text-white">
@@ -165,180 +176,133 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         )}
 
         <Card className="w-full border-white/10 bg-card pb-0 shadow-2xl">
-          {step === "signIn" ? (
-            <>
-              <CardHeader className="text-center">
-                <CardTitle className="display text-xl">
-                  Entra al centro de control
-                </CardTitle>
-                <CardDescription>
-                  Escribe tu correo: te enviamos un código para entrar o crear
-                  tu cuenta.
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleEmailSubmit}>
-                <CardContent>
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail
-                        className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <Input
-                        name="email"
-                        placeholder="presidente@correo.com"
-                        type="email"
-                        aria-label="Correo electrónico"
-                        className="h-11 pl-9"
-                        disabled={isLoading}
-                        required
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="icon"
-                      className="size-11"
-                      disabled={isLoading}
-                      aria-label="Enviar código de acceso"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                  {error && (
-                    <p role="alert" className="mt-3 text-sm text-destructive">
-                      {error}
-                    </p>
-                  )}
-
-                  <div className="mt-5">
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">
-                          o
-                        </span>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="mt-4 min-h-11 w-full"
-                      onClick={handleGuestLogin}
-                      disabled={isLoading}
-                    >
-                      <UserX className="mr-2 h-4 w-4" aria-hidden="true" />
-                      Entrar como invitado
-                    </Button>
-                    <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
-                      El acceso como invitado crea una cuenta temporal para
-                      explorar el torneo.
-                    </p>
-                  </div>
-                </CardContent>
-              </form>
-            </>
-          ) : (
-            <>
-              <CardHeader className="mt-2 text-center">
-                <CardTitle className="display text-lg">
-                  Revisa tu correo
-                </CardTitle>
-                <CardDescription>
-                  Hemos enviado un código a {step.email}
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleOtpSubmit}>
-                <CardContent className="pb-4">
-                  <input type="hidden" name="email" value={step.email} />
-                  <input type="hidden" name="code" value={otp} />
-
-                  <div className="flex justify-center">
-                    <InputOTP
-                      value={otp}
-                      onChange={setOtp}
-                      maxLength={6}
-                      disabled={isLoading}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter" &&
-                          otp.length === 6 &&
-                          !isLoading
-                        ) {
-                          const form = (e.target as HTMLElement).closest(
-                            "form",
-                          );
-                          if (form) form.requestSubmit();
-                        }
-                      }}
-                    >
-                      <InputOTPGroup>
-                        {Array.from({ length: 6 }).map((_, index) => (
-                          <InputOTPSlot key={index} index={index} />
-                        ))}
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  {error && (
-                    <p
-                      role="alert"
-                      className="mt-3 text-center text-sm text-destructive"
-                    >
-                      {error}
-                    </p>
-                  )}
-                  <p className="mt-4 text-center text-sm text-muted-foreground">
-                    ¿No recibiste el código?{" "}
-                    <Button
-                      variant="link"
-                      className="h-auto p-0"
-                      onClick={() => setStep("signIn")}
-                    >
-                      Probar con otro correo
-                    </Button>
-                  </p>
-                </CardContent>
-                <CardFooter className="flex-col gap-2">
+          <CardHeader className="text-center">
+            <CardTitle className="display text-xl">
+              {mode === "setPassword"
+                ? "Define tu contraseña"
+                : mode === "reset"
+                  ? "Recupera tu acceso"
+                  : mode === "signUp"
+                    ? "Crea tu cuenta"
+                    : "Entra al centro de control"}
+            </CardTitle>
+            <CardDescription>
+              {mode === "setPassword"
+                ? "Crea una contraseña de al menos 8 caracteres para tus siguientes accesos."
+                : mode === "reset"
+                  ? "Te enviaremos un enlace seguro para definir o cambiar tu contraseña."
+                  : mode === "signUp"
+                    ? "Registra tu correo y una contraseña para entrar al torneo."
+                    : "Ingresa con tu correo y contraseña."}
+            </CardDescription>
+          </CardHeader>
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              {mode !== "setPassword" && (
+                <Input
+                  name="email"
+                  placeholder="presidente@correo.com"
+                  type="email"
+                  aria-label="Correo electrónico"
+                  autoComplete="email"
+                  disabled={isLoading}
+                  required
+                />
+              )}
+              {mode !== "reset" && (
+                <div className="relative">
+                  <KeyRound
+                    className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    name="password"
+                    placeholder="Contraseña (mínimo 8 caracteres)"
+                    type="password"
+                    aria-label="Contraseña"
+                    autoComplete={
+                      mode === "signUp" || mode === "setPassword"
+                        ? "new-password"
+                        : "current-password"
+                    }
+                    className="h-11 pl-9"
+                    disabled={isLoading}
+                    minLength={8}
+                    required
+                  />
+                </div>
+              )}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              {message && (
+                <p role="status" className="text-sm text-emerald-600">
+                  {message}
+                </p>
+              )}
+            </CardContent>
+            <CardFooter className="flex-col gap-2">
+              <Button
+                type="submit"
+                className="min-h-11 w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="mr-2 h-4 w-4" aria-hidden="true" />
+                )}
+                {mode === "setPassword"
+                  ? "Guardar contraseña"
+                  : mode === "reset"
+                    ? "Enviar enlace"
+                    : mode === "signUp"
+                      ? "Crear cuenta"
+                      : "Entrar"}
+              </Button>
+              {mode === "signIn" && (
+                <>
                   <Button
-                    type="submit"
-                    className="min-h-11 w-full"
-                    disabled={isLoading || otp.length !== 6}
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0"
+                    onClick={() => {
+                      setMode("reset");
+                      setError(null);
+                    }}
                   >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verificando…
-                      </>
-                    ) : (
-                      <>
-                        Verificar código
-                        <ArrowRight
-                          className="ml-2 h-4 w-4"
-                          aria-hidden="true"
-                        />
-                      </>
-                    )}
+                    Definir contraseña / recuperar acceso
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setStep("signIn")}
-                    disabled={isLoading}
-                    className="min-h-11 w-full"
+                    className="min-h-10 w-full"
+                    onClick={() => {
+                      setMode("signUp");
+                      setError(null);
+                    }}
                   >
-                    Usar otro correo
+                    Crear una cuenta nueva
                   </Button>
-                </CardFooter>
-              </form>
-            </>
-          )}
+                </>
+              )}
+              {mode !== "signIn" && mode !== "setPassword" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-10 w-full"
+                  onClick={() => {
+                    setMode("signIn");
+                    setError(null);
+                  }}
+                >
+                  Volver a iniciar sesión
+                </Button>
+              )}
+            </CardFooter>
+          </form>
 
           <div className="flex items-center justify-center gap-1.5 rounded-b-lg border-t bg-muted px-6 py-4 text-xs text-muted-foreground">
             <ShieldCheck className="size-3.5" aria-hidden="true" />
