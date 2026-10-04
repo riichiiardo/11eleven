@@ -304,6 +304,9 @@ export function useMutation(hookRef?: unknown) {
   }, [hookRefStr]);
 }
 
+/** Actions use the same Supabase RPC bridge as mutations in the compatibility layer. */
+export const useAction = useMutation;
+
 function resolveMutation(ref: string): (args: Record<string, unknown>) => Promise<unknown> {
   const map: Record<string, (a: Record<string, unknown>) => Promise<unknown>> = {
     "tournament.ensureSetup": () => rpc("ensure_setup"),
@@ -421,5 +424,4 @@ function resolveMutation(ref: string): (args: Record<string, unknown>) => Promis
   }
   return fn;
 }
-
 
