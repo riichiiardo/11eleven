@@ -42,6 +42,18 @@ jobs:
         if: ${{ env.CONVEX_DEPLOYMENT == '' }}
         run: echo "CONVEX_DEPLOYMENT is not configured; skipping deployed Convex self-tests."
 
+      - name: Validate Supabase configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$VITE_SUPABASE_URL" || { echo "::error::VITE_SUPABASE_URL no está configurada"; exit 1; }
+          test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::VITE_SUPABASE_ANON_KEY no está configurada"; exit 1; }
+          case "$VITE_SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *) echo "::error::VITE_SUPABASE_URL no parece una Project URL válida"; exit 1 ;;
+          esac
+
       - name: Build
         # GitHub Pages serves a project site under /<repo-name>/, so the base
         # is derived from the repository name at runtime. Hardcoding it broke
@@ -49,6 +61,8 @@ jobs:
         # and the page rendered blank).
         run: bunx vite build --base=/${{ github.event.repository.name }}/
         env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # Public Convex endpoint (it ships in the client bundle anyway).
           # Override by setting the VITE_CONVEX_URL secret in the repo.
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL || 'https://valuable-hedgehog-471.convex.cloud' }}

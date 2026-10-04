@@ -1,4 +1,8 @@
-import { createClient, type SupabaseClient, type Session } from "@supabase/supabase-js";
+import {
+  createClient,
+  type SupabaseClient,
+  type Session,
+} from "@supabase/supabase-js";
 
 /**
  * 11Eleven — capa de acceso a datos (Supabase).
@@ -10,54 +14,18 @@ import { createClient, type SupabaseClient, type Session } from "@supabase/supab
 
 // Normaliza los valores: quita comillas envolventes, espacios, y a la URL le
 // añade https:// si falta y le quita la barra final.
-const clean = (v: string) => v.trim().replace(/^["']+/, "").replace(/["',;]+$/, "");
+const clean = (v: string) =>
+  v
+    .trim()
+    .replace(/^["']+/, "")
+    .replace(/["',;]+$/, "");
 
-// Variables inyectadas por la plataforma (vía Keys / API keys).
+// Variables inyectadas por la plataforma durante el build.
 const envUrl = clean((import.meta.env.VITE_SUPABASE_URL ?? "") as string);
 const envKey = clean((import.meta.env.VITE_SUPABASE_ANON_KEY ?? "") as string);
 
-// Fallback manual: si la plataforma no inyectó las variables, se permite pegar
-// la Project URL y la anon key en pantalla (se guardan en localStorage). URL y
-// anon key son credenciales públicas del navegador; la seguridad la aportan
-// RLS y las RPC security definer.
-const LS_URL = "11eleven.supabase.url";
-const LS_KEY = "11eleven.supabase.anonKey";
-
-function lsGet(name: string): string {
-  try {
-    return localStorage.getItem(name) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-const rawUrl = envUrl || clean(lsGet(LS_URL));
-const anonKey = envKey || clean(lsGet(LS_KEY));
-
-/** Guarda la configuración manual y recarga la app para reinicializar el cliente. */
-export function saveSupabaseConfig(projectUrl: string, anonKeyValue: string): void {
-  try {
-    localStorage.setItem(LS_URL, clean(projectUrl));
-    localStorage.setItem(LS_KEY, clean(anonKeyValue));
-    window.location.reload();
-  } catch {
-    // Sin localStorage disponible no se puede configurar manualmente.
-  }
-}
-
-/** ¿La configuración activa viene del fallback manual (localStorage)? */
-export const usingManualSupabaseConfig = Boolean(!envUrl || !envKey) && Boolean(rawUrl);
-
-/** Borra la configuración manual guardada y recarga la app. */
-export function clearSupabaseConfig(): void {
-  try {
-    localStorage.removeItem(LS_URL);
-    localStorage.removeItem(LS_KEY);
-    window.location.reload();
-  } catch {
-    // Sin localStorage no hay nada que borrar.
-  }
-}
+const rawUrl = envUrl;
+const anonKey = envKey;
 
 /** Health-check real de Auth contra el proyecto dado (o el actual). */
 export async function testSupabaseConnection(
@@ -74,10 +42,15 @@ export async function testSupabaseConnection(
     return { ok: false, detail: "Falta la anon key." };
   }
   try {
-    const res = await fetch(`${base}/auth/v1/health`, { headers: { apikey: key } });
+    const res = await fetch(`${base}/auth/v1/health`, {
+      headers: { apikey: key },
+    });
     if (res.ok) return { ok: true, detail: `${host} responde correctamente.` };
     const text = await res.text();
-    return { ok: false, detail: `HTTP ${res.status} desde ${host}: ${text.slice(0, 160)}` };
+    return {
+      ok: false,
+      detail: `HTTP ${res.status} desde ${host}: ${text.slice(0, 160)}`,
+    };
   } catch (cause) {
     return {
       ok: false,
@@ -93,7 +66,9 @@ function normalizeProjectUrl(raw: string): string {
   let u = clean(raw);
   if (!u) return "";
   // Link del dashboard (https://supabase.com/dashboard/project/<ref>) → ref.
-  const dash = u.match(/^https?:\/\/[^/]*supabase\.com\/(?:dashboard\/)?project\/([a-z0-9]+)/i);
+  const dash = u.match(
+    /^https?:\/\/[^/]*supabase\.com\/(?:dashboard\/)?project\/([a-z0-9]+)/i,
+  );
   if (dash) return `https://${dash[1]}.supabase.co`;
   if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
   // Rutas internas pegadas por error (/rest/v1, /auth/v1, ...).
@@ -106,9 +81,7 @@ const url = normalizeProjectUrl(rawUrl);
 /** Motivo por el que Supabase no está listo, o null si la configuración es correcta. */
 export const supabaseConfigError: string | null =
   !url || !anonKey
-    ? `Faltan las claves de Supabase (${[!url && "VITE_SUPABASE_URL", !anonKey && "VITE_SUPABASE_ANON_KEY"]
-        .filter(Boolean)
-        .join(" y ")}). Pégalas en Keys / API keys — o conéctalas ahora en el panel de aquí abajo.`
+    ? "El servicio de acceso no está configurado. Contacta con soporte."
     : null;
 
 if (supabaseConfigError) {
@@ -181,10 +154,14 @@ export type DbRules = {
   tournament_id: string;
   budget: number;
   squad_size: number;
-  gk_min: number; gk_max: number;
-  def_min: number; def_max: number;
-  mid_min: number; mid_max: number;
-  fwd_min: number; fwd_max: number;
+  gk_min: number;
+  gk_max: number;
+  def_min: number;
+  def_max: number;
+  mid_min: number;
+  mid_max: number;
+  fwd_min: number;
+  fwd_max: number;
   max_per_real_club: number;
   min_ovr: number;
   max_u21: number;
@@ -259,8 +236,16 @@ export type DbOffer = {
   cash: number;
   message: string | null;
   status:
-    | "borrador" | "enviada" | "negociacion" | "aceptada" | "reservada"
-    | "ejecutada" | "rechazada" | "cancelada" | "expirada" | "invalidada";
+    | "borrador"
+    | "enviada"
+    | "negociacion"
+    | "aceptada"
+    | "reservada"
+    | "ejecutada"
+    | "rechazada"
+    | "cancelada"
+    | "expirada"
+    | "invalidada";
   parent_offer_id: string | null;
   last_validation: string | null;
   invalid_reason: string | null;
@@ -342,14 +327,19 @@ export async function getSession(): Promise<Session | null> {
 }
 
 /** Ejecuta un RPC security definer y devuelve data o lanza con el mensaje. */
-export async function rpc<T = unknown>(fn: string, args: Record<string, unknown> = {}): Promise<T> {
+export async function rpc<T = unknown>(
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
   if (error) throw new Error(error.message);
   return data as T;
 }
 
 /** Ejecuta una lectura y lanza con el mensaje si falla (patrón uniforme). */
-export async function select<T>(query: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T | null> {
+export async function select<T>(
+  query: PromiseLike<{ data: T | null; error: { message: string } | null }>,
+): Promise<T | null> {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data;

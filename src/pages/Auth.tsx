@@ -16,12 +16,8 @@ import {
 
 import { useAuth } from "@/hooks/use-auth";
 import {
-  clearSupabaseConfig,
-  saveSupabaseConfig,
   supabaseConfigError,
-  supabaseUrl,
   testSupabaseConnection,
-  usingManualSupabaseConfig,
 } from "@/lib/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
 import { ArrowRight, Loader2, Mail, ShieldCheck, UserX } from "lucide-react";
@@ -55,42 +51,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Configuración manual de Supabase (fallback si la plataforma no inyecta las claves).
-  const [cfgUrl, setCfgUrl] = useState("");
-  const [cfgKey, setCfgKey] = useState("");
-  const [cfgError, setCfgError] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState(false);
 
-  const handleManualConnect = () => {
-    const u = cfgUrl.trim().replace(/\/+$/, "");
-    const k = cfgKey.trim();
-    if (!u || !k) {
-      setCfgError("Pega la Project URL y la anon key.");
-      return;
-    }
-    // La Project URL debe ser la raíz del proyecto: https://<ref>.supabase.co
-    if (!/^https:\/\/[a-z0-9][a-z0-9-]*\.supabase\.(co|in)(:\d+)?$/i.test(u)) {
-      setCfgError(
-        "No parece una Project URL de Supabase. Debe verse así: https://abcdefghij.supabase.co — cópiala desde Project Settings → API.",
-      );
-      return;
-    }
-    setCfgError(null);
-    saveSupabaseConfig(u, k);
-  };
-
-  const handleTestConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
-    const hasTyped = Boolean(cfgUrl.trim() && cfgKey.trim());
-    const result = await testSupabaseConnection(
-      hasTyped ? cfgUrl : undefined,
-      hasTyped ? cfgKey : undefined,
-    );
-    setTesting(false);
-    setTestResult(`${result.ok ? "✅" : "❌"} ${result.detail}`);
-  };
+  useEffect(() => {
+    let active = true;
+    void testSupabaseConnection().then((result) => {
+      if (active) setConnectionError(!result.ok);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -128,7 +99,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       navigate(redirect);
     } catch (error) {
       console.error("OTP verification error:", error);
-      setError("El código de verificación no es correcto. Vuelve a intentarlo.");
+      setError(
+        "El código de verificación no es correcto. Vuelve a intentarlo.",
+      );
       setIsLoading(false);
       setOtp("");
     }
@@ -142,14 +115,18 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       navigate(redirect);
     } catch (error) {
       console.error("Guest login error:", error);
-      const message = error instanceof Error ? error.message : "error desconocido";
+      const message =
+        error instanceof Error ? error.message : "error desconocido";
       let hint = "";
       if (/invalid path|request url/i.test(message)) {
-        hint = " La URL guardada no parece una Project URL válida (debe ser https://xxxx.supabase.co). Cámbiala con el botón ✎ bajo el logo.";
+        hint =
+          " La URL guardada no parece una Project URL válida (debe ser https://xxxx.supabase.co). Cámbiala con el botón ✎ bajo el logo.";
       } else if (/anonymous sign-?ins?|Anonymous provider/i.test(message)) {
-        hint = " Activa el proveedor anónimo: Supabase → Authentication → Providers → Anonymous → Enable → Save.";
+        hint =
+          " Activa el proveedor anónimo: Supabase → Authentication → Providers → Anonymous → Enable → Save.";
       } else if (/invalid api key|api key/i.test(message)) {
-        hint = " La anon key parece incorrecta (debe ser la anon public del mismo proyecto).";
+        hint =
+          " La anon key parece incorrecta (debe ser la anon public del mismo proyecto).";
       }
       setError(`No se pudo entrar como invitado: ${message}.${hint}`);
       setIsLoading(false);
@@ -177,72 +154,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           <BrandLockup />
         </button>
 
-        {supabaseConfigError ? (
-          <div className="w-full space-y-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3">
-            <p className="text-center text-xs leading-relaxed text-amber-200">⚠️ {supabaseConfigError}</p>
-            <details className="text-xs">
-              <summary className="cursor-pointer select-none text-center font-medium text-amber-200 underline decoration-dotted underline-offset-4">
-                Conectar manualmente (Project URL + anon key)
-              </summary>
-              <div className="mt-3 space-y-2">
-                <Input
-                  value={cfgUrl}
-                  onChange={(e) => setCfgUrl(e.target.value)}
-                  placeholder="https://xxxx.supabase.co"
-                  aria-label="Project URL de Supabase"
-                  className="h-9 bg-card text-foreground"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <Input
-                  value={cfgKey}
-                  onChange={(e) => setCfgKey(e.target.value)}
-                  type="password"
-                  placeholder="eyJ… (anon public)"
-                  aria-label="Anon public key de Supabase"
-                  className="h-9 bg-card font-mono text-[11px] text-foreground"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                {cfgError && <p className="text-[11px] text-red-300">{cfgError}</p>}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleTestConnection}
-                    disabled={testing}
-                  >
-                    {testing ? "Probando…" : "Probar conexión"}
-                  </Button>
-                  <Button type="button" size="sm" className="flex-1" onClick={handleManualConnect}>
-                    Guardar y conectar
-                  </Button>
-                </div>
-                {testResult && (
-                  <p className="text-center text-[11px] leading-relaxed text-amber-100">{testResult}</p>
-                )}
-                <p className="text-center text-[10px] leading-relaxed text-amber-200/70">
-                  Se guardan solo en este navegador. La anon key es pública; la seguridad la aplican RLS y las RPC.
-                </p>
-              </div>
-            </details>
-          </div>
-        ) : (
-          <p className="flex w-full items-center justify-center gap-1.5 text-[11px] text-white/50">
-            <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-emerald-400" />
-            Conectado a Supabase · {supabaseUrl.replace(/^https?:\/\//, "")}
-            {usingManualSupabaseConfig && (
-              <button
-                type="button"
-                onClick={clearSupabaseConfig}
-                title="Borrar la conexión guardada y volver a configurar"
-                className="rounded px-1 text-[10px] text-white/60 underline decoration-dotted underline-offset-2 transition-colors hover:text-white"
-              >
-                ✎ cambiar
-              </button>
-            )}
+        {(supabaseConfigError || connectionError) && (
+          <p
+            role="status"
+            className="w-full rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-center text-xs leading-relaxed text-amber-200"
+          >
+            El servicio de acceso no está disponible en este momento. Inténtalo
+            de nuevo más tarde.
           </p>
         )}
 
@@ -254,7 +172,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   Entra al centro de control
                 </CardTitle>
                 <CardDescription>
-                  Escribe tu correo: te enviamos un código para entrar o crear tu cuenta.
+                  Escribe tu correo: te enviamos un código para entrar o crear
+                  tu cuenta.
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleEmailSubmit}>
@@ -302,7 +221,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                         <span className="w-full border-t" />
                       </div>
                       <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-2 text-muted-foreground">o</span>
+                        <span className="bg-card px-2 text-muted-foreground">
+                          o
+                        </span>
                       </div>
                     </div>
 
@@ -317,7 +238,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       Entrar como invitado
                     </Button>
                     <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
-                      El acceso como invitado crea una cuenta temporal para explorar el torneo.
+                      El acceso como invitado crea una cuenta temporal para
+                      explorar el torneo.
                     </p>
                   </div>
                 </CardContent>
@@ -326,8 +248,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           ) : (
             <>
               <CardHeader className="mt-2 text-center">
-                <CardTitle className="display text-lg">Revisa tu correo</CardTitle>
-                <CardDescription>Hemos enviado un código a {step.email}</CardDescription>
+                <CardTitle className="display text-lg">
+                  Revisa tu correo
+                </CardTitle>
+                <CardDescription>
+                  Hemos enviado un código a {step.email}
+                </CardDescription>
               </CardHeader>
               <form onSubmit={handleOtpSubmit}>
                 <CardContent className="pb-4">
@@ -341,8 +267,14 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       maxLength={6}
                       disabled={isLoading}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" && otp.length === 6 && !isLoading) {
-                          const form = (e.target as HTMLElement).closest("form");
+                        if (
+                          e.key === "Enter" &&
+                          otp.length === 6 &&
+                          !isLoading
+                        ) {
+                          const form = (e.target as HTMLElement).closest(
+                            "form",
+                          );
                           if (form) form.requestSubmit();
                         }
                       }}
@@ -355,7 +287,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </InputOTP>
                   </div>
                   {error && (
-                    <p role="alert" className="mt-3 text-center text-sm text-destructive">
+                    <p
+                      role="alert"
+                      className="mt-3 text-center text-sm text-destructive"
+                    >
                       {error}
                     </p>
                   )}
@@ -384,7 +319,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     ) : (
                       <>
                         Verificar código
-                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                        <ArrowRight
+                          className="ml-2 h-4 w-4"
+                          aria-hidden="true"
+                        />
                       </>
                     )}
                   </Button>
@@ -417,8 +355,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         </Card>
 
         <p className="max-w-sm text-center text-[11px] leading-relaxed text-white/55">
-          Al entrar aceptas el reglamento del torneo. Tus operaciones quedan registradas en la
-          auditoría con tu nombre y tu nickname.
+          Al entrar aceptas el reglamento del torneo. Tus operaciones quedan
+          registradas en la auditoría con tu nombre y tu nickname.
         </p>
       </div>
     </div>
