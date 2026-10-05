@@ -32,9 +32,6 @@ type AuthContextValue = {
   profile: DbProfile | null;
   signIn: (credentials: { email: string; password?: string }) => Promise<void>;
   signUp: (credentials: { email: string; password: string }) => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
-  isRecovery: boolean;
   signOut: () => Promise<void>;
 };
 
@@ -47,7 +44,6 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     >(null);
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -61,7 +57,6 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         setSession(newSession);
-        setIsRecovery(event === "PASSWORD_RECOVERY");
       },
     );
 
@@ -122,22 +117,11 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw new Error(error.message);
       },
-      requestPasswordReset: async (email) => {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth`,
-        });
-        if (error) throw new Error(error.message);
-      },
-      updatePassword: async (password) => {
-        const { error } = await supabase.auth.updateUser({ password });
-        if (error) throw new Error(error.message);
-      },
-      isRecovery,
       signOut: async () => {
         await supabase.auth.signOut();
       },
     };
-  }, [session, profile, isLoading, isRecovery]);
+  }, [session, profile, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

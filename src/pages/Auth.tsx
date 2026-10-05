@@ -126,11 +126,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           : "No se pudo completar la operación.";
       if (/invalid login credentials|invalid password/i.test(raw)) {
         setError(
-          "El correo o la contraseña no son correctos. Si aún no tienes contraseña, usa «Definir contraseña».",
+          "El correo o la contraseña no son correctos. Usa «Recuperar contraseña» si necesitas restablecerla.",
         );
       } else if (/already registered|already exists|user already/i.test(raw)) {
         setError(
-          "Ya existe una cuenta con ese correo. Usa «Definir contraseña» si todavía no tienes una.",
+          "Ya existe una cuenta con ese correo. Usa «Recuperar contraseña» si no recuerdas tu contraseña.",
         );
       } else {
         setError(raw);
@@ -285,7 +285,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       setError(null);
                     }}
                   >
-                    Definir contraseña / recuperar acceso
+                    Recuperar contraseña
                   </Button>
                   <Button
                     type="button"

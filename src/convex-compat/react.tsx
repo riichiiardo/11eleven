@@ -10,7 +10,6 @@ import {
   adaptTournamentState,
 } from "@/lib/supabase/adapters";
 import {
-  getAuthRedirectUrl,
   rpc,
   supabase,
   supabaseConfigError,
@@ -54,9 +53,6 @@ type AuthValue = {
   user: CompatUser | null;
   signIn: (credentials: { email: string; password?: string }) => Promise<void>;
   signUp: (credentials: { email: string; password: string }) => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<void>;
-  updatePassword: (password: string) => Promise<void>;
-  isRecovery: boolean;
   signOut: () => Promise<void>;
 };
 
@@ -68,7 +64,6 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
   } | null>(null);
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -81,11 +76,10 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
       );
       setIsLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(
         s as unknown as { user?: { id: string; email?: string } } | null,
       );
-      setIsRecovery(event === "PASSWORD_RECOVERY");
     });
     return () => {
       active = false;
@@ -147,28 +141,11 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
           .catch(throwNetwork);
         if (error) throw new Error(error.message);
       },
-      requestPasswordReset: async (email) => {
-        if (supabaseConfigError) throw new Error(supabaseConfigError);
-        const { error } = await supabase.auth
-          .resetPasswordForEmail(email, {
-            redirectTo: getAuthRedirectUrl(),
-          })
-          .catch(throwNetwork);
-        if (error) throw new Error(error.message);
-      },
-      updatePassword: async (password) => {
-        if (supabaseConfigError) throw new Error(supabaseConfigError);
-        const { error } = await supabase.auth
-          .updateUser({ password })
-          .catch(throwNetwork);
-        if (error) throw new Error(error.message);
-      },
-      isRecovery,
       signOut: async () => {
         await supabase.auth.signOut();
       },
     };
-  }, [session, profile, isLoading, isRecovery]);
+  }, [session, profile, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -191,9 +168,6 @@ export function useAuthActions() {
   return {
     signIn: ctx.signIn,
     signUp: ctx.signUp,
-    requestPasswordReset: ctx.requestPasswordReset,
-    updatePassword: ctx.updatePassword,
-    isRecovery: ctx.isRecovery,
     signOut: ctx.signOut,
   };
 }
