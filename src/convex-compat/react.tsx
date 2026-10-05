@@ -10,6 +10,7 @@ import {
   adaptTournamentState,
 } from "@/lib/supabase/adapters";
 import {
+  getAuthRedirectUrl,
   rpc,
   supabase,
   supabaseConfigError,
@@ -150,7 +151,7 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
         if (supabaseConfigError) throw new Error(supabaseConfigError);
         const { error } = await supabase.auth
           .resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/auth`,
+            redirectTo: getAuthRedirectUrl(),
           })
           .catch(throwNetwork);
         if (error) throw new Error(error.message);

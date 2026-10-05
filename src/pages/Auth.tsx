@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  getAuthRedirectUrl,
   supabase,
   supabaseConfigError,
   testSupabaseConnection,
@@ -84,7 +85,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       if (mode === "reset") {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(
           email,
-          { redirectTo: `${window.location.origin}/auth` },
+          { redirectTo: getAuthRedirectUrl() },
         );
         if (resetError) throw resetError;
         setMessage(

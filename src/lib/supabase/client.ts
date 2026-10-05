@@ -106,6 +106,16 @@ export const supabase: SupabaseClient = createClient(
 /** URL efectiva que usa el cliente (para diagnóstico). */
 export const supabaseUrl = url || "http://localhost:54321";
 
+/** URL pública donde Supabase debe devolver al usuario tras recuperar acceso. */
+export function getAuthRedirectUrl(): string {
+  const configuredOrigin = clean(
+    (import.meta.env.VITE_PUBLIC_APP_URL ?? "") as string,
+  ).replace(/\/+$/, "");
+  if (configuredOrigin) return `${configuredOrigin}/auth`;
+  const basePath = String(import.meta.env.BASE_URL ?? "/").replace(/\/+$/, "");
+  return `${window.location.origin}${basePath}/auth`;
+}
+
 /* ------------------------------------------------------------------ *
  * Tipos mínimos del esquema (shape PostgREST camelCase aliasado)
  * ------------------------------------------------------------------ */
