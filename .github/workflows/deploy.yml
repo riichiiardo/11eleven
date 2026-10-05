@@ -46,7 +46,6 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_PUBLIC_APP_URL: https://riichiiardo.github.io/11eleven
         run: |
           test -n "$VITE_SUPABASE_URL" || { echo "::error::VITE_SUPABASE_URL no está configurada"; exit 1; }
           test -n "$VITE_SUPABASE_ANON_KEY" || { echo "::error::VITE_SUPABASE_ANON_KEY no está configurada"; exit 1; }
@@ -64,6 +63,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PUBLIC_APP_URL: https://riichiiardo.github.io/11eleven
           # Public Convex endpoint (it ships in the client bundle anyway).
           # Override by setting the VITE_CONVEX_URL secret in the repo.
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL || 'https://valuable-hedgehog-471.convex.cloud' }}
