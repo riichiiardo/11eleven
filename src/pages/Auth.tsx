@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  supabase,
   supabaseConfigError,
   testSupabaseConnection,
 } from "@/lib/supabase/client";
@@ -33,15 +34,7 @@ function resolveRedirectAfterAuth(
 }
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
-  const {
-    isLoading: authLoading,
-    isAuthenticated,
-    signIn,
-    signUp,
-    requestPasswordReset,
-    updatePassword,
-    isRecovery,
-  } = useAuth();
+  const { isLoading: authLoading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveRedirectAfterAuth(
@@ -50,7 +43,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   );
   const [mode, setMode] = useState<
     "signIn" | "signUp" | "reset" | "setPassword"
-  >(isRecovery ? "setPassword" : "signIn");
+  >("signIn");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -58,8 +51,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [connectionError, setConnectionError] = useState(false);
 
   useEffect(() => {
-    if (isRecovery) setMode("setPassword");
-  }, [isRecovery]);
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setMode("setPassword");
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -86,25 +82,40 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     const password = String(form.get("password") ?? "");
     try {
       if (mode === "reset") {
-        await requestPasswordReset(email);
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          email,
+          { redirectTo: `${window.location.origin}/auth` },
+        );
+        if (resetError) throw resetError;
         setMessage(
           "Si existe una cuenta con ese correo, recibirás un enlace para definir tu contraseña.",
         );
       } else if (mode === "setPassword") {
         if (password.length < 8)
           throw new Error("La contraseña debe tener al menos 8 caracteres.");
-        await updatePassword(password);
+        const { error: updateError } = await supabase.auth.updateUser({
+          password,
+        });
+        if (updateError) throw updateError;
         navigate(redirect);
       } else if (mode === "signUp") {
         if (password.length < 8)
           throw new Error("La contraseña debe tener al menos 8 caracteres.");
-        await signUp({ email, password });
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (signUpError) throw signUpError;
         setMessage(
           "Cuenta creada. Ya puedes entrar con tu correo y contraseña.",
         );
         setMode("signIn");
       } else {
-        await signIn({ email, password });
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
         navigate(redirect);
       }
     } catch (cause) {
