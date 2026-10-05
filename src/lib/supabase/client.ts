@@ -112,8 +112,10 @@ export function getAuthRedirectUrl(): string {
     (import.meta.env.VITE_PUBLIC_APP_URL ?? "") as string,
   ).replace(/\/+$/, "");
   if (configuredOrigin) return `${configuredOrigin}/auth`;
-  const basePath = String(import.meta.env.BASE_URL ?? "/").replace(/\/+$/, "");
-  return `${window.location.origin}${basePath}/auth`;
+  // Recovery links must never point to a transient local preview. The public
+  // deployment is the canonical callback unless an environment explicitly
+  // overrides it with VITE_PUBLIC_APP_URL.
+  return "https://riichiiardo.github.io/11eleven/auth";
 }
 
 /* ------------------------------------------------------------------ *
