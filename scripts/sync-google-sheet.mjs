@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const SHEET_ID = process.env.SHEET_ID || "1pVh3XGoH_vmIPU3oi6WCd0FRkMwxPIjK";
+const SHEET_ID = process.env.SHEET_ID || "1Rg-emaBHM2A51OB70erWPT3dbSPxsNaF";
 const SHEET_GID = process.env.SHEET_GID || "1957949783";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -13,7 +13,7 @@ jobs:
       - name: Sync public sheet to Supabase
         run: node scripts/sync-google-sheet.mjs
         env:
-          SHEET_ID: 1pVh3XGoH_vmIPU3oi6WCd0FRkMwxPIjK
+          SHEET_ID: 1Rg-emaBHM2A51OB70erWPT3dbSPxsNaF
           SHEET_GID: 1957949783
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
