@@ -8,6 +8,26 @@ const SHEET_GIDS = (process.env.SHEET_GIDS || Array.from({ length: 18 }, (_, i) 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SOURCE = `google-sheet:${SHEET_ID}:all-tabs`;
+const CREST_URLS = {
+  "Manchester United": "https://r2.thesportsdb.com/images/media/team/badge/xzqdr11517660252.png",
+  "Fútbol Club Barcelona": "https://r2.thesportsdb.com/images/media/team/badge/wq9sir1639406443.png",
+  "Palermo FC": "https://r2.thesportsdb.com/images/media/team/badge/zi1tb01579708939.png",
+  "Arsenal Football Club": "https://r2.thesportsdb.com/images/media/team/badge/uyhbfe1612467038.png",
+  "Real Sociedad de Fútbol": "https://r2.thesportsdb.com/images/media/team/badge/vptvpr1473502986.png",
+  "Newcastle United Football Club": "https://r2.thesportsdb.com/images/media/team/badge/lhwuiz1621593302.png",
+  "París Saint-Germain Football Club": "https://upload.wikimedia.org/wikipedia/en/a/a7/Paris_Saint-Germain_F.C..svg",
+  "Racing Club": "https://r2.thesportsdb.com/images/media/team/badge/vi4mu41695734959.png",
+  "Sporting Clube de Portugal": "https://r2.thesportsdb.com/images/media/team/badge/5hiuk71783137875.png",
+  "Club Atlético de Madrid": "https://r2.thesportsdb.com/images/media/team/badge/0ulh3q1719984315.png",
+  "FC Porto": "https://upload.wikimedia.org/wikipedia/en/f/f1/FC_Porto.svg",
+  "Racing Club de Estrasburgo": "https://r2.thesportsdb.com/images/media/team/badge/b8k77w1766625501.png",
+  "Parma Calcio 1913": "https://r2.thesportsdb.com/images/media/team/badge/6yiaxs1627406063.png",
+  "Los Angeles Galaxy": "https://r2.thesportsdb.com/images/media/team/badge/ysyysr1420227188.png",
+  "Bayer 04 Leverkusen": "https://r2.thesportsdb.com/images/media/team/badge/3x9k851726760113.png",
+  "Club de Fútbol Cruz Azul": "https://r2.thesportsdb.com/images/media/team/badge/wcd2yi1781543370.png",
+  "Leicester City Football Club": "https://r2.thesportsdb.com/images/media/team/badge/xtxwtu1448813356.png",
+  "Club Deportivo Chivas de Guadalajara": "https://r2.thesportsdb.com/images/media/team/badge/mp1box1593452087.png",
+};
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son obligatorias.");
@@ -115,6 +135,7 @@ const teams = blocks.map(({ team }) => ({
   country: "",
   color_primary: "#334155",
   color_secondary: "#0f172a",
+  crest_url: CREST_URLS[team.trim()] || null,
   source_key: `${SOURCE}:team:${team.trim()}`,
 }));
 const teamRows = await api("team_catalog?on_conflict=source_key", {
