@@ -581,6 +581,7 @@ export type AppStateView = {
     league: string;
     country: string;
     colors: [string, string];
+    crestUrl: string | null;
     takenByMe: boolean;
     takenByOther: boolean;
   }>;

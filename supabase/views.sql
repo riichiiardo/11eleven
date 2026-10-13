@@ -70,6 +70,7 @@ begin
         select jsonb_agg(jsonb_build_object(
           'id', t.id, 'name', t.name, 'league', t.league, 'country', t.country,
           'colors', jsonb_build_array(t.color_primary, t.color_secondary),
+          'crestUrl', t.crest_url,
           'takenByMe', false,
           'takenByOther', exists(select 1 from public.clubs c join public.presidents p on p.club_id = c.id where c.catalog_team_id = t.id and c.tournament_id = v_tid)
         ) order by t.name)

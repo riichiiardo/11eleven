@@ -267,6 +267,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                       name={entry.name}
                       shortName={entry.name.slice(0, 3).toUpperCase()}
                       colors={entry.colors}
+                      crestUrl={entry.crestUrl}
                       size="lg"
                     />
                     <div className="min-w-0">

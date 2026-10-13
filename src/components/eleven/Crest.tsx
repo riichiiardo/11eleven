@@ -19,17 +19,19 @@ export function Crest({
   name,
   shortName,
   colors,
+  crestUrl,
   size = "md",
   className,
 }: {
   name: string;
   shortName: string;
   colors: [string, string];
+  crestUrl?: string | null;
   size?: keyof typeof SIZES;
   className?: string;
 }) {
   const [primary, secondary] = colors;
-  const src = crestFor(name);
+  const src = crestUrl || crestFor(name);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const showImage = src !== null && failedSrc !== src;
 
