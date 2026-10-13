@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 const SHEET_ID = process.env.SHEET_ID || "1Rg-emaBHM2A51OB70erWPT3dbSPxsNaF";
-const SHEET_GID = process.env.SHEET_GID || "1957949783";
+const SHEET_GIDS = (process.env.SHEET_GIDS || Array.from({ length: 18 }, (_, i) => String(i + 1)).join(","))
+  .split(",")
+  .map((gid) => gid.trim())
+  .filter(Boolean);
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SOURCE = `google-sheet:${SHEET_ID}:${SHEET_GID}`;
+const SOURCE = `google-sheet:${SHEET_ID}:all-tabs`;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son obligatorias.");
@@ -89,18 +92,20 @@ async function api(path, options = {}) {
   return response.status === 204 ? [] : response.json();
 }
 
-const csv = await (
-  await fetch(
-    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`,
-  )
-).text();
-const rows = csvRows(csv);
-const headers = rows[1] || [];
-const blocks = [];
-for (let start = 0; start < headers.length; start += 1) {
-  const team = rows[0]?.[start];
-  if (team && headers[start] === "Nombre") blocks.push({ team, start });
+const sheetRows = [];
+for (const gid of SHEET_GIDS) {
+  const csv = await (
+    await fetch(
+      `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`,
+    )
+  ).text();
+  sheetRows.push({ gid, rows: csvRows(csv) });
 }
+const blocks = sheetRows.map(({ gid, rows }) => ({
+  gid,
+  rows,
+  team: rows[0]?.find(Boolean)?.trim(),
+})).filter(({ team, rows }) => team && rows[1]?.includes("Nombre"));
 if (!blocks.length)
   throw new Error("No se encontraron bloques de equipos en la hoja.");
 
@@ -127,7 +132,7 @@ const existing = await api(
 );
 const previous = new Map(existing.map((player) => [player.source_key, player]));
 const players = [];
-for (const { team, start } of blocks) {
+for (const { team, rows } of blocks) {
   for (const row of rows.slice(2)) {
     const name = row[start];
     if (!name) continue;

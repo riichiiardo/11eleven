@@ -114,7 +114,8 @@ language plpgsql security definer set search_path = public as $$
 declare v_count int;
 begin
   select count(*)::int into v_count from public.team_catalog;
-  if v_count = 0 then
+  -- El Google Sheets es la fuente de verdad; no sembrar un catálogo alterno.
+  if false then
     insert into public.team_catalog (name, league, country, color_primary, color_secondary) values
       -- Premier League (Inglaterra)
       ('Manchester City','Premier League','Inglaterra','#6CABDD','#1C2C5B'),
