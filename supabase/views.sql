@@ -694,9 +694,13 @@ begin
       'clubId', id, 'clubName', name, 'clubShortName', short_name,
       'clubColors', jsonb_build_array(color_primary, color_secondary),
       'points', points, 'won', won, 'drawn', drawn, 'lost', lost, 'goalsFor', gf, 'goalsAgainst', ga,
-      'position', row_number() over (order by points desc, (gf - ga) desc, gf desc)
+      'position', position
     ) order by points desc, (gf - ga) desc, gf desc), '[]'::jsonb)
-  into v_standings from all_clubs;
+  into v_standings
+  from (
+    select all_clubs.*, row_number() over (order by points desc, (gf - ga) desc, gf desc) as position
+    from all_clubs
+  ) ranked;
 
   select coalesce(jsonb_agg(md order by md.matchday), '[]'::jsonb) into v_matchdays from (
     select f.matchday,
