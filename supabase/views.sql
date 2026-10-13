@@ -508,6 +508,9 @@ returns jsonb language sql stable as $$
     'squadPlayerId', sp.id, 'playerId', sp.player_id,
     'name', pl.name, 'position', pl.position, 'group', pl."group",
     'ovr', pl.ovr, 'age', pl.age, 'value', pl.value,
+    'initialValue', coalesce(pl.initial_value, pl.value),
+    'ovrDelta', coalesce((select h.ovr_delta from public.player_stat_history h where h.player_id = pl.id order by h.recorded_at desc limit 1), 0),
+    'valueDelta', coalesce((select h.value_delta from public.player_stat_history h where h.player_id = pl.id order by h.recorded_at desc limit 1), 0),
     'nationality', pl.nationality, 'flag', pl.flag,
     'availability', sp.availability,
     'realClub', pl.real_club, 'realLeague', pl.real_league, 'fcVersion', pl.fc_version, 'photo', pl.photo

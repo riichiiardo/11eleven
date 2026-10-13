@@ -16,8 +16,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { GroupMeter } from "./RuleCheckList";
-import { AvailabilityBadge, OvrBadge, PlayerAvatar, PositionPill } from "./PlayerBits";
-import { ChevronRight } from "lucide-react";
+import {
+  AvailabilityBadge,
+  OvrBadge,
+  PlayerAvatar,
+  PositionPill,
+} from "./PlayerBits";
+import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react";
 
 export function SquadTable({
   squad,
@@ -42,8 +47,12 @@ export function SquadTable({
               <TableHead>Jugador</TableHead>
               <TableHead className="w-16 text-center">POS</TableHead>
               <TableHead className="w-16 text-center">OVR</TableHead>
-              <TableHead className="hidden w-16 text-center sm:table-cell">Edad</TableHead>
-              <TableHead className="hidden w-24 text-right md:table-cell">Valor</TableHead>
+              <TableHead className="hidden w-16 text-center sm:table-cell">
+                Edad
+              </TableHead>
+              <TableHead className="hidden w-24 text-right md:table-cell">
+                Valor
+              </TableHead>
               <TableHead className="min-w-[150px]">Estado</TableHead>
               <TableHead className="w-24 text-right">
                 <span className="sr-only">Acciones</span>
@@ -66,7 +75,9 @@ export function SquadTable({
                       photo={player.photo}
                     />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{player.name}</p>
+                      <p className="truncate text-sm font-semibold">
+                        {player.name}
+                      </p>
                       <p className="truncate text-[11px] text-muted-foreground">
                         {player.nationality} · {POSITION_LABEL[player.position]}
                       </p>
@@ -74,16 +85,52 @@ export function SquadTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-center">
-                  <PositionPill position={player.position} group={player.group} />
+                  <PositionPill
+                    position={player.position}
+                    group={player.group}
+                  />
                 </TableCell>
                 <TableCell className="text-center">
-                  <OvrBadge ovr={player.ovr} />
+                  <span className="inline-flex items-center gap-1">
+                    <OvrBadge ovr={player.ovr} />
+                    {player.ovrDelta ? (
+                      player.ovrDelta > 0 ? (
+                        <ArrowUp
+                          className="size-3.5 text-emerald-600"
+                          aria-label={`Subió ${player.ovrDelta}`}
+                        />
+                      ) : (
+                        <ArrowDown
+                          className="size-3.5 text-red-600"
+                          aria-label={`Bajó ${Math.abs(player.ovrDelta)}`}
+                        />
+                      )
+                    ) : null}
+                  </span>
                 </TableCell>
                 <TableCell className="num hidden text-center sm:table-cell">
                   {player.age}
                 </TableCell>
                 <TableCell className="num hidden text-right md:table-cell">
-                  {formatMoney(player.value)}
+                  <span className="inline-flex items-center justify-end gap-1">
+                    {formatMoney(player.value)}
+                    {player.valueDelta ? (
+                      player.valueDelta > 0 ? (
+                        <ArrowUp
+                          className="size-3.5 text-emerald-600"
+                          aria-label="Valor aumentó"
+                        />
+                      ) : (
+                        <ArrowDown
+                          className="size-3.5 text-red-600"
+                          aria-label="Valor bajó"
+                        />
+                      )
+                    ) : null}
+                  </span>
+                  <span className="block text-[10px] text-muted-foreground">
+                    Inicial: {formatMoney(player.initialValue ?? player.value)}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <AvailabilityBadge availability={player.availability} />
@@ -107,7 +154,10 @@ export function SquadTable({
           </TableBody>
           <TableFooter>
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={3} className="text-xs font-semibold uppercase tracking-wide">
+              <TableCell
+                colSpan={3}
+                className="text-xs font-semibold uppercase tracking-wide"
+              >
                 Valor total
               </TableCell>
               <TableCell colSpan={2} className="num text-left font-semibold">

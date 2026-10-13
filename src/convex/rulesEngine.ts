@@ -420,7 +420,10 @@ export const RULE_DESCRIPTORS: RuleDescriptor[] = [
     description:
       "El torneo exige que el XI inicial de cada partido de liga incluya un número mínimo de jugadores con la nacionalidad del club presidido (su país de origen). El motor lo valida al guardar la alineación.",
     scope: "Competición",
-    value: (r) => (r.clubNationalityMin > 0 ? `${r.clubNationalityMin} del país del club` : "Sin regla"),
+    value: (r) =>
+      r.clubNationalityMin > 0
+        ? `${r.clubNationalityMin} del país del club`
+        : "Sin regla",
     field: "clubNationalityMin",
     min: 0,
     max: 11,
@@ -445,6 +448,9 @@ export type SquadPlayerView = {
   ovr: number;
   age: number;
   value: number;
+  initialValue?: number;
+  ovrDelta?: number;
+  valueDelta?: number;
   nationality: string;
   flag: string;
   availability: PlayerAvailability;
@@ -580,9 +586,14 @@ export function evaluateSquadRules(
   for (const player of squad) {
     if (ownClubName && player.realClub === ownClubName) continue;
     if (player.realClub === FREE_AGENT_CLUB) continue; // free agents belong to no club
-    perRealClub.set(player.realClub, (perRealClub.get(player.realClub) ?? 0) + 1);
+    perRealClub.set(
+      player.realClub,
+      (perRealClub.get(player.realClub) ?? 0) + 1,
+    );
   }
-  const biggestGroup = [...perRealClub.entries()].sort((a, b) => b[1] - a[1])[0];
+  const biggestGroup = [...perRealClub.entries()].sort(
+    (a, b) => b[1] - a[1],
+  )[0];
   const maxFromClub = biggestGroup?.[1] ?? 0;
   checks.push({
     id: "real-club",
@@ -628,7 +639,14 @@ export function evaluateSquadRules(
 export function evaluateSigning(
   rules: TournamentRules,
   squad: SquadPlayerView[],
-  candidate: { name: string; position: Position; ovr: number; age: number; value: number; realClub: string },
+  candidate: {
+    name: string;
+    position: Position;
+    ovr: number;
+    age: number;
+    value: number;
+    realClub: string;
+  },
   availableBudget: number,
   ownClubName?: string,
 ): SquadEvaluation {
@@ -1302,7 +1320,8 @@ function greedyAssign(
 
   const candidatesFor = (slot: FormationSlot) =>
     squad.filter(
-      (player) => !used.has(player.playerId) && slot.accepts.includes(player.position),
+      (player) =>
+        !used.has(player.playerId) && slot.accepts.includes(player.position),
     );
 
   const pending = [...slots];
@@ -1312,7 +1331,8 @@ function greedyAssign(
 
     for (const slot of pending) {
       const candidates = candidatesFor(slot);
-      if (candidates.length === 0 || candidates.length >= bestScarcity) continue;
+      if (candidates.length === 0 || candidates.length >= bestScarcity)
+        continue;
       bestScarcity = candidates.length;
       chosen = {
         slot,
@@ -1360,11 +1380,15 @@ export function remapLineup(
   current: Lineup,
 ): Lineup {
   const incumbents = new Set(
-    current.slots.map((slot) => slot.playerId).filter((id): id is string => Boolean(id)),
+    current.slots
+      .map((slot) => slot.playerId)
+      .filter((id): id is string => Boolean(id)),
   );
   return buildLineup(
     formation,
-    greedyAssign(squad, FORMATIONS[formation].slots, (id) => incumbents.has(id)),
+    greedyAssign(squad, FORMATIONS[formation].slots, (id) =>
+      incumbents.has(id),
+    ),
   );
 }
 
@@ -1446,16 +1470,19 @@ export function evaluateLineup(
         : errors[0],
   });
 
-  const squadEval = squadEvaluation ?? evaluateSquadRules(rules, squad, rules.budget);
+  const squadEval =
+    squadEvaluation ?? evaluateSquadRules(rules, squad, rules.budget);
   checks.push({
     id: "lineup-rules",
     ruleRef: "Reglas del torneo",
     label: "Reglas del torneo",
-    value: squadEval.passed ? "Cumple" : `${squadEval.violations.length} alerta(s)`,
+    value: squadEval.passed
+      ? "Cumple"
+      : `${squadEval.violations.length} alerta(s)`,
     passed: squadEval.passed,
     detail: squadEval.passed
       ? "La alineación respeta el reglamento del torneo."
-      : squadEval.violations[0]?.detail ?? "",
+      : (squadEval.violations[0]?.detail ?? ""),
     action: { label: "Ver reglas", to: "/dashboard/reglas" },
   });
 
@@ -1484,7 +1511,8 @@ export function evaluateLineup(
   const requiredNation = clubCountry?.trim() ?? "";
   if (requiredNation && rules.clubNationalityMin > 0) {
     const nationStarters = starters.filter(
-      (p) => p.nationality.trim().toLowerCase() === requiredNation.toLowerCase(),
+      (p) =>
+        p.nationality.trim().toLowerCase() === requiredNation.toLowerCase(),
     ).length;
     checks.push({
       id: "lineup-club-nation",
@@ -1522,7 +1550,8 @@ export function lineupShape(formation: FormationCode): string {
 export function formatMoney(value: number): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000_000) return `${sign}€${(abs / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000_000)
+    return `${sign}€${(abs / 1_000_000_000).toFixed(2)}B`;
   if (abs >= 1_000_000) return `${sign}€${(abs / 1_000_000).toFixed(1)}M`;
   if (abs >= 1_000) return `${sign}€${Math.round(abs / 1_000)}K`;
   return `${sign}€${Math.round(abs)}`;
@@ -1597,7 +1626,8 @@ export const TOURNAMENT_STATUS_META: Record<
   configuracion: {
     label: "Configuración",
     tone: "progress",
-    className: "border-slate-400/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    className:
+      "border-slate-400/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
     dotClassName: "bg-slate-500",
     hint: "Administración está definiendo reglas y calendario.",
   },
@@ -1618,70 +1648,80 @@ export const TOURNAMENT_STATUS_META: Record<
   pre_draft: {
     label: "Pre-draft",
     tone: "progress",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    className:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
     dotClassName: "bg-amber-500",
     hint: "Mercado en preparación. Aún no se ejecutan operaciones.",
   },
   negociaciones: {
     label: "Negociaciones",
     tone: "open",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    className:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     dotClassName: "bg-emerald-500",
     hint: "Puedes negociar y dejar acuerdos reservados para el draft.",
   },
   draft_abierto: {
     label: "Draft abierto",
     tone: "open",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    className:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     dotClassName: "bg-emerald-500",
     hint: "El draft está abierto: las operaciones aceptadas se ejecutan.",
   },
   draft_en_curso: {
     label: "Draft en curso",
     tone: "open",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    className:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     dotClassName: "bg-emerald-500 animate-pulse",
     hint: "Turnos activos. Cada adquisición se refleja en tiempo real.",
   },
   draft_cerrado: {
     label: "Draft cerrado",
     tone: "locked",
-    className: "border-slate-400/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    className:
+      "border-slate-400/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
     dotClassName: "bg-slate-500",
     hint: "No se admiten nuevas incorporaciones en esta fase.",
   },
   plantillas_bloqueadas: {
     label: "Plantillas bloqueadas",
     tone: "locked",
-    className: "border-slate-400/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+    className:
+      "border-slate-400/30 bg-slate-500/10 text-slate-700 dark:text-slate-300",
     dotClassName: "bg-slate-500",
     hint: "Solo puedes ajustar alineación y táctica.",
   },
   competicion: {
     label: "Competición",
     tone: "open",
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    className:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     dotClassName: "bg-emerald-500",
     hint: "La liga está en juego. Fija tu once antes del cierre.",
   },
   cierre_jornada: {
     label: "Cierre de jornada",
     tone: "progress",
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    className:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
     dotClassName: "bg-amber-500",
     hint: "Administración está validando resultados de la jornada.",
   },
   suspendido: {
     label: "Suspendido",
     tone: "blocked",
-    className: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    className:
+      "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
     dotClassName: "bg-rose-500",
     hint: "El torneo está en pausa. Ninguna operación se ejecuta.",
   },
   cancelado: {
     label: "Cancelado",
     tone: "blocked",
-    className: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    className:
+      "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
     dotClassName: "bg-rose-500",
     hint: "El torneo fue cancelado por Administración.",
   },
