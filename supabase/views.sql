@@ -704,7 +704,7 @@ begin
 
   select coalesce(jsonb_agg(md order by md.matchday), '[]'::jsonb) into v_matchdays from (
     select f.matchday,
-      case when f.status='jugado' then 'jugada' when f.kickoff_at < now() then 'en_curso' else 'futura' end as status,
+      case when bool_and(f.status='jugado') then 'jugada' when min(f.kickoff_at) < now() then 'en_curso' else 'futura' end as status,
       min(f.kickoff_at) as kickoff_at,
       count(*) as played_count,
       jsonb_agg(jsonb_build_object(
