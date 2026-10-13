@@ -686,8 +686,8 @@ begin
   all_clubs as (
     select c.id, c.name, c.short_name, c.color_primary, c.color_secondary, coalesce(a.points,0) as points,
            coalesce(a.won,0) won, coalesce(a.drawn,0) drawn, coalesce(a.lost,0) lost, coalesce(a.gf,0) gf, coalesce(a.ga,0) ga,
-           (select count(*) from played f where f.status='jugado' and v_club_id in (f.home_club_id, f.away_club_id)) as played
-    from public.clubs c, lateral (select c.id as v_club_id) L left join agg a on a.club_id = c.id
+           (select count(*) from played f where f.status='jugado' and c.id in (f.home_club_id, f.away_club_id)) as played
+    from public.clubs c left join agg a on a.club_id = c.id
     where c.tournament_id = v_tid
   )
   select coalesce(jsonb_agg(jsonb_build_object(
