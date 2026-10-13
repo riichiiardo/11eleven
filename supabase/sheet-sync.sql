@@ -56,3 +56,48 @@ begin
   return v_tid;
 end;
 $$;
+
+-- Alta automática: los nuevos usuarios entran en la Primera Liga y reciben
+-- el primer club libre. Si no hay clubes libres, podrán ser asignados después
+-- desde Administración sin bloquear el registro.
+create or replace function app.handle_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  v_tid uuid;
+  v_club public.clubs%rowtype;
+  v_president_id uuid;
+  v_name text := coalesce(new.raw_user_meta_data->>'name', split_part(coalesce(new.email, ''), '@', 1));
+  v_nickname text := coalesce(new.raw_user_meta_data->>'nickname', v_name);
+begin
+  insert into public.profiles (id, email, name, nickname, is_anonymous)
+  values (new.id, new.email, v_name, v_nickname, false)
+  on conflict (id) do nothing;
+
+  select id into v_tid from public.tournaments
+  where code = 'PRIMERA-11' limit 1;
+  if v_tid is null then return new; end if;
+
+  update public.profiles set active_tournament_id = v_tid where id = new.id;
+  insert into public.league_members (tournament_id, user_id, role)
+  values (v_tid, new.id, 'presidente') on conflict do nothing;
+
+  select c.* into v_club
+  from public.clubs c
+  where c.tournament_id = v_tid
+    and not exists (select 1 from public.presidents p where p.club_id = c.id)
+  order by c.name limit 1;
+  if v_club.id is null then return new; end if;
+
+  insert into public.presidents (tournament_id, user_id, nickname, display_name, club_id, budget)
+  select v_tid, new.id, v_nickname, v_name, v_club.id, r.budget
+  from public.tournament_rules r where r.tournament_id = v_tid
+  on conflict (tournament_id, user_id) do nothing
+  returning id into v_president_id;
+
+  insert into public.squads (tournament_id, club_id, president_id)
+  select v_tid, v_club.id, v_president_id
+  where v_president_id is not null
+  on conflict (club_id) do nothing;
+  return new;
+end;
+$$;
