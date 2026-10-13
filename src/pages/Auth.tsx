@@ -24,6 +24,11 @@ interface AuthProps {
   redirectAfterAuth?: string;
 }
 
+const PASSWORD_PATTERN =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{6,}$/;
+const PASSWORD_HINT =
+  "Mínimo 6 caracteres: incluye mayúsculas, minúsculas, números y un carácter especial.";
+
 function resolveRedirectAfterAuth(
   returnTo: string | null,
   fallback = "/dashboard",
@@ -92,16 +97,14 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           "Si existe una cuenta con ese correo, recibirás un enlace para definir tu contraseña.",
         );
       } else if (mode === "setPassword") {
-        if (password.length < 8)
-          throw new Error("La contraseña debe tener al menos 8 caracteres.");
+        if (!PASSWORD_PATTERN.test(password)) throw new Error(PASSWORD_HINT);
         const { error: updateError } = await supabase.auth.updateUser({
           password,
         });
         if (updateError) throw updateError;
         navigate(redirect);
       } else if (mode === "signUp") {
-        if (password.length < 8)
-          throw new Error("La contraseña debe tener al menos 8 caracteres.");
+        if (!PASSWORD_PATTERN.test(password)) throw new Error(PASSWORD_HINT);
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -149,11 +152,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         ? "Crea tu cuenta"
         : "Entra al centro de control";
   const description = isPasswordSetup
-    ? "Crea una contraseña de al menos 8 caracteres para tus siguientes accesos."
+    ? PASSWORD_HINT
     : mode === "reset"
       ? "Te enviaremos un enlace seguro para definir o cambiar tu contraseña."
       : mode === "signUp"
-        ? "Registra tu correo y una contraseña para entrar al torneo."
+        ? "Registra tu correo y una contraseña segura para entrar al torneo."
         : "Ingresa con tu correo y contraseña.";
 
   return (
@@ -200,11 +203,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
             </CardTitle>
             <CardDescription>
               {mode === "setPassword"
-                ? "Crea una contraseña de al menos 8 caracteres para tus siguientes accesos."
+                ? PASSWORD_HINT
                 : mode === "reset"
                   ? "Te enviaremos un enlace seguro para definir o cambiar tu contraseña."
                   : mode === "signUp"
-                    ? "Registra tu correo y una contraseña para entrar al torneo."
+                    ? "Registra tu correo y una contraseña segura para entrar al torneo."
                     : "Ingresa con tu correo y contraseña."}
             </CardDescription>
           </CardHeader>
@@ -229,7 +232,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   />
                   <Input
                     name="password"
-                    placeholder="Contraseña (mínimo 8 caracteres)"
+                    placeholder="Contraseña segura"
                     type="password"
                     aria-label="Contraseña"
                     autoComplete={
@@ -239,7 +242,12 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     }
                     className="h-11 pl-9"
                     disabled={isLoading}
-                    minLength={8}
+                    minLength={6}
+                    pattern={
+                      mode === "signUp" || mode === "setPassword"
+                        ? PASSWORD_PATTERN.source
+                        : undefined
+                    }
                     required
                   />
                 </div>
@@ -318,15 +326,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
           <div className="flex items-center justify-center gap-1.5 rounded-b-lg border-t bg-muted px-6 py-4 text-xs text-muted-foreground">
             <ShieldCheck className="size-3.5" aria-hidden="true" />
-            Sesión protegida por{" "}
-            <a
-              href="https://freebuff.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline transition-colors hover:text-primary"
-            >
-              freebuff.com
-            </a>
+            Producto desarrollado por 11Eleven
           </div>
         </Card>
 
