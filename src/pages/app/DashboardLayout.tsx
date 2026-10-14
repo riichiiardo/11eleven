@@ -5,7 +5,7 @@ import { AppError, AppLoading, AppShell } from "@/components/eleven/AppShell";
 import { useEnsureTournament, useTournamentState } from "@/hooks/use-tournament";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
-import { useLocation, useOutlet, useSearchParams } from "react-router";
+import { Outlet, useLocation, useSearchParams } from "react-router";
 import ClubSelection from "./ClubSelection";
 import LeagueGate from "./LeagueGate";
 import HomePage from "./Home";
@@ -18,7 +18,6 @@ export default function DashboardLayout() {
   const { state, isLoading } = useTournamentState();
   const { error } = useEnsureTournament(state === null);
   const location = useLocation();
-  const outlet = useOutlet(state);
   const joinLeague = useMutation(api.leagues.joinLeague);
 
   // Shared invitation link: /dashboard?invitar=CODE — accepted here so the
@@ -99,7 +98,9 @@ export default function DashboardLayout() {
     routePath.endsWith("/dashboard/formacion");
   return (
     <DashboardStateProvider state={state}>
-      <AppShell state={state}>{isCoreDashboardRoute ? fallbackPage : outlet}</AppShell>
+      <AppShell state={state}>
+        {isCoreDashboardRoute ? fallbackPage : <Outlet context={state} />}
+      </AppShell>
     </DashboardStateProvider>
   );
 }
