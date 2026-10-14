@@ -23,6 +23,19 @@ hasta completar la migración del frontend (fase 2) y su eliminación (fase 3).*
    4. `supabase/views.sql` — contratos de lectura del dashboard.
    5. `supabase/rules-configuration.sql` — reglas del Universo y competiciones.
    6. `supabase/club-budgets.sql` — presupuesto general e importes propios por equipo.
+   7. `supabase/rule-edit-session.sql` — guardado conjunto y atómico de reglas y presupuestos.
+
+Reglas abre en modo lectura. Administración utiliza «Editar reglas» y luego
+«Guardar» o «Cancelar», situados al mismo nivel. Los presupuestos por equipo
+son borradores hasta guardar; cancelar restaura los valores anteriores sin
+enviar escrituras. Si falla cualquier validación, el guardado revierte todos
+los cambios de la operación.
+
+`save_rule_changes` es una RPC privilegiada: permite invocación a usuarios
+autenticados, pero comprueba el rol de administrador del Universo activo antes
+de escribir; `anon` no tiene permiso de ejecución. El aviso del asesor
+`authenticated_security_definer_function_executable` es esperado para esta
+interfaz y no sustituye esa comprobación de autorización.
 
 `clubs.initial_budget = NULL` hereda el presupuesto general. Un importe propio
 se aplica también a equipos sin presidente. `presidents.initial_budget` conserva

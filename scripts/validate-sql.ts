@@ -89,6 +89,11 @@ await run(
   "club-budgets.sql",
 );
 
+await run(
+  readFileSync("supabase/rule-edit-session.sql", "utf8"),
+  "rule-edit-session.sql",
+);
+
 // --- Smoke tests ligeros ----------------------------------------------------
 const smoke = await db.query<{
   ok_uid: boolean;
@@ -225,7 +230,10 @@ const wallet = async () => {
     "select budget,initial_budget from public.presidents where id=$1",
     [pres],
   );
-  return {budget:Number(result.rows[0].budget),initial_budget:Number(result.rows[0].initial_budget)};
+  return {
+    budget: Number(result.rows[0].budget),
+    initial_budget: Number(result.rows[0].initial_budget),
+  };
 };
 await setBudget(1500000);
 assert.equal((await wallet()).budget, 1300100);
@@ -274,7 +282,57 @@ assert.equal(
 console.log(
   "🧪 Per-club budgets: inheritance, overrides, net spending/grants, commitments and future presidents verified.",
 );
+const saveChanges = (c: unknown, budgets: Record<string, number | null>) =>
+  db.query("select public.save_rule_changes($1::jsonb,'4-2-3-1',$2::jsonb)", [
+    JSON.stringify(c),
+    JSON.stringify(budgets),
+  ]);
+await saveChanges({ ...configuration, budget: 2500000 }, { [club]: 3000000 });
+assert.deepEqual(await wallet(), { budget: 2800100, initial_budget: 3000000 });
+await assert.rejects(
+  saveChanges(
+    {
+      ...configuration,
+      groups: {
+        ...configuration.groups,
+        GK: { enabled: true, min: 4, max: 1 },
+      },
+    },
+    { [club]: 4000000 },
+  ),
+  /Rango inválido/,
+);
+assert.deepEqual(
+  await wallet(),
+  { budget: 2800100, initial_budget: 3000000 },
+  "Invalid rules must roll back staged budgets",
+);
+await db.query("select public.update_rules($1::jsonb)", [
+  JSON.stringify({ budget: 0 }),
+]);
+await saveChanges({ ...configuration, budget: 4000000 }, { [club]: null });
+assert.deepEqual(
+  await wallet(),
+  { budget: 3800100, initial_budget: 4000000 },
+  "Inheritance must use final general budget, not old budget",
+);
+await assert.rejects(
+  saveChanges(
+    { ...configuration, budget: 5000000 },
+    { [club]: 6000000, "ffffffff-ffff-ffff-ffff-ffffffffffff": 100 },
+  ),
+  /Universo activo/,
+);
+assert.deepEqual(
+  await wallet(),
+  { budget: 3800100, initial_budget: 4000000 },
+  "Invalid team must roll back preceding team changes",
+);
+console.log(
+  "🧪 Atomic rule save: combined changes, rollback and final-budget inheritance verified.",
+);
 await db.exec("select set_config('request.jwt.claims','{}',false)");
+await assert.rejects(saveChanges(configuration, {}), /Solo Administración/);
 await assert.rejects(setBudget(1200000), /Solo Administración/);
 await assert.rejects(saveConfig(configuration), /Solo Administración/);
 console.log(

@@ -125,9 +125,15 @@ try {
     "Aumentar Jugadores en plantilla",
     "Crear competición",
     "Crear regla parametrizable",
-    "Guardar reglas del Universo",
+    "Editar reglas",
   ])
     assert.ok(html.includes(label), label);
+  assert.ok(/<fieldset[^>]*disabled/.test(html), "Rules initially read-only");
+  assert.ok(!html.includes(">Guardar<"), "Save only appears in editing mode");
+  assert.ok(
+    !html.includes(">Cancelar<"),
+    "Cancel only appears in editing mode",
+  );
   console.log(
     "Rules: 30 valid formations; removed R08/R09; disabled ranges; per-competition XI; invalid bounds rejected; editor rendered.",
   );

@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { rpc } from "@/lib/supabase/client";
-import { useMutation } from "@/convex-compat/react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/convex/rulesEngine";
 
 type ClubBudget = {
@@ -14,47 +12,16 @@ type ClubBudget = {
 };
 function ClubBudgetRow({
   club,
-  onSaved,
+  draft,
+  onChange,
 }: {
   club: ClubBudget;
-  onSaved: () => void;
+  draft: string | null | undefined;
+  onChange: (value: string | null) => void;
 }) {
-  const [inherit, setInherit] = useState(club.override === null);
-  const [amount, setAmount] = useState(String(club.override ?? club.initial));
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const saveBudget = useMutation("tournament.setClubBudget");
-  const save = async () => {
-    const value = Number(amount);
-    if (
-      !inherit &&
-      (!/^\d+(?:\.\d{1,2})?$/.test(amount.trim()) ||
-        !Number.isFinite(value) ||
-        value < 0 ||
-        value > 2000000000)
-    ) {
-      setMessage(
-        "Introduce un importe válido en euros, con hasta dos decimales.",
-      );
-      return;
-    }
-    setBusy(true);
-    setMessage("");
-    try {
-      await saveBudget({
-        clubId: club.id,
-        initialBudget: inherit ? null : value,
-      });
-      setMessage("Presupuesto guardado.");
-      onSaved();
-    } catch (cause) {
-      setMessage(
-        cause instanceof Error ? cause.message : "No se pudo guardar.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const inherit = (draft === undefined ? club.override : draft) === null;
+  const amount =
+    typeof draft === "string" ? draft : String(club.override ?? club.initial);
   return (
     <div className="rounded-lg border p-3 space-y-3">
       <div>
@@ -68,7 +35,11 @@ function ClubBudgetRow({
         <input
           type="checkbox"
           checked={inherit}
-          onChange={(e) => setInherit(e.target.checked)}
+          onChange={(e) =>
+            onChange(
+              e.target.checked ? null : String(club.override ?? club.initial),
+            )
+          }
         />
         Usar presupuesto general
       </label>
@@ -80,26 +51,27 @@ function ClubBudgetRow({
           min={0}
           max={2000000000}
           step="0.01"
-          disabled={inherit || busy}
+          disabled={inherit}
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
         />
-        <Button type="button" disabled={busy} onClick={() => void save()}>
-          {busy ? "Guardando…" : "Guardar equipo"}
-        </Button>
       </div>
-      {message && (
-        <p role="status" className="text-sm">
-          {message}
-        </p>
-      )}
     </div>
   );
 }
-export function ClubBudgets({ generalBudget }: { generalBudget: number }) {
+export function ClubBudgets({
+  generalBudget,
+  drafts,
+  onChange,
+  revision,
+}: {
+  generalBudget: number;
+  drafts: Record<string, string | null>;
+  onChange: (id: string, value: string | null) => void;
+  revision: number;
+}) {
   const [clubs, setClubs] = useState<ClubBudget[] | null>(null);
   const [error, setError] = useState("");
-  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
     rpc<ClubBudget[]>("club_budgets")
@@ -140,7 +112,8 @@ export function ClubBudgets({ generalBudget }: { generalBudget: number }) {
           <ClubBudgetRow
             key={`${club.id}:${club.initial}:${club.override}`}
             club={club}
-            onSaved={() => setRevision((v) => v + 1)}
+            draft={drafts[club.id]}
+            onChange={(value) => onChange(club.id, value)}
           />
         ))}
       </div>

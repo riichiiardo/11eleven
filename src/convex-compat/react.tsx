@@ -382,6 +382,12 @@ function resolveMutation(
           p_club_id: a.clubId,
           p_initial_budget: a.initialBudget,
         }),
+      "tournament.saveRuleChanges": (a) =>
+        rpc("save_rule_changes", {
+          p_configuration: a.configuration,
+          p_formation: a.formation,
+          p_budgets: a.budgets,
+        }),
       "tournament.chooseCatalogTeam": (a) =>
         rpc("choose_catalog_team", { p_team_catalog_id: a.catalogTeamId }),
       "tournament.ensureTeamCatalog": () => rpc<number>("ensure_team_catalog"),

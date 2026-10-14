@@ -244,6 +244,13 @@ export function RulesEditor({
 }) {
   const [draft, setDraft] = useState(() => configurationFor(rules));
   const [formation, setFormation] = useState(rules.fc27FormationCode);
+  const [savedDraft, setSavedDraft] = useState(() => configurationFor(rules));
+  const [savedFormation, setSavedFormation] = useState(rules.fc27FormationCode);
+  const [editing, setEditing] = useState(false);
+  const [clubDrafts, setClubDrafts] = useState<Record<string, string | null>>(
+    {},
+  );
+  const [budgetRevision, setBudgetRevision] = useState(0);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const mutate = useMutation();
@@ -256,12 +263,33 @@ export function RulesEditor({
       setMessage(parsed.error.issues.map((i) => i.message).join(" "));
       return;
     }
+    const budgets: Record<string, number | null> = {};
+    for (const [id, value] of Object.entries(clubDrafts)) {
+      if (
+        value !== null &&
+        (!/^\d+(?:\.\d{1,2})?$/.test(value.trim()) ||
+          !Number.isFinite(Number(value)) ||
+          Number(value) > 2000000000)
+      ) {
+        setMessage(
+          "Revisa los presupuestos de los equipos: introduce importes válidos en euros, con hasta dos decimales.",
+        );
+        return;
+      }
+      budgets[id] = value === null ? null : Number(value);
+    }
     setBusy(true);
     try {
-      await mutate("tournament.saveConfiguration", {
+      await mutate("tournament.saveRuleChanges", {
         configuration: parsed.data,
         formation,
+        budgets,
       });
+      setSavedDraft(parsed.data);
+      setSavedFormation(formation);
+      setEditing(false);
+      setClubDrafts({});
+      setBudgetRevision((v) => v + 1);
       setMessage("Reglas guardadas.");
     } catch (e) {
       setMessage(
@@ -278,8 +306,42 @@ export function RulesEditor({
         <p>{universe}. Las reglas del XI se configuran por competición.</p>
         {!isAdmin && <p>Solo el administrador puede modificar estas reglas.</p>}
       </header>
+      <div className="flex items-center gap-3" aria-label="Acciones de reglas">
+        {editing ? (
+          <>
+            <Button type="button" disabled={busy} onClick={() => void save()}>
+              {busy ? "Guardando…" : "Guardar"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                setDraft(savedDraft);
+                setFormation(savedFormation);
+                setClubDrafts({});
+                setMessage("");
+                setEditing(false);
+              }}
+            >
+              Cancelar
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            disabled={!isAdmin}
+            onClick={() => {
+              setMessage("");
+              setEditing(true);
+            }}
+          >
+            Editar reglas
+          </Button>
+        )}
+      </div>
       <fieldset
-        disabled={!isAdmin || busy}
+        disabled={!isAdmin || !editing || busy}
         className="space-y-5 disabled:opacity-80"
       >
         <SectionCard title="R-01 · Presupuesto inicial" icon={Scale}>
@@ -299,7 +361,14 @@ export function RulesEditor({
             El presupuesto general se aplica a los equipos que lo heredan. Los
             importes individuales se conservan cuando cambia el general.
           </p>
-          <ClubBudgets generalBudget={rules.budget} />
+          <ClubBudgets
+            generalBudget={savedDraft.budget}
+            drafts={clubDrafts}
+            revision={budgetRevision}
+            onChange={(id, value) =>
+              setClubDrafts((previous) => ({ ...previous, [id]: value }))
+            }
+          />
         </SectionCard>
         <SectionCard title="R-02 · Tamaño de plantilla" icon={Scale}>
           <Stepper
@@ -562,9 +631,6 @@ export function RulesEditor({
             onChange={(customRules) => set({ customRules })}
           />
         </SectionCard>
-        <Button type="button" onClick={() => void save()}>
-          {busy ? "Guardando…" : "Guardar reglas del Universo"}
-        </Button>
       </fieldset>
       {message && (
         <p role="status" className="rounded border p-3">
