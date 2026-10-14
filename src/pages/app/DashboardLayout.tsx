@@ -5,14 +5,19 @@ import { AppError, AppLoading, AppShell } from "@/components/eleven/AppShell";
 import { useEnsureTournament, useTournamentState } from "@/hooks/use-tournament";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
-import { Outlet, useLocation, useSearchParams } from "react-router";
+import { useLocation, useOutlet, useSearchParams } from "react-router";
 import ClubSelection from "./ClubSelection";
 import LeagueGate from "./LeagueGate";
+import HomePage from "./Home";
+import ClubPage from "./Club";
+import SquadPage from "./Squad";
+import FormationPage from "./Formation";
 
 export default function DashboardLayout() {
   const { state, isLoading } = useTournamentState();
   const { error } = useEnsureTournament(state === null);
   const location = useLocation();
+  const outlet = useOutlet();
   const joinLeague = useMutation(api.leagues.joinLeague);
 
   // Shared invitation link: /dashboard?invitar=CODE — accepted here so the
@@ -82,9 +87,21 @@ export default function DashboardLayout() {
     }
   }
 
+  // GitHub Pages can restore a deep URL after its SPA fallback before the
+  // nested route outlet has been rehydrated. Keep the four core screens
+  // visible in that case instead of rendering an empty main region.
+  const routePath = location.pathname.replace(/\/+$/, "");
+  const page = routePath.endsWith("/club/plantilla")
+    ? <SquadPage />
+    : routePath.endsWith("/formacion")
+      ? <FormationPage />
+      : routePath.endsWith("/club")
+        ? <ClubPage />
+        : <HomePage />;
+
   return (
     <AppShell state={state}>
-      <Outlet context={state} />
+      {outlet ?? page}
     </AppShell>
   );
 }
