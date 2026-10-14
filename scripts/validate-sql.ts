@@ -84,6 +84,10 @@ await run(
   "rules-configuration.sql",
 );
 await run(readFileSync("supabase/seed.sql", "utf8"), "seed.sql");
+await run(
+  readFileSync("supabase/club-budgets.sql", "utf8"),
+  "club-budgets.sql",
+);
 
 // --- Smoke tests ligeros ----------------------------------------------------
 const smoke = await db.query<{
@@ -186,13 +190,92 @@ await saveConfig({
   ],
 });
 await assert.rejects(saveLineup(), /R-12/);
-await saveConfig({ ...configuration, customRules: [{id:"value-limit",title:"Valor máximo",enabled:true,scope:"xi",metric:"totalValue",parameter:"",min:0,max:500}] });
+await saveConfig({
+  ...configuration,
+  customRules: [
+    {
+      id: "value-limit",
+      title: "Valor máximo",
+      enabled: true,
+      scope: "xi",
+      metric: "totalValue",
+      parameter: "",
+      min: 0,
+      max: 500,
+    },
+  ],
+});
 await assert.rejects(saveLineup(), /Valor máximo/);
-await saveConfig({...configuration,groups:{...configuration.groups,GK:{enabled:true,min:1,max:3}}});
+await saveConfig({
+  ...configuration,
+  groups: { ...configuration.groups, GK: { enabled: true, min: 1, max: 3 } },
+});
 await assert.rejects(saveLineup(), /Cupo GK/);
 await saveConfig(configuration);
 await saveLineup();
+await db.query(
+  "update public.presidents set budget=budget-200000 where id=$1",
+  [pres],
+);
+await db.query("select public.grant_budget($1,100,'Test grant')", [pres]);
+const setBudget = (amount: number | null) =>
+  db.query("select public.set_club_budget($1,$2::numeric)", [club, amount]);
+const wallet = async () => {
+  const result = await db.query<{ budget: number; initial_budget: number }>(
+    "select budget,initial_budget from public.presidents where id=$1",
+    [pres],
+  );
+  return {budget:Number(result.rows[0].budget),initial_budget:Number(result.rows[0].initial_budget)};
+};
+await setBudget(1500000);
+assert.equal((await wallet()).budget, 1300100);
+assert.equal((await wallet()).initial_budget, 1500000);
+await db.query("select public.update_rules($1::jsonb)", [
+  JSON.stringify({ budget: 2000000 }),
+]);
+assert.equal(
+  (await wallet()).budget,
+  1300100,
+  "General budget must preserve individual override",
+);
+await setBudget(null);
+assert.equal(
+  (await wallet()).budget,
+  1800100,
+  "Returning to general must preserve net spending and grants",
+);
+await assert.rejects(setBudget(100000), /saldo insuficiente/);
+await db.query(
+  "insert into public.offers(tournament_id,type,bidder_president_id,bidder_club_id,cash) values($1,'cash',$2,$3,1000000)",
+  [tid, pres, club],
+);
+await assert.rejects(setBudget(1100000), /compromisos/);
+assert.equal(
+  (await wallet()).initial_budget,
+  2000000,
+  "Rejected reduction must be atomic",
+);
+await db.exec(
+  `insert into public.clubs(id,tournament_id,name,short_name,league,country) values('00000000-0000-0000-0000-000000000005','${tid}','Future Club','FUT','Test','México');`,
+);
+await db.query("select public.set_club_budget($1,900000)", [
+  "00000000-0000-0000-0000-000000000005",
+]);
+await db.exec(`insert into auth.users(id,email) values('00000000-0000-0000-0000-000000000006','future-test@example.invalid');
+insert into public.presidents(tournament_id,user_id,club_id,nickname,display_name,budget) values('${tid}','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000005','Future','Future',0);`);
+const future = await db.query<{ budget: number }>(
+  "select budget from public.presidents where club_id='00000000-0000-0000-0000-000000000005'",
+);
+assert.equal(
+  Number(future.rows[0].budget),
+  900000,
+  "Unclaimed club must retain its independent starting budget",
+);
+console.log(
+  "🧪 Per-club budgets: inheritance, overrides, net spending/grants, commitments and future presidents verified.",
+);
 await db.exec("select set_config('request.jwt.claims','{}',false)");
+await assert.rejects(setBudget(1200000), /Solo Administración/);
 await assert.rejects(saveConfig(configuration), /Solo Administración/);
 console.log(
   "🧪 SQL rules: persisted config/euros; disabled bounds; R11/R12 rejection; unauthorized mutation refused.",

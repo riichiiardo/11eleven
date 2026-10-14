@@ -201,6 +201,7 @@ create table if not exists clubs (
   color_primary text not null default '#334155',
   color_secondary text not null default '#0f172a',
   catalog_team_id uuid references team_catalog(id),
+  initial_budget numeric check (initial_budget is null or initial_budget between 0 and 2000000000),
   unique (tournament_id, catalog_team_id)
 );
 alter table clubs enable row level security;
@@ -285,6 +286,7 @@ create table if not exists presidents (
   display_name text not null,
   club_id uuid references clubs(id),
   budget numeric not null default 0,
+  initial_budget numeric,
   joined_at timestamptz not null default now(),
   unique (tournament_id, user_id),
   unique (club_id)

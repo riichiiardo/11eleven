@@ -22,6 +22,13 @@ hasta completar la migración del frontend (fase 2) y su eliminación (fase 3).*
    3. `supabase/sheet-sync.sql` — columnas y catálogo del Sheets.
    4. `supabase/views.sql` — contratos de lectura del dashboard.
    5. `supabase/rules-configuration.sql` — reglas del Universo y competiciones.
+   6. `supabase/club-budgets.sql` — presupuesto general e importes propios por equipo.
+
+`clubs.initial_budget = NULL` hereda el presupuesto general. Un importe propio
+se aplica también a equipos sin presidente. `presidents.initial_budget` conserva
+la base asignada; al editarla se ajusta el saldo por la diferencia, manteniendo
+gastos y entradas anteriores. Las reducciones que no cubren compromisos abiertos
+se rechazan. Solo un administrador del Universo activo puede editar importes.
 
 El torneo existente actúa como Universo. `tournament_rules.configuration`
 conserva los límites originales, interruptores, competiciones y reglas

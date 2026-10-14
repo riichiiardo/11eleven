@@ -141,7 +141,7 @@ begin
     'squad', v_squad_players,
     'stats', public.squad_stats_json(v_squad_players),
     'budget', jsonb_build_object(
-      'initial', v_rules.budget,
+      'initial', coalesce(v_me.initial_budget,v_rules.budget),
       'committed', coalesce((select sum(cash) from public.offers o where o.bidder_president_id = v_me.id and o.status in ('enviada','negociacion','aceptada','reservada')), 0),
       'available', v_me.budget - coalesce((select sum(cash) from public.offers o where o.bidder_president_id = v_me.id and o.status in ('enviada','negociacion','aceptada','reservada')), 0)
     ),
@@ -268,7 +268,7 @@ begin
   return jsonb_build_object(
     'summary', public.market_summary_json(v_tid, v_me.id),
     'budget', jsonb_build_object(
-      'initial', (select budget from public.tournament_rules where tournament_id = v_tid),
+      'initial', coalesce(v_me.initial_budget,(select budget from public.tournament_rules where tournament_id = v_tid)),
       'committed', coalesce((select sum(cash) from public.offers o where o.bidder_president_id = v_me.id and o.status in ('enviada','negociacion','aceptada','reservada')), 0),
       'available', v_me.budget - coalesce((select sum(cash) from public.offers o where o.bidder_president_id = v_me.id and o.status in ('enviada','negociacion','aceptada','reservada')), 0)
     ),

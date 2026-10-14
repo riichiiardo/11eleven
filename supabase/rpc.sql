@@ -232,7 +232,7 @@ begin
   values (v_tid, v_uid,
           coalesce((select nickname from public.profiles where id = v_uid), 'Presidente'),
           coalesce((select name from public.profiles where id = v_uid), 'Presidente'),
-          v_club.id, v_rules.budget)
+          v_club.id, coalesce(v_club.initial_budget,v_rules.budget))
   on conflict (tournament_id, user_id) do update set club_id = excluded.club_id, budget = excluded.budget
   returning id into v_president;
 
@@ -254,7 +254,7 @@ begin
   update public.squads set president_id = v_president where club_id = v_club.id;
 
   perform public.audit(v_tid, 'club.elegido', 'clubs',
-    'Presidirá ' || v_club.name || ' con un presupuesto de ' || v_rules.budget::text || ' €.', v_club.id);
+    'Presidirá ' || v_club.name || ' con un presupuesto de ' || coalesce(v_club.initial_budget,v_rules.budget)::text || ' €.', v_club.id);
   return v_club.id;
 end $$;
 

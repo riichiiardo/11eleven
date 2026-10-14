@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { Scale } from "lucide-react";
 import { FORMATION_CODES } from "@/convex/rulesEngine";
+import { ClubBudgets } from "@/components/eleven/admin/ClubBudgets";
 
 function Stepper({
   label,
@@ -294,6 +295,11 @@ export function RulesEditor({
               onChange={(e) => set({ budget: Number(e.target.value) })}
             />
           </label>
+          <p className="mt-2 text-sm text-muted-foreground">
+            El presupuesto general se aplica a los equipos que lo heredan. Los
+            importes individuales se conservan cuando cambia el general.
+          </p>
+          <ClubBudgets generalBudget={rules.budget} />
         </SectionCard>
         <SectionCard title="R-02 · Tamaño de plantilla" icon={Scale}>
           <Stepper
