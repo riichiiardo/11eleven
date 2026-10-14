@@ -28,16 +28,17 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, RotateCcw, Search, Shirt, Sparkles, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const EMPTY_SQUAD: AppStateView["squad"] = [];
+
 export default function Formation({ state: directState }: { state?: AppStateView }) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
-  if (!state) return null;
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
   const autoFill = useMutation(api.squads.autoFillLineup);
   const updateRules = useMutation(api.tournament.updateRules);
 
-  const serverLineup = state.lineup;
+  const serverLineup = state?.lineup ?? null;
   // "Alinear en el XI" from the squad page arrives with the player pre-selected.
   const incomingPlayerId =
     (location.state as { playerId?: string } | null)?.playerId ?? null;
@@ -49,18 +50,21 @@ export default function Formation({ state: directState }: { state?: AppStateView
   const [busy, setBusy] = useState(false);
 
   const lineup = draft ?? serverLineup;
-  const rules = state.rules;
-  const squad = state.squad;
+  const rules = state?.rules ?? null;
+  const squad = state?.squad ?? EMPTY_SQUAD;
 
-  const [fc27Code, setFc27Code] = useState(rules?.fc27FormationCode ?? "");
-  const [instructions, setInstructions] = useState(rules?.formationInstructions ?? "");
+  const [fc27Code, setFc27Code] = useState(() => rules?.fc27FormationCode ?? "");
+  const [instructions, setInstructions] = useState(
+    () => rules?.formationInstructions ?? "",
+  );
+  const evaluationInput = state?.evaluation;
 
   const evaluation = useMemo(
     () =>
       rules && lineup
-        ? evaluateLineup(rules, squad, lineup, state.evaluation ?? undefined)
+        ? evaluateLineup(rules, squad, lineup, evaluationInput ?? undefined)
         : null,
-    [rules, squad, lineup, state.evaluation],
+    [rules, squad, lineup, evaluationInput],
   );
 
   const assignedIds = new Set(
@@ -83,7 +87,7 @@ export default function Formation({ state: directState }: { state?: AppStateView
     );
   });
 
-  if (!rules || !lineup || !evaluation || !state.club) return null;
+  if (!state || !rules || !lineup || !evaluation || !state.club) return null;
 
   const definition = FORMATIONS[lineup.formation];
   const formationChanged = draft ? draft.formation !== serverLineup?.formation : false;

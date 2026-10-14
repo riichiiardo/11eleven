@@ -143,22 +143,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     }
   };
 
-  const isPasswordSetup = mode === "setPassword";
-  const title = isPasswordSetup
-    ? "Define tu contraseña"
-    : mode === "reset"
-      ? "Recupera tu acceso"
-      : mode === "signUp"
-        ? "Crea tu cuenta"
-        : "Entra al centro de control";
-  const description = isPasswordSetup
-    ? PASSWORD_HINT
-    : mode === "reset"
-      ? "Te enviaremos un enlace seguro para definir o cambiar tu contraseña."
-      : mode === "signUp"
-        ? "Registra tu correo y una contraseña segura para entrar al torneo."
-        : "Ingresa con tu correo y contraseña.";
-
   return (
     <div className="rail-surface relative flex min-h-screen flex-col items-center justify-center px-4 py-10 text-white">
       <div

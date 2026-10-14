@@ -42,7 +42,6 @@ import { cn } from "@/lib/utils";
 export default function Home({ state: directState }: { state?: AppStateView }) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
-  if (!state) return null;
   const navigate = useNavigate();
   const now = useNow(30000);
   const [marketTarget, setMarketTarget] = useState<MarketPlayerView | null>(null);
@@ -61,6 +60,8 @@ export default function Home({ state: directState }: { state?: AppStateView }) {
   // nationalities: string[] }. The leader board only consumes the player array.
   const featured = featuredView ? (featuredView.players ?? []) : undefined;
   const negotiations = useQuery(api.market.overview);
+
+  if (!state) return null;
 
   const tournament = state.tournament;
   const club = state.club;

@@ -91,6 +91,8 @@ export function ConvexAuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     const uid = session?.user?.id;
     if (!uid) {
+      // Reset local profile when the external auth session is cleared.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(null);
       return;
     }
@@ -253,7 +255,8 @@ export function useQuery<T = unknown>(
   // OJO: los hooks van SIEMPRE primero (reglas de React). El guard de
   // configuración vive dentro de `load`, no como early-return.
   const ref = refOf(fnRef);
-  const key = `${ref}:${JSON.stringify(args ?? {})}`;
+  const argsKey = JSON.stringify(args ?? {});
+  const key = `${ref}:${argsKey}`;
   const [value, setValue] = useState<unknown>(() => cache.get(key));
   const [tick, setTick] = useState(0);
 
@@ -290,8 +293,7 @@ export function useQuery<T = unknown>(
       }, 10);
       timers.set(key, timer);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, ref, JSON.stringify(args ?? {})],
+    [argsKey, key, ref],
   );
 
   useEffect(() => {
@@ -303,6 +305,8 @@ export function useQuery<T = unknown>(
   // Re-render cuando el cache cambia (cualquier mutación o refresco).
   useEffect(() => {
     const next = cache.get(key);
+    // This state update is the subscription bridge from the module cache to React.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (next !== undefined && next !== value) setValue(next);
   }, [tick, key, value]);
 

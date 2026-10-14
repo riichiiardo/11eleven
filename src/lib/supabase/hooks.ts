@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { rpc, supabase } from "@/lib/supabase/client";
 
 /**
@@ -82,8 +82,8 @@ export function useQuery<T = unknown>(
   const { refreshMs = REFRESH_MS, enabled = true } = options ?? {};
   const cacheKey = `${key}:${JSON.stringify(args ?? {})}`;
   const cached = cache.get(cacheKey);
-  const [value, setValue] = useState<unknown>(cached?.value);
   const errorRef = useRef<Error | null>(null);
+  const argsKey = JSON.stringify(args ?? {});
 
   const load = useCallback(
     async (force: boolean) => {
@@ -112,7 +112,7 @@ export function useQuery<T = unknown>(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cacheKey, enabled, key, refreshMs, JSON.stringify(args ?? {})],
+    [argsKey, cacheKey, enabled, key, refreshMs],
   );
 
   useEffect(() => {

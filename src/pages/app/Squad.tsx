@@ -22,10 +22,11 @@ import { ClipboardList, Info, LayoutGrid, Shirt, Sparkles } from "lucide-react";
 export default function Squad({ state: directState }: { state?: AppStateView }) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
-  if (!state) return null;
   const navigate = useNavigate();
   const { saveAvailability, savingAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
+
+  if (!state) return null;
 
   const club = state.club;
   const rules = state.rules;

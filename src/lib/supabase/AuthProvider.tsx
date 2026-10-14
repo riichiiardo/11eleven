@@ -70,6 +70,8 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     if (!session?.user) {
+      // Clear the previous user's profile when the external session ends.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(null);
       return;
     }
