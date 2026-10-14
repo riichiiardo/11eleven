@@ -266,9 +266,10 @@ export function AppShell({
   state,
   children,
 }: {
-  state: AppStateView;
+  state: AppStateView | null | undefined;
   children: ReactNode;
 }) {
+  if (!state) return <AppLoading />;
   const tournament = state.tournament;
   const statusMeta = tournament ? TOURNAMENT_STATUS_META[tournament.status] : null;
   const lockAt = state.nextEvent?.lockAt ?? null;
