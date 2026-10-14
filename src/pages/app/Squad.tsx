@@ -19,8 +19,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, Info, LayoutGrid, Shirt, Sparkles } from "lucide-react";
 
-export default function Squad() {
-  const state = useDashboardState();
+export default function Squad({ state: directState }: { state?: AppStateView }) {
+  const contextState = useDashboardState();
+  const state = directState ?? contextState;
+  if (!state) return null;
   const navigate = useNavigate();
   const { saveAvailability, savingAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);

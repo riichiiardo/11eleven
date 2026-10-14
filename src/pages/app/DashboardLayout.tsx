@@ -89,9 +89,9 @@ export default function DashboardLayout() {
   }
 
   const routePath = location.pathname.replace(/\/+$/, "");
-  const fallbackPage = routePath.endsWith("/club/plantilla") ? <SquadPage />
-    : routePath.endsWith("/formacion") ? <FormationPage />
-      : routePath.endsWith("/club") ? <ClubPage /> : <HomePage />;
+  const fallbackPage = routePath.endsWith("/club/plantilla") ? <SquadPage state={state} />
+    : routePath.endsWith("/formacion") ? <FormationPage state={state} />
+      : routePath.endsWith("/club") ? <ClubPage state={state} /> : <HomePage state={state} />;
   const isCoreDashboardRoute =
     routePath === "/dashboard" ||
     routePath.endsWith("/dashboard/club") ||

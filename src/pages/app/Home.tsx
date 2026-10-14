@@ -39,8 +39,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function Home() {
-  const state = useDashboardState();
+export default function Home({ state: directState }: { state?: AppStateView }) {
+  const contextState = useDashboardState();
+  const state = directState ?? contextState;
+  if (!state) return null;
   const navigate = useNavigate();
   const now = useNow(30000);
   const [marketTarget, setMarketTarget] = useState<MarketPlayerView | null>(null);

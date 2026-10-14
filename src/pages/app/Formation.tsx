@@ -28,8 +28,10 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, RotateCcw, Search, Shirt, Sparkles, Wand2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function Formation() {
-  const state = useDashboardState();
+export default function Formation({ state: directState }: { state?: AppStateView }) {
+  const contextState = useDashboardState();
+  const state = directState ?? contextState;
+  if (!state) return null;
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
   const autoFill = useMutation(api.squads.autoFillLineup);

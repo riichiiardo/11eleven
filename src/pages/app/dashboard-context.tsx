@@ -9,5 +9,5 @@ export function DashboardStateProvider({ state, children }: { state: AppStateVie
 export function useDashboardState() {
   const provided = useContext(DashboardStateContext);
   const outletState = useOutletContext<AppStateView>();
-  return provided ?? outletState;
+  return provided ?? outletState ?? null;
 }
