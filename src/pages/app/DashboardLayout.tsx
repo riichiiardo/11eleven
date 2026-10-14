@@ -8,6 +8,11 @@ import { toast } from "sonner";
 import { useLocation, useOutlet, useSearchParams } from "react-router";
 import ClubSelection from "./ClubSelection";
 import LeagueGate from "./LeagueGate";
+import HomePage from "./Home";
+import ClubPage from "./Club";
+import SquadPage from "./Squad";
+import FormationPage from "./Formation";
+import { DashboardStateProvider } from "./dashboard-context";
 
 export default function DashboardLayout() {
   const { state, isLoading } = useTournamentState();
@@ -83,9 +88,9 @@ export default function DashboardLayout() {
     }
   }
 
-  return (
-    <AppShell state={state}>
-      {outlet}
-    </AppShell>
-  );
+  const routePath = location.pathname.replace(/\/+$/, "");
+  const fallbackPage = routePath.endsWith("/club/plantilla") ? <SquadPage />
+    : routePath.endsWith("/formacion") ? <FormationPage />
+      : routePath.endsWith("/club") ? <ClubPage /> : <HomePage />;
+  return <DashboardStateProvider state={state}><AppShell state={state}>{outlet ?? fallbackPage}</AppShell></DashboardStateProvider>;
 }

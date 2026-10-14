@@ -2,7 +2,8 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { AppStateView, MarketPlayerView } from "@/convex/appTypes";
 import { formatMoney, TOURNAMENT_STATUS_META } from "@/convex/rulesEngine";
-import { useOutletContext, useNavigate, Link } from "react-router";
+import { useNavigate, Link } from "react-router";
+import { useDashboardState } from "./dashboard-context";
 import { relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
 import { useQuery } from "convex/react";
@@ -39,7 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function Home() {
-  const state = useOutletContext<AppStateView>();
+  const state = useDashboardState();
   const navigate = useNavigate();
   const now = useNow(30000);
   const [marketTarget, setMarketTarget] = useState<MarketPlayerView | null>(null);

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { AppStateView } from "@/convex/appTypes";
 import { FC_VERSION, formatMoney, type SquadPlayerView } from "@/convex/rulesEngine";
-import { useNavigate, useOutletContext } from "react-router";
+import { useNavigate } from "react-router";
+import { useDashboardState } from "./dashboard-context";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
 import { SquadTable } from "@/components/eleven/SquadTable";
@@ -19,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { ClipboardList, Info, LayoutGrid, Shirt, Sparkles } from "lucide-react";
 
 export default function Squad() {
-  const state = useOutletContext<AppStateView>();
+  const state = useDashboardState();
   const navigate = useNavigate();
   const { saveAvailability, savingAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);

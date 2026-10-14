@@ -16,7 +16,8 @@ import {
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errors";
-import { useLocation, useOutletContext } from "react-router";
+import { useLocation } from "react-router";
+import { useDashboardState } from "./dashboard-context";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
 import { RuleCheckList } from "@/components/eleven/RuleCheckList";
@@ -28,7 +29,7 @@ import { Check, Loader2, RotateCcw, Search, Shirt, Sparkles, Wand2, X } from "lu
 import { cn } from "@/lib/utils";
 
 export default function Formation() {
-  const state = useOutletContext<AppStateView>();
+  const state = useDashboardState();
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
   const autoFill = useMutation(api.squads.autoFillLineup);
