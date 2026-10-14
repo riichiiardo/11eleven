@@ -203,28 +203,28 @@ begin
   ),
   filtered as (
     select jsonb_build_object(
-      'playerId', pl.id, 'name', pl.name, 'position', pl.position, 'group', pl."group",
-      'ovr', pl.ovr, 'age', pl.age, 'value', pl.value, 'nationality', pl.nationality, 'flag', pl.flag,
-      'realClub', pl.real_club, 'realLeague', pl.real_league, 'fcVersion', pl.fc_version, 'photo', pl.photo,
-      'kind', case when sp.president_id is null then 'libre' else 'club' end,
-      'ownerClubId', sp.club_id, 'ownerClubName', c.name, 'ownerShortName', c.short_name,
-      'ownerColors', case when c.id is null then null else jsonb_build_array(c.color_primary, c.color_secondary) end,
-      'ownerNickname', p.nickname, 'ownerPresidentId', sp.president_id,
-      'ownerIsMe', sp.president_id = v_me.id,
-      'availability', coalesce(sp.availability, 'libre'),
-      'offerable', (sp.president_id is null or (sp.availability in ('transferible','negociacion','neutro') and sp.president_id <> v_me.id)),
-      'blockedReason', case when sp.president_id = v_me.id then 'Es tu propio jugador'
-                            when sp.availability = 'intransferible' then 'Intransferible'
+      'playerId', pool.id, 'name', pool.name, 'position', pool.position, 'group', pool."group",
+      'ovr', pool.ovr, 'age', pool.age, 'value', pool.value, 'nationality', pool.nationality, 'flag', pool.flag,
+      'realClub', pool.real_club, 'realLeague', pool.real_league, 'fcVersion', pool.fc_version, 'photo', pool.photo,
+      'kind', case when pool.owner_president_id is null then 'libre' else 'club' end,
+      'ownerClubId', pool.owner_club_id, 'ownerClubName', pool.owner_club_name, 'ownerShortName', pool.owner_short_name,
+      'ownerColors', case when pool.owner_club_id is null then null else jsonb_build_array(pool.color_primary, pool.color_secondary) end,
+      'ownerNickname', pool.owner_nickname, 'ownerPresidentId', pool.owner_president_id,
+      'ownerIsMe', pool.owner_president_id = v_me.id,
+      'availability', coalesce(pool.availability, 'libre'),
+      'offerable', (pool.owner_president_id is null or (pool.availability in ('transferible','negociacion','neutro') and pool.owner_president_id <> v_me.id)),
+      'blockedReason', case when pool.owner_president_id = v_me.id then 'Es tu propio jugador'
+                            when pool.availability = 'intransferible' then 'Intransferible'
                             else null end,
-      'committedOfferId', null, 'withinBudget', pl.value <= v_me.budget,
-      'minimumCash', pl.value
+      'committedOfferId', null, 'withinBudget', pool.value <= v_me.budget,
+      'minimumCash', pool.value
     ) as item
     from pool
     where ((p_scope = 'todos')
-        or (p_scope = 'libres' and sp.president_id is null)
-        or (p_scope = 'clubes' and sp.president_id is not null)
-        or (p_scope = 'mios' and sp.president_id = v_me.id))
-      and (not p_only_affordable or pl.value <= v_me.budget)
+        or (p_scope = 'libres' and pool.owner_president_id is null)
+        or (p_scope = 'clubes' and pool.owner_president_id is not null)
+        or (p_scope = 'mios' and pool.owner_president_id = v_me.id))
+      and (not p_only_affordable or pool.value <= v_me.budget)
   ),
   paged as (
     select row_number() over (
