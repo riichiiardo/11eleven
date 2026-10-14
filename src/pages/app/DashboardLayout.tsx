@@ -8,10 +8,12 @@ import { toast } from "sonner";
 import { Outlet, useLocation, useSearchParams } from "react-router";
 import ClubSelection from "./ClubSelection";
 import LeagueGate from "./LeagueGate";
-import HomePage from "./Home";
-import ClubPage from "./Club";
-import SquadPage from "./Squad";
-import FormationPage from "./Formation";
+// Explicit extensions are intentional: legacy transpiled .js siblings remain
+// in this repository and Vite otherwise resolves those stale modules first.
+import HomePage from "./Home.tsx";
+import ClubPage from "./Club.tsx";
+import SquadPage from "./Squad.tsx";
+import FormationPage from "./Formation.tsx";
 import { DashboardStateProvider } from "./dashboard-context";
 
 export default function DashboardLayout() {
