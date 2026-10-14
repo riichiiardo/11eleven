@@ -5,6 +5,7 @@
  * mutaciones vive en la función resolve; las páginas no cambian.
  */
 import {
+  adaptAdminOverview,
   adaptDraft,
   adaptMarketOverview,
   adaptTournamentState,
@@ -234,7 +235,9 @@ function resolveRead(
     case "footballSync.catalogState":
       return rpc<Record<string, unknown>>("catalog_state");
     case "tournament.adminOverview":
-      return rpc<Record<string, unknown>>("admin_overview");
+      return rpc<Record<string, unknown>>("admin_overview").then(
+        adaptAdminOverview,
+      );
     case "market.validateOffer":
     case "market.guidance":
       return Promise.resolve(null);

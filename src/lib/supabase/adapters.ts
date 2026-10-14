@@ -125,3 +125,80 @@ export function adaptMarketOverview(raw: Json | null) {
 export function adaptDraft(raw: Json | null) {
   return raw;
 }
+
+/** No prepared draft is a valid state, not a rendering failure. */
+export function adaptAdminOverview(raw: Json | null): Json | null {
+  if (!raw) return null;
+  const object = (v: unknown): Json =>
+    v && typeof v === "object" && !Array.isArray(v) ? (v as Json) : {};
+  const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+  const draft = object(raw.draft);
+  const market = object(raw.market);
+  const competition = object(raw.competition);
+  const normalized: Json = {
+    ...raw,
+    draft: {
+      status: null,
+      statusLabel: "Sin preparar",
+      statusHint: "Todavía no se ha preparado un orden de turnos.",
+      round: 0,
+      totalRounds: 0,
+      pickSeconds: 300,
+      snake: true,
+      currentDeadline: null,
+      currentPresidentId: null,
+      currentNickname: null,
+      currentClubName: null,
+      orderSize: 0,
+      totalSteps: 0,
+      totalPicks: 0,
+      poolSize: 0,
+      reservedPending: 0,
+      executedReserved: 0,
+      invalidatedReserved: 0,
+      ...draft,
+      turnOrder: list(draft.turnOrder),
+      picks: list(draft.picks),
+      unsignedPresidents: list(draft.unsignedPresidents),
+    },
+    market: {
+      ...market,
+      reserved: adaptOfferList(list(market.reserved) as Json[]),
+      recent: adaptOfferList(list(market.recent) as Json[]),
+      pending: market.pending ?? 0,
+      open: market.open ?? false,
+    },
+    competition: {
+      available: false,
+      currentMatchday: 0,
+      totalMatchdays: 0,
+      calendarMatchdays: 0,
+      myMatch: null,
+      previousMatch: null,
+      playedCount: 0,
+      totalCount: 0,
+      leader: null,
+      ...competition,
+      matchdays: list(competition.matchdays),
+      standings: list(competition.standings),
+    },
+    totals: {
+      squads: 0,
+      players: 0,
+      committedBudget: 0,
+      freeClubs: 0,
+      ...object(raw.totals),
+    },
+  };
+  for (const key of [
+    "presidents",
+    "admins",
+    "clubs",
+    "activity",
+    "prizes",
+    "availableTeams",
+    "grants",
+  ])
+    normalized[key] = list(raw[key]);
+  return normalized;
+}

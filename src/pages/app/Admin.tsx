@@ -543,7 +543,7 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
  * order, open the window (which executes reserved agreements), pause/resume
  * the clock, skip a stuck turn and close the draft.
  */
-function DraftPanel({ overview }: { overview: AdminOverviewView }) {
+export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
   const { prepare, open, pause, resume, skipTurn, close, busyKey } =
     useDraftActions();
   const { draft } = overview;

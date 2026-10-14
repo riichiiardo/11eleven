@@ -2,7 +2,10 @@ import { useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { errorMessage } from "@/lib/errors";
 import { AppError, AppLoading, AppShell } from "@/components/eleven/AppShell";
-import { useEnsureTournament, useTournamentState } from "@/hooks/use-tournament";
+import {
+  useEnsureTournament,
+  useTournamentState,
+} from "@/hooks/use-tournament";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { Outlet, useLocation, useSearchParams } from "react-router";
@@ -15,6 +18,7 @@ import ClubPage from "./Club.tsx";
 import SquadPage from "./Squad.tsx";
 import FormationPage from "./Formation.tsx";
 import { DashboardStateProvider } from "./dashboard-context";
+import { SectionErrorBoundary } from "@/components/eleven/SectionErrorBoundary";
 
 export default function DashboardLayout() {
   const { state, isLoading } = useTournamentState();
@@ -40,7 +44,8 @@ export default function DashboardLayout() {
     joinLeague({ code: inviteCode })
       .then((result) => {
         toast.success(`Te uniste a ${result.name}`, {
-          description: "Invitación aceptada: ya puedes elegir el equipo que vas a presidir.",
+          description:
+            "Invitación aceptada: ya puedes elegir el equipo que vas a presidir.",
         });
       })
       .catch((cause) => {
@@ -49,14 +54,7 @@ export default function DashboardLayout() {
         });
       })
       .finally(() => setSearchParams(next, { replace: true }));
-  }, [
-    inviteCode,
-    isLoading,
-    state,
-    joinLeague,
-    searchParams,
-    setSearchParams,
-  ]);
+  }, [inviteCode, isLoading, state, joinLeague, searchParams, setSearchParams]);
 
   if (error) {
     return (
@@ -90,9 +88,15 @@ export default function DashboardLayout() {
   }
 
   const routePath = location.pathname.replace(/\/+$/, "");
-  const fallbackPage = routePath.endsWith("/club/plantilla") ? <SquadPage state={state} />
-    : routePath.endsWith("/formacion") ? <FormationPage state={state} />
-      : routePath.endsWith("/club") ? <ClubPage state={state} /> : <HomePage state={state} />;
+  const fallbackPage = routePath.endsWith("/club/plantilla") ? (
+    <SquadPage state={state} />
+  ) : routePath.endsWith("/formacion") ? (
+    <FormationPage state={state} />
+  ) : routePath.endsWith("/club") ? (
+    <ClubPage state={state} />
+  ) : (
+    <HomePage state={state} />
+  );
   const isCoreDashboardRoute =
     routePath === "/dashboard" ||
     routePath.endsWith("/dashboard/club") ||
@@ -101,7 +105,9 @@ export default function DashboardLayout() {
   return (
     <DashboardStateProvider state={state}>
       <AppShell state={state}>
-        {isCoreDashboardRoute ? fallbackPage : <Outlet context={state} />}
+        <SectionErrorBoundary key={location.pathname}>
+          {isCoreDashboardRoute ? fallbackPage : <Outlet context={state} />}
+        </SectionErrorBoundary>
       </AppShell>
     </DashboardStateProvider>
   );
