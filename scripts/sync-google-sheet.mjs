@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+
 const SHEET_ID = process.env.SHEET_ID || "1Rg-emaBHM2A51OB70erWPT3dbSPxsNaF";
 const SHEET_GIDS = (process.env.SHEET_GIDS || Array.from({ length: 18 }, (_, i) => String(i + 1)).join(","))
   .split(",")
@@ -8,26 +10,9 @@ const SHEET_GIDS = (process.env.SHEET_GIDS || Array.from({ length: 18 }, (_, i) 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SOURCE = `google-sheet:${SHEET_ID}:all-tabs`;
-const CREST_URLS = {
-  "Manchester United": "https://assets.footylogos.com/previews/manchester-united/manchester-united-logo-footylogos-1200.webp",
-  "Fútbol Club Barcelona": "https://assets.footylogos.com/previews/fc-barcelona/fc-barcelona-logo-footylogos-1200.webp",
-  "Palermo FC": "https://www.footylogos.com/dls/logo/palermo-fc.png",
-  "Arsenal Football Club": "https://assets.footylogos.com/previews/arsenal/arsenal-logo-footylogos-1200.webp",
-  "Real Sociedad de Fútbol": "https://assets.footylogos.com/previews/real-sociedad/real-sociedad-logo-footylogos-1200.webp",
-  "Newcastle United Football Club": "https://assets.footylogos.com/previews/newcastle-united-logo-2026-footylogos-1200.webp",
-  "París Saint-Germain Football Club": "https://assets.footylogos.com/previews/paris-saint-germain-psg/paris-saint-germain-psg-logo-footylogos-1200.webp",
-  "Racing Club": "https://assets.footylogos.com/previews/racing-club/racing-club-logo-footylogos-1200.webp",
-  "Sporting Clube de Portugal": "https://assets.footylogos.com/previews/sporting-cp/sporting-cp-logo-footylogos-1200.webp",
-  "Club Atlético de Madrid": "https://assets.footylogos.com/previews/atletico-madrid/atletico-madrid-logo-footylogos-1200.webp",
-  "FC Porto": "https://assets.footylogos.com/previews/fc-porto/fc-porto-logo-footylogos-1200.webp",
-  "Racing Club de Estrasburgo": "https://assets.footylogos.com/previews/rc-strasbourg-alsace/rc-strasbourg-alsace-logo-footylogos-1200.webp",
-  "Parma Calcio 1913": "https://assets.footylogos.com/previews/parma/parma-logo-footylogos-1200.webp",
-  "Los Angeles Galaxy": "https://assets.footylogos.com/previews/la-galaxy/la-galaxy-logo-footylogos-1200.webp",
-  "Bayer 04 Leverkusen": "https://assets.footylogos.com/previews/bayer-leverkusen/bayer-leverkusen-logo-footylogos-1200.webp",
-  "Club de Fútbol Cruz Azul": "https://assets.footylogos.com/previews/cruz-azul/cruz-azul-logo-footylogos-1200.webp",
-  "Leicester City Football Club": "https://www.footylogos.com/dls/logo/leicester.png",
-  "Club Deportivo Chivas de Guadalajara": "https://www.footylogos.com/dls/logo/cd-guadalajara.png",
-};
+const teamCrests = JSON.parse(readFileSync(new URL("../src/lib/team-crests.json", import.meta.url), "utf8"));
+const publicAppUrl = (process.env.VITE_PUBLIC_APP_URL || "https://riichiiardo.github.io/11eleven").replace(/\/$/, "");
+const CREST_URLS = Object.fromEntries(Object.entries(teamCrests).map(([name, entry]) => [name, `${publicAppUrl}/${entry.path}`]));
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son obligatorias.");

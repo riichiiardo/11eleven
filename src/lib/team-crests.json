@@ -1,0 +1,20 @@
+{
+  "Arsenal Football Club": { "path": "crests/arsenal-fc.png" },
+  "Bayer 04 Leverkusen": { "path": "crests/bayer-leverkusen.png" },
+  "Club Atlético de Madrid": { "path": "crests/atletico-madrid.png" },
+  "Club de Fútbol Cruz Azul": { "path": "crests/cruz-azul.png" },
+  "Club Deportivo Chivas de Guadalajara": { "path": "crests/chivas-de-guadalajara.png" },
+  "FC Porto": { "path": "crests/fc-porto.png" },
+  "Fútbol Club Barcelona": { "path": "crests/fc-barcelona.png" },
+  "Leicester City Football Club": { "path": "crests/leicester-city.png" },
+  "Los Angeles Galaxy": { "path": "crests/la-galaxy.png" },
+  "Manchester United": { "path": "crests/manchester-united.png" },
+  "Newcastle United Football Club": { "path": "crests/newcastle-united.png" },
+  "Palermo FC": { "path": "crests/palermo-fc.png", "source": "https://www.footylogos.com/dls/logo/palermo-fc.png" },
+  "París Saint-Germain Football Club": { "path": "crests/paris-saint-germain.png" },
+  "Parma Calcio 1913": { "path": "crests/parma.webp", "source": "https://assets.footylogos.com/previews/parma/parma-logo-footylogos-1200.webp" },
+  "Racing Club": { "path": "crests/racing-club.png" },
+  "Racing Club de Estrasburgo": { "path": "crests/rc-strasbourg.png" },
+  "Real Sociedad de Fútbol": { "path": "crests/real-sociedad.png" },
+  "Sporting Clube de Portugal": { "path": "crests/sporting-cp.png" }
+}

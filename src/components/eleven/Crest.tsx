@@ -31,7 +31,7 @@ export function Crest({
   className?: string;
 }) {
   const [primary, secondary] = colors;
-  const src = crestUrl || crestFor(name);
+  const src = crestFor(name) || crestUrl || null;
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const showImage = src !== null && failedSrc !== src;
 

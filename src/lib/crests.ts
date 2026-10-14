@@ -1,9 +1,9 @@
 /**
  * Escudos de los clubes del catálogo 11Eleven (FC 27).
  *
- * Fuente: API pública de ESPN (`site.api.espn.com`) + su CDN de escudos, sin
- * clave ni coste de consumo. Las imágenes viven en `public/crests` a 256px
- * (≤2,4 MB en total) para que el dashboard no descargue assets de 500px.
+ * Los archivos existentes proceden de ESPN; los faltantes de la liga se
+ * descargan de Footylogos. Todos se sirven desde `public/crests`.
+ * `team-crests.json` asocia los 18 nombres canónicos del Excel a esos archivos.
  *
  * Regenerar: `python3 scripts/sync-crests.py fetch`
  *
@@ -11,6 +11,8 @@
  * no aparezca (p. ej. una liga creada a mano) cae gracefully al escudo de
  * iniciales del componente `Crest`.
  */
+import teamCrests from "./team-crests.json";
+
 export const CRESTS: Record<string, string> = {
   "AC Milan": "crests/ac-milan.png",
   "ACF Fiorentina": "crests/acf-fiorentina.png",
@@ -127,6 +129,7 @@ export const CRESTS: Record<string, string> = {
   "West Ham United": "crests/west-ham-united.png",
   "Wolverhampton": "crests/wolverhampton.png",
   "Yokohama F. Marinos": "crests/yokohama-f-marinos.png",
+  ...Object.fromEntries(Object.entries(teamCrests).map(([name, entry]) => [name, entry.path])),
 };
 
 /**
@@ -136,7 +139,8 @@ export const CRESTS: Record<string, string> = {
  */
 export function crestFor(name?: string | null): string | null {
   if (!name) return null;
-  const path = CRESTS[name.trim()];
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  const path = CRESTS[name.trim()] ?? Object.entries(CRESTS).find(([key]) => normalize(key) === normalize(name))?.[1];
   if (!path) return null;
   return `${import.meta.env.BASE_URL}${path}`;
 }
