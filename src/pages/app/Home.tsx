@@ -88,7 +88,8 @@ export default function Home() {
             <Crest
               name={club.name}
               shortName={club.shortName}
-              colors={[club.colorPrimary, club.colorSecondary]}
+                colors={[club.colorPrimary, club.colorSecondary]}
+                crestUrl={club.crestUrl}
               size="xl"
             />
             <div className="min-w-0">

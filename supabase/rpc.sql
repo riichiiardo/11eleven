@@ -195,6 +195,7 @@ declare
   v_uid uuid := auth.uid();
   v_tid uuid;
   v_club public.clubs%rowtype;
+  v_team public.team_catalog%rowtype;
   v_rules public.tournament_rules%rowtype;
   v_president uuid;
   v_taken uuid;
@@ -203,6 +204,8 @@ begin
   select active_tournament_id into v_tid from public.profiles where id = v_uid;
   if v_tid is null then raise exception 'Primero crea o únete a una liga.'; end if;
   select * into v_rules from public.tournament_rules where tournament_id = v_tid;
+  select * into v_team from public.team_catalog where id = p_team_catalog_id;
+  if v_team.id is null then raise exception 'El equipo seleccionado no existe.'; end if;
 
   -- Ya presidía un club: solo se cambia desde Administración.
   if exists (select 1 from public.presidents p where p.tournament_id = v_tid and p.user_id = v_uid and p.club_id is not null) then
@@ -214,14 +217,16 @@ begin
   where c.tournament_id = v_tid and c.catalog_team_id = p_team_catalog_id;
   if v_taken is not null then raise exception 'Ese equipo ya tiene presidente.'; end if;
 
-  insert into public.clubs (tournament_id, name, short_name, league, country, color_primary, color_secondary, catalog_team_id)
-  select v_tid, t.name, split_part(t.name, ' ', 1), t.league, t.country, t.color_primary, t.color_secondary, t.id
-  from public.team_catalog t where t.id = p_team_catalog_id
-  returning * into v_club;
-
-  insert into public.squads (tournament_id, club_id, president_id, formation)
-  values (v_tid, v_club.id, public.my_president_id(v_tid), v_rules.fc27_formation_code)
-  returning id into v_president;
+  -- El bootstrap de la liga puede haber creado el club sin presidente.
+  -- Reutilizarlo evita violar la unicidad (tournament_id, catalog_team_id).
+  select * into v_club from public.clubs
+  where tournament_id = v_tid and catalog_team_id = p_team_catalog_id;
+  if v_club.id is null then
+    insert into public.clubs (tournament_id, name, short_name, league, country, color_primary, color_secondary, catalog_team_id)
+    values (v_tid, v_team.name, split_part(v_team.name, ' ', 1), v_team.league, v_team.country,
+            v_team.color_primary, v_team.color_secondary, v_team.id)
+    returning * into v_club;
+  end if;
 
   insert into public.presidents (tournament_id, user_id, nickname, display_name, club_id, budget)
   values (v_tid, v_uid,
@@ -230,6 +235,21 @@ begin
           v_club.id, v_rules.budget)
   on conflict (tournament_id, user_id) do update set club_id = excluded.club_id, budget = excluded.budget
   returning id into v_president;
+
+  insert into public.squads (tournament_id, club_id, president_id, formation)
+  values (v_tid, v_club.id, v_president, v_rules.fc27_formation_code)
+  on conflict (club_id) do update set president_id = excluded.president_id;
+
+  -- La pestaña del Excel es la fuente de verdad de la plantilla del club.
+  insert into public.squad_players (tournament_id, club_id, squad_id, player_id, president_id, ovr_at_join, value_at_join)
+  select v_tid, v_club.id, s.id, p.id, v_president, p.ovr, p.value
+  from public.squads s
+  join public.players p on p.real_club = v_team.name
+  where s.club_id = v_club.id
+    and not exists (
+      select 1 from public.squad_players existing
+      where existing.squad_id = s.id and existing.player_id = p.id
+    );
 
   update public.squads set president_id = v_president where club_id = v_club.id;
 

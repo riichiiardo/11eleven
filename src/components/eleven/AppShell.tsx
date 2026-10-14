@@ -287,6 +287,7 @@ export function AppShell({
               name={state.club.name}
               shortName={state.club.shortName}
               colors={[state.club.colorPrimary, state.club.colorSecondary]}
+              crestUrl={state.club.crestUrl}
               size="md"
             />
             <div className="min-w-0">

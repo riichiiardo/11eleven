@@ -30,6 +30,7 @@ export type ClubView = {
   presidentName: string | null;
   /** teamCatalog entry this club was instantiated from (SoFIFA team). */
   catalogTeamId: Id<"teamCatalog"> | null;
+  crestUrl: string | null;
 };
 
 export type TournamentView = {
@@ -582,6 +583,7 @@ export type AppStateView = {
     country: string;
     colors: [string, string];
     crestUrl: string | null;
+    playerCount: number;
     takenByMe: boolean;
     takenByOther: boolean;
   }>;

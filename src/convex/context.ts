@@ -592,6 +592,7 @@ export async function buildClubViews(
       presidentNickname: president?.nickname ?? null,
       presidentName: president ? user?.name ?? president.displayName : null,
       catalogTeamId: club.catalogTeamId ?? null,
+      crestUrl: null,
     });
   }
 

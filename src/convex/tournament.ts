@@ -359,6 +359,7 @@ export const state = query({
           country: team.country,
           colors: [team.colorPrimary, team.colorSecondary] as [string, string],
           crestUrl: null,
+          playerCount: 0,
           takenByMe:
             clubId !== null &&
             ownerByClub.get(clubId) === userId,

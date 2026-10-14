@@ -52,6 +52,7 @@ export default function Club() {
             name={club.name}
             shortName={club.shortName}
             colors={[club.colorPrimary, club.colorSecondary]}
+            crestUrl={club.crestUrl}
             size="lg"
           />
           <div>

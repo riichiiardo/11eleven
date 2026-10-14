@@ -376,6 +376,7 @@ export default function Profile() {
               name={state.club.name}
               shortName={state.club.shortName}
               colors={[state.club.colorPrimary, state.club.colorSecondary]}
+              crestUrl={state.club.crestUrl}
               size="lg"
             />
             <div className="flex-1">

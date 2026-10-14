@@ -101,7 +101,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
     try {
       await chooseTeam({ catalogTeamId: candidate.catalogTeamId });
       toast.success(`¡Bienvenido a ${candidate.name}!`, {
-        description: "Tu plantilla arranca vacía: todo se decide en el primer draft.",
+        description: "Tu plantilla preseleccionada estará disponible desde el primer ingreso.",
       });
       setCandidate(null);
     } catch (cause) {
@@ -120,8 +120,9 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
     colorSecondary: entry.colors[1],
     shortName: entry.name.slice(0, 3).toUpperCase(),
     catalogTeamId: entry.id as Id<"teamCatalog">,
+    crestUrl: entry.crestUrl,
     presidentNickname: entry.takenByMe ? (state.president?.nickname ?? "Tú") : null,
-    rosterSize: 0,
+    rosterSize: entry.playerCount,
     averageOvr: 0,
     totalValue: 0,
     presidentName: entry.takenByMe ? state.president?.nickname ?? null : null,
@@ -142,8 +143,8 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                 {state.tournament?.name}
               </strong>{" "}
               ({state.tournament?.season}). Explora el catálogo global de equipos
-              por país y liga. Tu plantilla arranca vacía: la construirás en el
-              primer draft.
+              por país y liga. Recibirás la plantilla preseleccionada del equipo
+              y podrás gestionarla desde el primer ingreso.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">

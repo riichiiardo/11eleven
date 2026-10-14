@@ -71,6 +71,7 @@ begin
           'id', t.id, 'name', t.name, 'league', t.league, 'country', t.country,
           'colors', jsonb_build_array(t.color_primary, t.color_secondary),
           'crestUrl', t.crest_url,
+          'playerCount', (select count(*) from public.players p where p.real_club = t.name),
           'takenByMe', false,
           'takenByOther', exists(select 1 from public.clubs c join public.presidents p on p.club_id = c.id where c.catalog_team_id = t.id and c.tournament_id = v_tid)
         ) order by t.name)
@@ -117,6 +118,7 @@ begin
       'id', v_club.id, 'name', v_club.name, 'shortName', v_club.short_name, 'league', v_club.league, 'country', v_club.country,
       'colorPrimary', v_club.color_primary, 'colorSecondary', v_club.color_secondary,
       'catalogTeamId', v_club.catalog_team_id,
+      'crestUrl', (select t.crest_url from public.team_catalog t where t.id = v_club.catalog_team_id),
       'rosterSize', (select count(*) from public.squad_players sp where sp.club_id = v_club.id),
       'averageOvr', coalesce((select round(avg(sp.ovr_at_join)::numeric, 1) from public.squad_players sp where sp.club_id = v_club.id), 0),
       'totalValue', coalesce((select sum(sp.value_at_join) from public.squad_players sp where sp.club_id = v_club.id), 0),
@@ -126,6 +128,7 @@ begin
       select jsonb_agg(jsonb_build_object(
         'id', c.id, 'name', c.name, 'shortName', c.short_name, 'league', c.league, 'country', c.country,
         'colorPrimary', c.color_primary, 'colorSecondary', c.color_secondary, 'catalogTeamId', c.catalog_team_id,
+        'crestUrl', (select t.crest_url from public.team_catalog t where t.id = c.catalog_team_id),
         'rosterSize', (select count(*) from public.squad_players sp where sp.club_id = c.id),
         'averageOvr', coalesce((select round(avg(sp.ovr_at_join)::numeric, 1) from public.squad_players sp where sp.club_id = c.id), 0),
         'totalValue', coalesce((select sum(sp.value_at_join) from public.squad_players sp where sp.club_id = c.id), 0),
