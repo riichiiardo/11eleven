@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { errorMessage } from "@/lib/errors";
 import { useLocation } from "react-router";
 import { useDashboardState } from "./dashboard-context";
+import { DashboardUnavailable } from "./DashboardUnavailable";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
 import { RuleCheckList } from "@/components/eleven/RuleCheckList";
@@ -87,7 +88,7 @@ export default function Formation({ state: directState }: { state?: AppStateView
     );
   });
 
-  if (!state || !rules || !lineup || !evaluation || !state.club) return null;
+  if (!state || !rules || !lineup || !evaluation || !state.club) return <DashboardUnavailable title="Formación" />;
 
   const definition = FORMATIONS[lineup.formation];
   const formationChanged = draft ? draft.formation !== serverLineup?.formation : false;

@@ -3,6 +3,7 @@ import type { AppStateView } from "@/convex/appTypes";
 import { FC_VERSION, formatMoney, type SquadPlayerView } from "@/convex/rulesEngine";
 import { useNavigate } from "react-router";
 import { useDashboardState } from "./dashboard-context";
+import { DashboardUnavailable } from "./DashboardUnavailable";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
 import { SquadTable } from "@/components/eleven/SquadTable";
@@ -26,12 +27,12 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
   const { saveAvailability, savingAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
 
-  if (!state) return null;
+  if (!state) return <DashboardUnavailable title="Plantilla" />;
 
   const club = state.club;
   const rules = state.rules;
   const stats = state.stats;
-  if (!club || !rules || !stats || !state.lineup) return null;
+  if (!club || !rules || !stats || !state.lineup) return <DashboardUnavailable title="Plantilla" />;
 
   const limits = {
     GK: { min: rules.gkMin, max: rules.gkMax },

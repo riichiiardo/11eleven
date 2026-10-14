@@ -3,6 +3,7 @@ import type { AppStateView } from "@/convex/appTypes";
 import { formatMoney } from "@/convex/rulesEngine";
 import { useNavigate } from "react-router";
 import { useDashboardState } from "./dashboard-context";
+import { DashboardUnavailable } from "./DashboardUnavailable";
 import { Crest } from "@/components/eleven/Crest";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
@@ -34,12 +35,12 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
   const { saveAvailability, savingAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
 
-  if (!state) return null;
+  if (!state) return <DashboardUnavailable title="Mi club" />;
 
   const club = state.club;
   const rules = state.rules;
   const stats = state.stats;
-  if (!club || !rules || !stats || !state.lineup) return null;
+  if (!club || !rules || !stats || !state.lineup) return <DashboardUnavailable title="Mi club" />;
 
   const limits = {
     GK: { min: rules.gkMin, max: rules.gkMax },

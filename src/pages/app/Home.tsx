@@ -38,6 +38,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DashboardUnavailable } from "./DashboardUnavailable";
 
 export default function Home({ state: directState }: { state?: AppStateView }) {
   const contextState = useDashboardState();
@@ -61,7 +62,7 @@ export default function Home({ state: directState }: { state?: AppStateView }) {
   const featured = featuredView ? (featuredView.players ?? []) : undefined;
   const negotiations = useQuery(api.market.overview);
 
-  if (!state) return null;
+  if (!state) return <DashboardUnavailable title="Inicio" />;
 
   const tournament = state.tournament;
   const club = state.club;

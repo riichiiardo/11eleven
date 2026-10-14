@@ -6,12 +6,35 @@
  * respuestas para la capa de compatibilidad.
  */
 
+import { autoLineup, evaluateLineup, evaluateSquadRules, isFormationCode, type Lineup } from "@/convex/rulesEngine";
+import type { AppStateView } from "@/convex/appTypes";
+
 type Json = Record<string, unknown>;
 
 const ts = (v: unknown): number | null => (typeof v === "number" ? v : null);
 
 export function adaptTournamentState(raw: Json | null): Json | null {
-  return raw;
+  if (!raw || raw.needsLeague || raw.needsClub) return raw;
+  const state = raw as unknown as AppStateView;
+  if (!state.rules || !state.club) return raw;
+  const squad = state.squad ?? [];
+  const saved = state.lineup;
+  const formation = saved && isFormationCode(saved.formation)
+    ? saved.formation
+    : isFormationCode(state.rules.fc27FormationCode)
+      ? state.rules.fc27FormationCode : "4-2-3-1";
+  // Preserve a saved XI; propose one only when none has been saved yet.
+  const lineup: Lineup = saved && Array.isArray(saved.slots) && saved.slots.length > 0
+    ? { formation, slots: saved.slots }
+    : autoLineup(squad, formation);
+  const evaluation = evaluateSquadRules(state.rules, squad, state.budget?.available ?? 0, state.club.name);
+  return {
+    ...raw,
+    squad,
+    lineup,
+    evaluation,
+    lineupEvaluation: evaluateLineup(state.rules, squad, lineup, evaluation, state.club.country),
+  };
 }
 
 export function adaptOffer(o: Json): Json {

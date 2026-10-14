@@ -169,7 +169,12 @@ begin
     ), '[]'::jsonb)
   );
 
-  return v_out;
+  return v_out || jsonb_build_object(
+    'lineup', jsonb_build_object(
+      'formation', coalesce(v_squad.formation, v_rules.fc27_formation_code, '4-2-3-1'),
+      'slots', public.map_lineup(coalesce(v_squad.lineup, '[]'::jsonb))
+    )
+  );
 end $$;
 
 -- ============================================================
