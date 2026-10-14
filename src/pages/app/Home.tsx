@@ -67,7 +67,16 @@ export default function Home({ state: directState }: { state?: AppStateView }) {
   const president = state.president;
   const stats = state.stats;
   const rules = state.rules;
-  if (!tournament || !club || !president || !stats || !rules || !state.lineup) return null;
+  if (!tournament || !club || !president || !stats || !rules || !state.lineup) {
+    return (
+      <section className="card-soft mx-auto flex w-full max-w-[900px] flex-col gap-3 p-6">
+        <h1 className="display text-2xl">Inicio</h1>
+        <p className="text-sm text-muted-foreground">
+          Estamos preparando los datos del centro de control. Vuelve a intentar en unos segundos.
+        </p>
+      </section>
+    );
+  }
 
   const statusMeta = TOURNAMENT_STATUS_META[tournament.status];
   const nextEvent = state.nextEvent;
