@@ -33,6 +33,11 @@ export function adaptTournamentState(raw: Json | null): Json | null {
     squad,
     lineup,
     evaluation,
+    actions: state.actions ?? (evaluation.passed ? [] : [{
+      id: "squad-rules", tone: "warning", title: "Revisa tu plantilla",
+      description: "Hay requisitos del reglamento pendientes de cumplir.",
+      action: { label: "Ver plantilla", to: "/dashboard/club/plantilla" },
+    }]),
     lineupEvaluation: evaluateLineup(state.rules, squad, lineup, evaluation, state.club.country),
   };
 }

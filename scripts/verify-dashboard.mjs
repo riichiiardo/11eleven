@@ -17,6 +17,7 @@ try {
   assert.equal(ready.lineup.slots.length, 11);
   assert.ok(ready.evaluation);
   assert.ok(ready.lineupEvaluation);
+  assert.ok(Array.isArray(ready.actions));
   assert.deepEqual(ready.lineupEvaluation.starters, []);
   assert.equal(ready.lineupEvaluation.valid, false);
   const saved = { formation: "4-2-3-1", slots: [{ slotId: "GK", playerId: null }] };
