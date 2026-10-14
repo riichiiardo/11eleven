@@ -359,10 +359,30 @@ begin
   select * into v_club from public.clubs where id = p_club_id and tournament_id = v_tid;
   if v_club.id is null then return null; end if;
   select * into v_squad from public.squads where club_id = v_club.id;
-  select coalesce(jsonb_agg(public.squad_player_json(sp) order by pl.name), '[]'::jsonb)
-    into v_players
-  from public.squad_players sp join public.players pl on pl.id = sp.player_id
-  where sp.club_id = v_club.id;
+  if v_squad.id is null then
+    -- Unclaimed catalog clubs do not have a president/squad yet. Expose their
+    -- canonical 28-player roster directly from the imported player catalog;
+    -- choose_catalog_team materializes these rows once a president claims it.
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'squadPlayerId', null, 'playerId', pl.id, 'name', pl.name,
+      'position', pl.position, 'group', pl."group", 'ovr', pl.ovr,
+      'age', pl.age, 'value', pl.value,
+      'initialValue', coalesce(pl.initial_value, pl.value),
+      'ovrDelta', coalesce((select h.ovr_delta from public.player_stat_history h where h.player_id = pl.id order by h.recorded_at desc limit 1), 0),
+      'valueDelta', coalesce((select h.value_delta from public.player_stat_history h where h.player_id = pl.id order by h.recorded_at desc limit 1), 0),
+      'nationality', pl.nationality, 'flag', pl.flag,
+      'availability', 'neutro', 'realClub', pl.real_club,
+      'realLeague', pl.real_league, 'fcVersion', pl.fc_version, 'photo', pl.photo
+    ) order by pl.name), '[]'::jsonb)
+      into v_players
+    from public.players pl
+    where pl.real_club = v_club.name;
+  else
+    select coalesce(jsonb_agg(public.squad_player_json(sp) order by pl.name), '[]'::jsonb)
+      into v_players
+    from public.squad_players sp join public.players pl on pl.id = sp.player_id
+    where sp.club_id = v_club.id;
+  end if;
   return jsonb_build_object(
     'clubId', v_club.id, 'clubName', v_club.name, 'clubShortName', v_club.short_name,
     'clubColors', jsonb_build_array(v_club.color_primary, v_club.color_secondary),
