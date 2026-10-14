@@ -325,6 +325,7 @@ begin
   where sp.president_id <> v_pres;
   if v_foreign > 0 then raise exception 'La alineación incluye jugadores que no son tuyos.'; end if;
 
+  perform public.assert_configured_lineup(v_tid, v_pres, p_slots);
   update public.squads
   set formation = p_formation, lineup = p_slots, lineup_updated_at = now()
   where club_id = v_club;
@@ -632,15 +633,15 @@ declare v_tid uuid := (select active_tournament_id from public.profiles where id
 begin
   if not public.is_admin(v_tid) then raise exception 'Solo Administración puede editar las reglas.'; end if;
   update public.tournament_rules set
-    budget              = coalesce((p_rules->>'budget')::bigint, budget),
+    budget              = coalesce((p_rules->>'budget')::numeric, budget),
     squad_size          = coalesce((p_rules->>'squadSize')::int, squad_size),
     gk_min = coalesce((p_rules->>'gkMin')::int, gk_min), gk_max = coalesce((p_rules->>'gkMax')::int, gk_max),
     def_min = coalesce((p_rules->>'defMin')::int, def_min), def_max = coalesce((p_rules->>'defMax')::int, def_max),
     mid_min = coalesce((p_rules->>'midMin')::int, mid_min), mid_max = coalesce((p_rules->>'midMax')::int, mid_max),
     fwd_min = coalesce((p_rules->>'fwdMin')::int, fwd_min), fwd_max = coalesce((p_rules->>'fwdMax')::int, fwd_max),
     max_per_real_club   = coalesce((p_rules->>'maxPerRealClub')::int, max_per_real_club),
-    min_ovr             = coalesce((p_rules->>'minOvr')::int, min_ovr),
-    max_u21             = coalesce((p_rules->>'maxU21')::int, max_u21),
+    min_ovr             = 0,
+    max_u21             = 1000,
     lineup_lock_hours   = coalesce((p_rules->>'lineupLockHours')::int, lineup_lock_hours),
     fc27_formation_code = coalesce(p_rules->>'fc27FormationCode', fc27_formation_code),
     formation_instructions = coalesce(p_rules->>'formationInstructions', formation_instructions),

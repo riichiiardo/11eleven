@@ -371,7 +371,9 @@ function resolveMutation(
       "tournament.setTournamentStatus": (a) =>
         rpc("set_tournament_status", { p_status: a.status }),
       "tournament.updateRules": (a) =>
-        rpc("update_rules", { p_rules: a.rules }),
+        rpc("update_rules", { p_rules: a.rules ?? a }),
+      "tournament.saveConfiguration": (a) =>
+        rpc("save_rule_configuration", { p_configuration: a.configuration, p_formation: a.formation }),
       "tournament.chooseCatalogTeam": (a) =>
         rpc("choose_catalog_team", { p_team_catalog_id: a.catalogTeamId }),
       "tournament.ensureTeamCatalog": () => rpc<number>("ensure_team_catalog"),

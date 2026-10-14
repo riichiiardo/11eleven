@@ -515,7 +515,8 @@ returns jsonb language sql immutable as $$
     'u20Min', r.u20_min, 'u20InStartingLineup', r.u20_in_starting_lineup,
     'sameNationalityMin', r.same_nationality_min, 'sameNationalityRule', r.same_nationality_rule,
     'sameNationalityMatchDurationMinutes', r.same_nationality_match_duration_minutes,
-    'clubNationalityMin', r.club_nationality_min
+    'clubNationalityMin', r.club_nationality_min,
+    'configuration', r.configuration
   )
 $$;
 

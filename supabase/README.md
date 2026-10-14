@@ -19,6 +19,18 @@ hasta completar la migración del frontend (fase 2) y su eliminación (fase 3).*
 1. **SQL Editor** de tu proyecto Supabase, en orden:
    1. `supabase/schema.sql` — tablas, RLS y trigger de perfiles.
    2. `supabase/rpc.sql` — RPCs de escritura del juego.
+   3. `supabase/sheet-sync.sql` — columnas y catálogo del Sheets.
+   4. `supabase/views.sql` — contratos de lectura del dashboard.
+   5. `supabase/rules-configuration.sql` — reglas del Universo y competiciones.
+
+El torneo existente actúa como Universo. `tournament_rules.configuration`
+conserva los límites originales, interruptores, competiciones y reglas
+personalizadas; las columnas numéricas mantienen los límites efectivos para
+las operaciones existentes. `save_rule_configuration` permite guardar solamente
+a administradores y `save_lineup` valida las reglas de la competición activa.
+Los formatos de liga, copa, liguilla y los destinos de ascenso/descenso quedan
+parametrizados; el generador de calendario existente no ejecuta todavía estas
+fases automáticamente.
 2. **Claves** (Supabase → Project Settings → API):
    - `VITE_SUPABASE_URL` (pública, termina en `.supabase.co`)
    - `VITE_SUPABASE_ANON_KEY` (pública)

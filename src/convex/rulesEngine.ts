@@ -271,165 +271,168 @@ export type RuleDescriptor = {
   input?: "money" | "number";
 };
 
-export const RULE_DESCRIPTORS: RuleDescriptor[] = [
-  {
-    code: "R-01",
-    title: "Presupuesto del Presidente",
-    description:
-      "Saldo inicial para construir la plantilla. Cada operación descuenta del mismo presupuesto y ninguna puede dejarlo en negativo.",
-    scope: "Club",
-    value: (r) => formatMoney(r.budget),
-    field: "budget",
-    min: 0,
-    max: 2_000_000_000,
-    step: 5_000_000,
-    input: "money",
-  },
-  {
-    code: "R-02",
-    title: "Tamaño máximo de plantilla",
-    description:
-      "Número máximo de jugadores que un club puede registrar. El motor bloquea cualquier incorporación que lo supere.",
-    scope: "Plantilla",
-    value: (r) => `${r.squadSize} jugadores`,
-    field: "squadSize",
-    min: 11,
-    max: 40,
-    step: 1,
-  },
-  {
-    code: "R-03",
-    title: "Porteros en plantilla",
-    description:
-      "Rango obligatorio de porteros. Por debajo del mínimo la plantilla queda inválida; por encima del máximo no se admiten fichajes.",
-    scope: "Plantilla",
-    value: (r) => `${r.gkMin} - ${r.gkMax}`,
-  },
-  {
-    code: "R-04",
-    title: "Defensas en plantilla",
-    description: "Rango obligatorio de defensas registrados en el club.",
-    scope: "Plantilla",
-    value: (r) => `${r.defMin} - ${r.defMax}`,
-  },
-  {
-    code: "R-05",
-    title: "Medios en plantilla",
-    description: "Rango obligatorio de centrocampistas registrados en el club.",
-    scope: "Plantilla",
-    value: (r) => `${r.midMin} - ${r.midMax}`,
-  },
-  {
-    code: "R-06",
-    title: "Delanteros en plantilla",
-    description: "Rango obligatorio de atacantes registrados en el club.",
-    scope: "Plantilla",
-    value: (r) => `${r.fwdMin} - ${r.fwdMax}`,
-  },
-  {
-    code: "R-07",
-    title: "Máximo de jugadores por club real",
-    description:
-      "Evita concentrar la plantilla en un solo club de origen y mantiene el mercado repartido entre Presidentes.",
-    scope: "Mercado",
-    value: (r) => `${r.maxPerRealClub} jugadores`,
-    field: "maxPerRealClub",
-    min: 1,
-    max: 10,
-    step: 1,
-  },
-  {
-    code: "R-08",
-    title: "OVR mínimo para fichar",
-    description:
-      "Ningún fichaje por debajo de este OVR entra en el torneo, salvo canteranos aprobados por Administración.",
-    scope: "Mercado",
-    value: (r) => `${r.minOvr} OVR`,
-    field: "minOvr",
-    min: 40,
-    max: 95,
-    step: 1,
-  },
-  {
-    code: "R-09",
-    title: "Máximo de jugadores sub-21",
-    description:
-      "Limita cuántos jugadores de 21 años o menos puede alinear un club a lo largo de la temporada.",
-    scope: "Plantilla",
-    value: (r) => `${r.maxU21} jugadores`,
-    field: "maxU21",
-    min: 0,
-    max: 15,
-    step: 1,
-  },
-  {
-    code: "R-10",
-    title: "Cierre de alineación",
-    description:
-      "Horas antes del inicio de la jornada en que la alineación titular queda bloqueada y no admite cambios.",
-    scope: "Competición",
-    value: (r) => `${r.lineupLockHours} h antes`,
-    field: "lineupLockHours",
-    min: 1,
-    max: 72,
-    step: 1,
-  },
-  {
-    code: "R-11",
-    title: "Jugadores sub-20 en el XI",
-    description:
-      "El torneo fija un mínimo de jugadores de 20 años o menos obligados a alinearse. Se toman desde el XI titular (obligatorio) o como reserva sustituible (cambiable en función del tiempo).",
-    scope: "Plantilla",
-    value: (r) =>
-      r.u20InStartingLineup === null
-        ? `Sin regla · mínimo ${r.u20Min}`
-        : `${r.u20Min} sub-20 · ${r.u20InStartingLineup === "obligatory" ? "desde el XI titular" : "como reserva sustituible"}`,
-    field: "u20Min",
-    min: 0,
-    max: 11,
-    step: 1,
-  },
-  {
-    code: "R-12",
-    title: "Mismas nacionalidades en el encuentro",
-    description:
-      "El torneo exige que, en todo el partido, el equipo cuente siempre con un número mínimo de jugadores de una misma nacionalidad, ya sea fijado en el XI o en el banco. El Presidente lo configura al crear el torneo.",
-    scope: "Plantilla",
-    value: (r) =>
-      r.sameNationalityRule === null
-        ? `Sin regla · mínimo ${r.sameNationalityMin}`
-        : `${r.sameNationalityMin} de una misma nacionalidad · ${r.sameNationalityRule === "obligatory" ? "siempre en campo" : "cambiable"} · ${r.sameNationalityMatchDurationMinutes} minutos de permanencia`,
-    field: "sameNationalityMin",
-    min: 0,
-    max: 22,
-    step: 1,
-  },
-  {
-    code: "R-13",
-    title: "Formación exportada del FC 27",
-    description:
-      "Código de formación seleccionado en el FC 27 y las instrucciones tácticas adicionales del presidente (cambios previstos, rango de minutos, bloqueos de posiciones…). El código se enlaza con los 22 esquemas del menú de tácticas del FC 27 para mantener un XI siempre legal.",
-    scope: "Plantilla",
-    value: (r) =>
-      `${r.fc27FormationCode} · ${r.formationInstructions.length > 60 ? r.formationInstructions.slice(0, 60) + "…" : r.formationInstructions}`,
-    field: "fc27FormationCode",
-  },
-  {
-    code: "R-14",
-    title: "Jugadores de la nacionalidad del club en el XI",
-    description:
-      "El torneo exige que el XI inicial de cada partido de liga incluya un número mínimo de jugadores con la nacionalidad del club presidido (su país de origen). El motor lo valida al guardar la alineación.",
-    scope: "Competición",
-    value: (r) =>
-      r.clubNationalityMin > 0
-        ? `${r.clubNationalityMin} del país del club`
-        : "Sin regla",
-    field: "clubNationalityMin",
-    min: 0,
-    max: 11,
-    step: 1,
-  },
-];
+export const RULE_DESCRIPTORS: RuleDescriptor[] = (
+  [
+    {
+      code: "R-01",
+      title: "Presupuesto del Presidente",
+      description:
+        "Saldo inicial para construir la plantilla. Cada operación descuenta del mismo presupuesto y ninguna puede dejarlo en negativo.",
+      scope: "Club",
+      value: (r) => formatMoney(r.budget),
+      field: "budget",
+      min: 0,
+      max: 2_000_000_000,
+      step: 5_000_000,
+      input: "money",
+    },
+    {
+      code: "R-02",
+      title: "Tamaño máximo de plantilla",
+      description:
+        "Número máximo de jugadores que un club puede registrar. El motor bloquea cualquier incorporación que lo supere.",
+      scope: "Plantilla",
+      value: (r) => `${r.squadSize} jugadores`,
+      field: "squadSize",
+      min: 11,
+      max: 40,
+      step: 1,
+    },
+    {
+      code: "R-03",
+      title: "Porteros en plantilla",
+      description:
+        "Rango obligatorio de porteros. Por debajo del mínimo la plantilla queda inválida; por encima del máximo no se admiten fichajes.",
+      scope: "Plantilla",
+      value: (r) => `${r.gkMin} - ${r.gkMax}`,
+    },
+    {
+      code: "R-04",
+      title: "Defensas en plantilla",
+      description: "Rango obligatorio de defensas registrados en el club.",
+      scope: "Plantilla",
+      value: (r) => `${r.defMin} - ${r.defMax}`,
+    },
+    {
+      code: "R-05",
+      title: "Medios en plantilla",
+      description:
+        "Rango obligatorio de centrocampistas registrados en el club.",
+      scope: "Plantilla",
+      value: (r) => `${r.midMin} - ${r.midMax}`,
+    },
+    {
+      code: "R-06",
+      title: "Delanteros en plantilla",
+      description: "Rango obligatorio de atacantes registrados en el club.",
+      scope: "Plantilla",
+      value: (r) => `${r.fwdMin} - ${r.fwdMax}`,
+    },
+    {
+      code: "R-07",
+      title: "Máximo de jugadores por club real",
+      description:
+        "Evita concentrar la plantilla en un solo club de origen y mantiene el mercado repartido entre Presidentes.",
+      scope: "Mercado",
+      value: (r) => `${r.maxPerRealClub} jugadores`,
+      field: "maxPerRealClub",
+      min: 1,
+      max: 10,
+      step: 1,
+    },
+    {
+      code: "R-08",
+      title: "OVR mínimo para fichar",
+      description:
+        "Ningún fichaje por debajo de este OVR entra en el torneo, salvo canteranos aprobados por Administración.",
+      scope: "Mercado",
+      value: (r) => `${r.minOvr} OVR`,
+      field: "minOvr",
+      min: 40,
+      max: 95,
+      step: 1,
+    },
+    {
+      code: "R-09",
+      title: "Máximo de jugadores sub-21",
+      description:
+        "Limita cuántos jugadores de 21 años o menos puede alinear un club a lo largo de la temporada.",
+      scope: "Plantilla",
+      value: (r) => `${r.maxU21} jugadores`,
+      field: "maxU21",
+      min: 0,
+      max: 15,
+      step: 1,
+    },
+    {
+      code: "R-10",
+      title: "Cierre de alineación",
+      description:
+        "Horas antes del inicio de la jornada en que la alineación titular queda bloqueada y no admite cambios.",
+      scope: "Competición",
+      value: (r) => `${r.lineupLockHours} h antes`,
+      field: "lineupLockHours",
+      min: 1,
+      max: 72,
+      step: 1,
+    },
+    {
+      code: "R-11",
+      title: "Jugadores sub-20 en el XI",
+      description:
+        "El torneo fija un mínimo de jugadores de 20 años o menos obligados a alinearse. Se toman desde el XI titular (obligatorio) o como reserva sustituible (cambiable en función del tiempo).",
+      scope: "Plantilla",
+      value: (r) =>
+        r.u20InStartingLineup === null
+          ? `Sin regla · mínimo ${r.u20Min}`
+          : `${r.u20Min} sub-20 · ${r.u20InStartingLineup === "obligatory" ? "desde el XI titular" : "como reserva sustituible"}`,
+      field: "u20Min",
+      min: 0,
+      max: 11,
+      step: 1,
+    },
+    {
+      code: "R-12",
+      title: "Mismas nacionalidades en el encuentro",
+      description:
+        "El torneo exige que, en todo el partido, el equipo cuente siempre con un número mínimo de jugadores de una misma nacionalidad, ya sea fijado en el XI o en el banco. El Presidente lo configura al crear el torneo.",
+      scope: "Plantilla",
+      value: (r) =>
+        r.sameNationalityRule === null
+          ? `Sin regla · mínimo ${r.sameNationalityMin}`
+          : `${r.sameNationalityMin} de una misma nacionalidad · ${r.sameNationalityRule === "obligatory" ? "siempre en campo" : "cambiable"} · ${r.sameNationalityMatchDurationMinutes} minutos de permanencia`,
+      field: "sameNationalityMin",
+      min: 0,
+      max: 22,
+      step: 1,
+    },
+    {
+      code: "R-13",
+      title: "Formación exportada del FC 27",
+      description:
+        "Código de formación e instrucciones tácticas. El esquema se enlaza con el catálogo de posiciones para mantener un XI válido.",
+      scope: "Plantilla",
+      value: (r) =>
+        `${r.fc27FormationCode} · ${r.formationInstructions.length > 60 ? r.formationInstructions.slice(0, 60) + "…" : r.formationInstructions}`,
+      field: "fc27FormationCode",
+    },
+    {
+      code: "R-14",
+      title: "Jugadores de la nacionalidad del club en el XI",
+      description:
+        "El torneo exige que el XI inicial de cada partido de liga incluya un número mínimo de jugadores con la nacionalidad del club presidido (su país de origen). El motor lo valida al guardar la alineación.",
+      scope: "Competición",
+      value: (r) =>
+        r.clubNationalityMin > 0
+          ? `${r.clubNationalityMin} del país del club`
+          : "Sin regla",
+      field: "clubNationalityMin",
+      min: 0,
+      max: 11,
+      step: 1,
+    },
+  ] as RuleDescriptor[]
+).filter((rule) => !["R-08", "R-09", "R-14"].includes(rule.code));
 
 /* ------------------------------------------------------------------ *
  * Formatting helpers (shared by server and client)
@@ -631,8 +634,9 @@ export function evaluateSquadRules(
         : `Tu presupuesto está excedido en ${formatMoney(Math.abs(availableBudget))}. Administración debe revisar tus operaciones.`,
   });
 
-  const violations = checks.filter((check) => !check.passed);
-  return { checks, passed: violations.length === 0, violations };
+  const activeChecks = checks.filter((check) => check.id !== "u21");
+  const violations = activeChecks.filter((check) => !check.passed);
+  return { checks: activeChecks, passed: violations.length === 0, violations };
 }
 
 /** Guards a single market operation against the same engine. */
@@ -723,8 +727,9 @@ export function evaluateSigning(
       : `Tu plantilla ya tiene ${sameClub} jugadores pertenecientes a este club.`,
   );
 
-  const violations = checks.filter((c) => !c.passed);
-  return { checks, passed: violations.length === 0, violations };
+  const activeChecks = checks.filter((check) => check.id !== "signing-ovr");
+  const violations = activeChecks.filter((c) => !c.passed);
+  return { checks: activeChecks, passed: violations.length === 0, violations };
 }
 
 /* ------------------------------------------------------------------ *
@@ -766,7 +771,16 @@ export type FormationCode =
   | "5-2-1-2"
   | "5-2-3"
   | "5-3-2"
-  | "5-4-1";
+  | "5-4-1"
+  | "3-1-4-2"
+  | "3-4-1-2"
+  | "4-1-4-1"
+  | "4-1-2-1-2 (2)"
+  | "4-2-3-1 (2)"
+  | "4-3-3 (3)"
+  | "4-3-3 (4)"
+  | "4-4-2 (2)"
+  | "4-5-1 (2)";
 
 export type FormationDefinition = {
   code: FormationCode;
@@ -805,7 +819,7 @@ function slot(
   };
 }
 
-export const FORMATIONS: Record<FormationCode, FormationDefinition> = {
+export const FORMATIONS = {
   "3-2-2-3": {
     code: "3-2-2-3",
     label: "3-2-2-3",
@@ -1247,9 +1261,101 @@ export const FORMATIONS: Record<FormationCode, FormationDefinition> = {
       slot("por1", "POR", 50, 89),
     ],
   },
+} as Record<FormationCode, FormationDefinition>;
+
+// Additional variants verified against https://www.fut.gg/tactics/ (2026-10-14).
+// Preserve existing codes so previously saved lineups continue to resolve.
+function variant(
+  code: FormationCode,
+  shape: string,
+  rows: Position[][],
+): FormationDefinition {
+  const counters = new Map<Position, number>();
+  const slots = rows.flatMap((row, index) =>
+    row.map((position, column) => {
+      const n = (counters.get(position) ?? 0) + 1;
+      counters.set(position, n);
+      return slot(
+        `${position.toLowerCase()}${n}`,
+        position,
+        row.length === 1 ? 50 : 12 + (column * 76) / (row.length - 1),
+        14 + (index * 58) / (rows.length - 1),
+      );
+    }),
+  );
+  slots.push(slot("por1", "POR", 50, 89));
+  return {
+    code,
+    label: code,
+    shape,
+    description: `Variante ${shape.toLowerCase()} con once posiciones.`,
+    slots,
+  };
+}
+Object.assign(FORMATIONS, {
+  "3-1-4-2": variant("3-1-4-2", "Pivote y carrileros", [
+    ["DC", "DC"],
+    ["EI", "MC", "MC", "ED"],
+    ["MCD"],
+    ["DFC", "DFC", "DFC"],
+  ]),
+  "3-4-1-2": variant("3-4-1-2", "Mediapunta", [
+    ["DC", "DC"],
+    ["MCO"],
+    ["EI", "MC", "MC", "ED"],
+    ["DFC", "DFC", "DFC"],
+  ]),
+  "4-1-4-1": variant("4-1-4-1", "Pivote", [
+    ["DC"],
+    ["EI", "MC", "MC", "ED"],
+    ["MCD"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+  "4-1-2-1-2 (2)": variant("4-1-2-1-2 (2)", "Rombo estrecho", [
+    ["DC", "DC"],
+    ["MCO"],
+    ["MC", "MC"],
+    ["MCD"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+  "4-2-3-1 (2)": variant("4-2-3-1 (2)", "Abierta", [
+    ["DC"],
+    ["EI", "MCO", "ED"],
+    ["MCD", "MCD"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+  "4-3-3 (3)": variant("4-3-3 (3)", "Defensiva", [
+    ["EI", "DC", "ED"],
+    ["MCD", "MC", "MCD"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+  "4-3-3 (4)": variant("4-3-3 (4)", "Ataque", [
+    ["EI", "DC", "ED"],
+    ["MCO"],
+    ["MC", "MC"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+  "4-4-2 (2)": variant("4-4-2 (2)", "Doble contención", [
+    ["DC", "DC"],
+    ["EI", "ED"],
+    ["MCD", "MCD"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+  "4-5-1 (2)": variant("4-5-1 (2)", "Plana", [
+    ["DC"],
+    ["EI", "MC", "MC", "MC", "ED"],
+    ["LI", "DFC", "DFC", "LD"],
+  ]),
+});
+// The legacy 5-1-2-1-2 definition contained twelve players. Keep its code only
+// as a read-compatible alias; new lineups use the valid 5-2-1-2 scheme.
+FORMATIONS["5-1-2-1-2"] = {
+  ...FORMATIONS["5-2-1-2"],
+  code: "5-1-2-1-2",
+  label: "5-2-1-2 (legado)",
 };
 
-/** Todas las formaciones del FC 27, en el orden del menú de tácticas del juego. */
+/** Catálogo de formaciones, conservando los códigos anteriores. */
 export const FORMATION_CODES: FormationCode[] = [
   "3-2-2-3",
   "3-4-2-1",
@@ -1268,11 +1374,19 @@ export const FORMATION_CODES: FormationCode[] = [
   "4-4-1-1",
   "4-4-2",
   "4-5-1",
-  "5-1-2-1-2",
   "5-2-1-2",
   "5-2-3",
   "5-3-2",
   "5-4-1",
+  "3-1-4-2",
+  "3-4-1-2",
+  "4-1-4-1",
+  "4-1-2-1-2 (2)",
+  "4-2-3-1 (2)",
+  "4-3-3 (3)",
+  "4-3-3 (4)",
+  "4-4-2 (2)",
+  "4-5-1 (2)",
 ];
 
 /** Formation every new squad starts with. */

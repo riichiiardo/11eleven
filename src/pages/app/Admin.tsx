@@ -1,14 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { AdminOverviewView, AppStateView } from "@/convex/appTypes";
 import { api } from "@/convex/_generated/api";
 import {
-  RULE_DESCRIPTORS,
   TOURNAMENT_STATUSES,
   TOURNAMENT_STATUS_META,
   formatMoney,
-  type TournamentRules,
 } from "@/convex/rulesEngine";
 import { errorMessage, relativeTime } from "@/lib/errors";
+import { RulesEditor } from "./Rules";
 import { useNow } from "@/hooks/use-tournament";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
@@ -63,12 +62,7 @@ import { OfferCard } from "@/components/eleven/OfferCard";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
 import { TurnStrip, DraftStatusPill } from "@/components/eleven/DraftBits";
 import { MatchCard, StandingsTable } from "@/components/eleven/MatchBits";
-import {
-  Award,
-  RefreshCw,
-  Swords,
-  Trophy,
-} from "lucide-react";
+import { Award, RefreshCw, Swords, Trophy } from "lucide-react";
 import { FieldLabel, Tip } from "@/components/eleven/admin/AdminBits";
 import { PrizesPanel } from "@/components/eleven/admin/PrizesPanel";
 import { CatalogPanel } from "@/components/eleven/admin/CatalogPanel";
@@ -96,7 +90,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   auditoria: "Auditoría",
 };
 
-type RuleFormState = TournamentRules;
+// The Rules route and Administration share the same parametrizable editor.
 
 export default function Admin() {
   const state = useOutletContext<AppStateView>();
@@ -106,11 +100,15 @@ export default function Admin() {
   if (!state.isAdmin) {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-xl flex-col items-center justify-center gap-3 text-center">
-        <ShieldCheck aria-hidden="true" className="size-8 text-muted-foreground" />
+        <ShieldCheck
+          aria-hidden="true"
+          className="size-8 text-muted-foreground"
+        />
         <h1 className="display text-xl">Solo para Administradores</h1>
         <p className="text-sm text-muted-foreground">
-          Administrar el torneo es un rol, no una cuenta distinta. Si necesitas acceso, pide al
-          Administrador principal que asigne tu correo con los permisos correspondientes.
+          Administrar el torneo es un rol, no una cuenta distinta. Si necesitas
+          acceso, pide al Administrador principal que asigne tu correo con los
+          permisos correspondientes.
         </p>
         <Button onClick={() => navigate("/dashboard")} className="min-h-11">
           Volver al inicio
@@ -141,13 +139,19 @@ export default function Admin() {
       <header className="flex flex-col gap-2">
         <h1 className="display text-2xl">Administración del torneo</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Control de reglas, presidentes y trazabilidad. Cada cambio que hagas aquí se aplica de
-          inmediato al motor de reglas y queda registrado con tu nombre en la auditoría.
+          Control de reglas, presidentes y trazabilidad. Cada cambio que hagas
+          aquí se aplica de inmediato al motor de reglas y queda registrado con
+          tu nombre en la auditoría.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-gold/40 bg-gold/15 text-amber-700 dark:text-amber-300">
+          <Badge
+            variant="outline"
+            className="border-gold/40 bg-gold/15 text-amber-700 dark:text-amber-300"
+          >
             <Crown className="size-3" aria-hidden="true" />
-            {state.adminRole === "principal" ? "Administrador principal" : "Co-Administrador"}
+            {state.adminRole === "principal"
+              ? "Administrador principal"
+              : "Co-Administrador"}
           </Badge>
           <Badge variant="outline">
             {overview.tournament.name} · {overview.tournament.season}
@@ -197,15 +201,17 @@ export default function Admin() {
 
         <TabsContent value="torneo" className="flex flex-col gap-5">
           <TournamentPanel overview={overview} />
-          {overview.tournament ? <CompetitionCard tournament={overview.tournament} /> : null}
+          {overview.tournament ? (
+            <CompetitionCard tournament={overview.tournament} />
+          ) : null}
           <ResetLeagueCard overview={overview} />
         </TabsContent>
 
         <TabsContent value="reglas" className="flex flex-col gap-5">
-          <RulesPanel
+          <RulesEditor
             rules={overview.rules}
-            presidents={overview.presidents}
-            clubCount={overview.clubs.length}
+            isAdmin={true}
+            universe={overview.tournament?.name ?? "Universo"}
           />
         </TabsContent>
 
@@ -230,7 +236,11 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="auditoria">
-          <SectionCard title="Registro de auditoría" icon={ScrollText} bodyClassName="p-0">
+          <SectionCard
+            title="Registro de auditoría"
+            icon={ScrollText}
+            bodyClassName="p-0"
+          >
             <AuditList entries={overview.activity} />
           </SectionCard>
         </TabsContent>
@@ -242,7 +252,6 @@ export default function Admin() {
     </div>
   );
 }
-
 
 function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
   const setStatus = useMutation(api.tournament.setTournamentStatus);
@@ -260,7 +269,9 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
         description: `Ahora el torneo está en fase «${TOURNAMENT_STATUS_META[status as (typeof TOURNAMENT_STATUSES)[number]].label}».`,
       });
     } catch (cause) {
-      toast.error("No se pudo cambiar el estado", { description: errorMessage(cause) });
+      toast.error("No se pudo cambiar el estado", {
+        description: errorMessage(cause),
+      });
     } finally {
       setBusy(false);
     }
@@ -269,10 +280,26 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Clubes del torneo" value={`${overview.clubs.length}`} hint={`${overview.totals.freeClubs} sin presidente`} />
-        <MetricCard label="Plantillas registradas" value={`${overview.totals.squads}`} hint={`${overview.totals.players} jugadores asignados`} />
-        <MetricCard label="Presupuesto asignado" value={formatMoney(overview.totals.committedBudget)} hint={`${overview.presidents.length} presidentes`} />
-        <MetricCard label="Jornada actual" value={`${tournament.currentMatchday} / ${tournament.totalMatchdays}`} hint={tournament.statusLabel} />
+        <MetricCard
+          label="Clubes del torneo"
+          value={`${overview.clubs.length}`}
+          hint={`${overview.totals.freeClubs} sin presidente`}
+        />
+        <MetricCard
+          label="Plantillas registradas"
+          value={`${overview.totals.squads}`}
+          hint={`${overview.totals.players} jugadores asignados`}
+        />
+        <MetricCard
+          label="Presupuesto asignado"
+          value={formatMoney(overview.totals.committedBudget)}
+          hint={`${overview.presidents.length} presidentes`}
+        />
+        <MetricCard
+          label="Jornada actual"
+          value={`${tournament.currentMatchday} / ${tournament.totalMatchdays}`}
+          hint={tournament.statusLabel}
+        />
       </div>
 
       <SectionCard title="Máquina de estados del torneo" icon={Gauge}>
@@ -313,7 +340,11 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Clubes y presidencias" icon={Users} bodyClassName="p-0">
+      <SectionCard
+        title="Clubes y presidencias"
+        icon={Users}
+        bodyClassName="p-0"
+      >
         <div className="overflow-x-auto scroll-thin">
           <Table>
             <TableHeader>
@@ -339,14 +370,25 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
                       <span className="text-sm font-semibold">{club.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{club.league}</TableCell>
-                  <TableCell className="num text-center">{club.rosterSize}</TableCell>
-                  <TableCell className="num text-center">{club.averageOvr}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {club.league}
+                  </TableCell>
+                  <TableCell className="num text-center">
+                    {club.rosterSize}
+                  </TableCell>
+                  <TableCell className="num text-center">
+                    {club.averageOvr}
+                  </TableCell>
                   <TableCell>
                     {club.presidentNickname ? (
-                      <span className="text-sm font-semibold">{club.presidentNickname}</span>
+                      <span className="text-sm font-semibold">
+                        {club.presidentNickname}
+                      </span>
                     ) : (
-                      <Badge variant="outline" className="text-muted-foreground">
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground"
+                      >
                         Disponible
                       </Badge>
                     )}
@@ -403,11 +445,11 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
       <SectionCard title="Centro de control del mercado" icon={Handshake}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            Al ejecutar, cada acuerdo vuelve a comprobarse contra el estado actual de
-            ambas plantillas, los cupos por posición, el límite por club real y los
-            presupuestos. Si algo cambió desde el acuerdo, la operación queda
-            invalidada con el motivo registrado y los jugadores vuelven a estar
-            disponibles.
+            Al ejecutar, cada acuerdo vuelve a comprobarse contra el estado
+            actual de ambas plantillas, los cupos por posición, el límite por
+            club real y los presupuestos. Si algo cambió desde el acuerdo, la
+            operación queda invalidada con el motivo registrado y los jugadores
+            vuelven a estar disponibles.
           </p>
           <Button
             type="button"
@@ -432,8 +474,8 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
       >
         {market.reserved.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No hay acuerdos reservados. Cuando dos Presidentes lleguen a un acuerdo
-            aparecerá aquí con su validación final antes de aplicarse.
+            No hay acuerdos reservados. Cuando dos Presidentes lleguen a un
+            acuerdo aparecerá aquí con su validación final antes de aplicarse.
           </p>
         ) : (
           <ul className="grid gap-4 xl:grid-cols-2">
@@ -456,7 +498,11 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
         )}
       </SectionCard>
 
-      <SectionCard title="Últimas operaciones del torneo" icon={Users} bodyClassName="p-0">
+      <SectionCard
+        title="Últimas operaciones del torneo"
+        icon={Users}
+        bodyClassName="p-0"
+      >
         {market.recent.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
             Todavía no se ha registrado ninguna operación en el torneo.
@@ -464,13 +510,18 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
         ) : (
           <ul className="divide-y">
             {market.recent.slice(0, 10).map((offer) => (
-              <li key={offer.id} className="flex flex-wrap items-center gap-2 p-3">
+              <li
+                key={offer.id}
+                className="flex flex-wrap items-center gap-2 p-3"
+              >
                 <OfferStatusPill status={offer.status} />
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {offer.bidderClubName} → {offer.sellerClubName ?? "Agente libre"}
+                  {offer.bidderClubName} →{" "}
+                  {offer.sellerClubName ?? "Agente libre"}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {offer.requested.map((player) => player.name).join(", ") || "—"}
+                  {offer.requested.map((player) => player.name).join(", ") ||
+                    "—"}
                 </span>
                 <span className="num text-xs font-bold">
                   {formatMoney(offer.cash)}
@@ -518,7 +569,9 @@ function DraftPanel({ overview }: { overview: AdminOverviewView }) {
         <MetricCard
           label="Estado del draft"
           value={draft.statusLabel ?? "Sin preparar"}
-          hint={draft.statusHint ?? "Todavía no se ha preparado un orden de turnos"}
+          hint={
+            draft.statusHint ?? "Todavía no se ha preparado un orden de turnos"
+          }
         />
         <MetricCard
           label="Turno actual"
@@ -636,9 +689,9 @@ function DraftPanel({ overview }: { overview: AdminOverviewView }) {
               className="mt-0.5 size-3.5 shrink-0"
               aria-hidden="true"
             />
-            {draft.unsignedPresidents.length} Presidente(s) se unieron después de
-            preparar el orden: {draft.unsignedPresidents.join(", ")}. Vuelve a
-            preparar el draft para incluirlos.
+            {draft.unsignedPresidents.length} Presidente(s) se unieron después
+            de preparar el orden: {draft.unsignedPresidents.join(", ")}. Vuelve
+            a preparar el draft para incluirlos.
           </p>
         ) : null}
       </SectionCard>
@@ -763,8 +816,8 @@ function DraftPanel({ overview }: { overview: AdminOverviewView }) {
       >
         {draft.picks.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">
-            Cada adquisición del draft quedará registrada aquí con su Presidente,
-            su precio y su ronda.
+            Cada adquisición del draft quedará registrada aquí con su
+            Presidente, su precio y su ronda.
           </p>
         ) : (
           <ul className="divide-y">
@@ -788,10 +841,9 @@ function DraftPanel({ overview }: { overview: AdminOverviewView }) {
                       </span>
                     </p>
                     <p className="truncate text-[11px] text-muted-foreground">
-                      Ronda {pickRow.round} · {pickRow.nickname} ({pickRow.clubName})
-                      {pickRow.mode === "reserva"
-                        ? " · acuerdo reservado"
-                        : ""}
+                      Ronda {pickRow.round} · {pickRow.nickname} (
+                      {pickRow.clubName})
+                      {pickRow.mode === "reserva" ? " · acuerdo reservado" : ""}
                     </p>
                   </div>
                   <span className="num text-sm font-bold">
@@ -821,7 +873,9 @@ function MetricCard({
         {label}
       </p>
       <p className="num display mt-1 text-xl">{value}</p>
-      {hint ? <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -842,15 +896,18 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
     String(competition.currentMatchday),
   );
   const reportGroup =
-    competition.matchdays.find((group) => String(group.matchday) === reportMatchday) ??
-    current;
+    competition.matchdays.find(
+      (group) => String(group.matchday) === reportMatchday,
+    ) ?? current;
 
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Jornada en curso"
-          value={competition.available ? `J${competition.currentMatchday}` : "—"}
+          value={
+            competition.available ? `J${competition.currentMatchday}` : "—"
+          }
           hint={
             competition.available
               ? `${competition.calendarMatchdays} jornadas en el calendario`
@@ -927,19 +984,17 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
         bodyClassName="flex flex-col gap-3"
       >
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Indica el resultado de cada partido a mano: marcador, goles por jugador, tarjetas
-          amarillas y rojas por jugador, y los lesionados con el número de jornadas que estarán
-          de baja. La tabla del torneo se actualiza al instante y todo queda en la auditoría.
+          Indica el resultado de cada partido a mano: marcador, goles por
+          jugador, tarjetas amarillas y rojas por jugador, y los lesionados con
+          el número de jornadas que estarán de baja. La tabla del torneo se
+          actualiza al instante y todo queda en la auditoría.
         </p>
 
         <div className="flex flex-col gap-1.5 sm:max-w-xs">
           <Label htmlFor="reportMatchday" className="text-xs">
             Jornada a registrar
           </Label>
-          <Select
-            value={reportMatchday}
-            onValueChange={setReportMatchday}
-          >
+          <Select value={reportMatchday} onValueChange={setReportMatchday}>
             <SelectTrigger id="reportMatchday" className="min-h-11">
               <SelectValue />
             </SelectTrigger>
@@ -953,7 +1008,8 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
                   Jornada {group.matchday}
                   <span className="text-muted-foreground">
                     {" "}
-                    · {group.playedCount}/{group.fixtures.length} jugados · {group.statusLabel}
+                    · {group.playedCount}/{group.fixtures.length} jugados ·{" "}
+                    {group.statusLabel}
                   </span>
                 </SelectItem>
               ))}
@@ -969,17 +1025,25 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-                  <span className="truncate font-semibold">{fixture.home.name}</span>
+                  <span className="truncate font-semibold">
+                    {fixture.home.name}
+                  </span>
                   {fixture.homeGoals !== null && fixture.awayGoals !== null ? (
                     <span className="num shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs font-bold">
                       {fixture.homeGoals} – {fixture.awayGoals}
                     </span>
                   ) : (
-                    <span className="shrink-0 text-xs text-muted-foreground">vs</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      vs
+                    </span>
                   )}
-                  <span className="truncate font-semibold">{fixture.away.name}</span>
+                  <span className="truncate font-semibold">
+                    {fixture.away.name}
+                  </span>
                   {fixture.status === "jugado" ? (
-                    <span className="shrink-0 text-[11px] text-muted-foreground">Jugado</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      Jugado
+                    </span>
                   ) : null}
                 </div>
                 <ResultReportButton fixture={fixture} />
@@ -988,8 +1052,8 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Esta jornada todavía no tiene partidos: genera el calendario desde «Sincronizar
-            calendario».
+            Esta jornada todavía no tiene partidos: genera el calendario desde
+            «Sincronizar calendario».
           </p>
         )}
       </SectionCard>
@@ -1021,286 +1085,15 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
   );
 }
 
-function RulesPanel({
-  rules,
-  presidents,
-  clubCount,
-}: {
-  rules: TournamentRules;
-  presidents: Array<{ id: string; clubName: string; squadSize: number }>;
-  clubCount: number;
-}) {
-  const updateRules = useMutation(api.tournament.updateRules);
-  const [form, setForm] = useState<RuleFormState>(rules);
-  const [busy, setBusy] = useState(false);
-
-  // Re-sync the editor when the server rules change (react.dev: adjusting state
-  // when a prop changes) without an extra render from an effect.
-  const serverKey = JSON.stringify(rules);
-  const [draftKey, setDraftKey] = useState(serverKey);
-  if (draftKey !== serverKey) {
-    setDraftKey(serverKey);
-    setForm(rules);
-  }
-
-  const errors = useMemo(() => {
-    const list: string[] = [];
-    const groups: Array<[string, number, number]> = [
-      ["porteros", form.gkMin, form.gkMax],
-      ["defensas", form.defMin, form.defMax],
-      ["medios", form.midMin, form.midMax],
-      ["delanteros", form.fwdMin, form.fwdMax],
-    ];
-    for (const [label, min, max] of groups) {
-      if (min > max) list.push(`En ${label} el mínimo no puede superar al máximo.`);
-    }
-    if (form.squadSize < 11 || form.squadSize > 40) {
-      list.push("El tamaño de plantilla debe estar entre 11 y 40 jugadores.");
-    }
-    const minTotal = form.gkMin + form.defMin + form.midMin + form.fwdMin;
-    if (minTotal > form.squadSize) {
-      list.push(
-        `Los mínimos por posición suman ${minTotal} jugadores y no caben en una plantilla de ${form.squadSize}.`,
-      );
-    }
-    if (form.maxU21 < 0 || form.maxU21 > 15) {
-      list.push("El límite de jugadores sub-21 debe estar entre 0 y 15.");
-    }
-    if (form.budget < 0) list.push("El presupuesto no puede ser negativo.");
-    return list;
-  }, [form]);
-
-  const impacted = presidents.filter(
-    (president) => president.squadSize > form.squadSize,
-  );
-
-  const dirty = JSON.stringify(form) !== JSON.stringify(rules);
-
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (errors.length > 0) return;
-    setBusy(true);
-    try {
-      const result = await updateRules(form);
-      toast.success("Reglas del torneo actualizadas", {
-        description:
-          result.changed > 0
-            ? `${result.changed} regla(s) modificadas. El motor de reglas ya las aplica.`
-            : "No había cambios que registrar.",
-      });
-    } catch (cause) {
-      toast.error("No se pudieron guardar las reglas", {
-        description: errorMessage(cause),
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const numberField = (
-    key: keyof RuleFormState,
-    label: string,
-    options?: { hint?: string; step?: number; tip?: string },
-  ) => (
-    <div className="flex flex-col gap-1.5">
-      <FieldLabel
-        htmlFor={key}
-        tip={
-          options?.tip ??
-          `${label}: valor numérico que el motor de reglas aplica a toda la liga en tiempo real.`
-        }
-      >
-        {label}
-      </FieldLabel>
-      <Input
-        id={key}
-        type="number"
-        className="h-11"
-        value={form[key] as number}
-        step={options?.step ?? 1}
-        onChange={(event) =>
-          setForm((previous) => ({
-            ...previous,
-            [key]: Number(event.target.value),
-          }))
-        }
-      />
-      {options?.hint ? (
-        <p className="text-[11px] text-muted-foreground">{options.hint}</p>
-      ) : null}
-    </div>
-  );
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-5">
-      <SectionCard title="Reglas del torneo" icon={ScrollText}>
-        <div className="grid gap-4">
-          <fieldset className="grid gap-4 sm:grid-cols-3">
-            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Presupuesto y plantilla
-            </legend>
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel
-                htmlFor="budgetMillions"
-                tip="Cuánto dinero recibe cada Presidente al unirse a la liga (y al reiniciarla). Con él ficha agentes libres y negocia en el mercado. Escribe el importe en millones: 50 = 50.000.000 €. No modifica los presupuestos ya gastados; lo que se suma después llega vía premios o presupuestos extra."
-              >
-                Presupuesto inicial por Presidente (millones €)
-              </FieldLabel>
-              <Input
-                id="budgetMillions"
-                type="number"
-                className="h-11"
-                step={5}
-                value={Math.round(form.budget / 1_000_000)}
-                onChange={(event) =>
-                  setForm((previous) => ({
-                    ...previous,
-                    budget: Number(event.target.value) * 1_000_000,
-                  }))
-                }
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Se asigna a cada Presidente nuevo: {formatMoney(form.budget)}
-              </p>
-            </div>
-            {numberField("squadSize", "Tamaño máximo de plantilla", {
-              hint: "Entre 11 y 40 jugadores",
-              tip: "Máximo de jugadores que puede acumular un club (entre 11 y 40). Si lo bajas, los clubes que lo superen quedan marcados como incumplidos hasta que ajusten su plantilla. Cuanto más pequeño, más disputa por las grandes estrellas.",
-            })}
-            {numberField("maxU21", "Máximo de jugadores sub-21", {
-              tip: "Cuántos jugadores de 21 años o menos puede tener cada plantilla (entre 0 y 15). Úsalo para obligar a mezclar promesas con experiencia: 0 = prohibidos, 15 = plantilla muy joven.",
-            })}
-            {numberField("maxPerRealClub", "Máximo por club real", {
-              hint: "Evita concentrar la plantilla",
-              tip: "Máximo de jugadores del MISMO club del mundo que puedes tener a la vez (p. ej. no más de 2 del Real Madrid). Evita que todos repitan la once titular de un equipo. El valor mínimo habitual es 1.",
-            })}
-            {numberField("minOvr", "Valoración (OVR) mínima para fichar", {
-              tip: "No se permite fichar a nadie con valoración general (OVR) por debajo de este número. Baja el valor si quieres permitir madera joven o suplentes; súbelo para un mercado exclusivo de estrellas.",
-            })}
-            {numberField("lineupLockHours", "Cierre de alineación (horas antes)", {
-              hint: "Aplica a cada jornada",
-              tip: "Horas antes del kickoff de cada jornada en que tu alineación titular queda congelada: después no puedes cambiarla hasta el siguiente partido. 0 = se bloquea al cerrar la jornada. P. ej. 1 = hasta una hora antes.",
-            })}
-          </fieldset>
-
-          <fieldset className="grid gap-4 sm:grid-cols-4">
-            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-              Cupos por posición
-            </legend>
-            {numberField("gkMin", "Porteros · mínimo", {
-              tip: "Cuántos porteros (POR) debe tener como mínimo cada plantilla para poder alinear (lo habitual es 2). Si un club queda por debajo, el motor lo marca como incumplido hasta que lo repare.",
-            })}
-            {numberField("gkMax", "Porteros · máximo", {
-              tip: "Tope de porteros por plantilla (p. ej. 3). Deja siempre el máximo por encima del mínimo para que haya margen de elección.",
-            })}
-            {numberField("defMin", "Defensas · mínimo", {
-              tip: "Defensas (LD, DFC, LI) obligatorios en plantilla. Lo habitual es 4 o más para poder rotar en tres centrales o laterales.",
-            })}
-            {numberField("defMax", "Defensas · máximo", {
-              tip: "Tope de defensas: evita plantillas de solo defensas y obliga a repartir el presupuesto entre líneas.",
-            })}
-            {numberField("midMin", "Medios · mínimo", {
-              tip: "Mediocampistas (MCD, MC, MCO) obligatorios. Sin al menos 3-4 no podrás cubrir formaciones con mediocampo cargado.",
-            })}
-            {numberField("midMax", "Medios · máximo", {
-              tip: "Tope de mediocampistas por plantilla para que el mercado tenga demanda en todas las líneas.",
-            })}
-            {numberField("fwdMin", "Delanteros · mínimo", {
-              tip: "Delanteros (ED, EI, DC) obligatorios. Lo habitual es 3 o más para asegurar gol en cualquier formación.",
-            })}
-            {numberField("fwdMax", "Delanteros · máximo", {
-              tip: "Tope de delanteros: impide acumular solo goleadores y garantiza plantillas equilibradas.",
-            })}
-          </fieldset>
-        </div>
-      </SectionCard>
-
-      {errors.length > 0 ? (
-        <div className="rounded-xl border border-rose-500/35 bg-rose-500/[0.06] p-4">
-          <p className="flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-300">
-            <AlertTriangle aria-hidden="true" className="size-4" />
-            Revisa estas reglas antes de guardar
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-            {errors.map((error) => (
-              <li key={error}>{error}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {impacted.length > 0 ? (
-        <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.07] p-4">
-          <p className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
-            <AlertTriangle aria-hidden="true" className="size-4" />
-            Impacto en presidencias actuales
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {impacted.length} club(es) superarían el nuevo máximo de{" "}
-            {form.squadSize} jugadores:{" "}
-            {impacted
-              .slice(0, 4)
-              .map((president) => `${president.clubName} (${president.squadSize})`)
-              .join(", ")}
-            {impacted.length > 4 ? ` y ${impacted.length - 4} más` : ""}. El motor marcará sus
-            plantillas como incumplidas hasta que se ajusten.
-          </p>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" className="min-h-11" disabled={busy || errors.length > 0 || !dirty}>
-          {busy ? (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Guardando…
-            </>
-          ) : (
-            "Guardar reglas"
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-11"
-          disabled={!dirty || busy}
-          onClick={() => setForm(rules)}
-        >
-          Descartar cambios
-        </Button>
-        <p className="text-xs text-muted-foreground">
-          {clubCount} clubes · {presidents.length} presidentes afectados por estas reglas.
-        </p>
-      </div>
-
-      <SectionCard title="Referencia de reglas" icon={ScrollText} bodyClassName="p-0">
-        <ul className="divide-y">
-          {RULE_DESCRIPTORS.map((descriptor) => (
-            <li key={descriptor.code} className="flex items-start gap-3 p-3">
-              <span className="display mt-0.5 rounded-md bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                {descriptor.code}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">{descriptor.title}</p>
-                <p className="text-xs text-muted-foreground">{descriptor.description}</p>
-              </div>
-              <span className="num ml-auto shrink-0 text-sm font-semibold text-primary">
-                {descriptor.value(form)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </SectionCard>
-    </form>
-  );
-}
-
 function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
   const grantAdmin = useMutation(api.tournament.grantAdmin);
   const revokeAdmin = useMutation(api.tournament.revokeAdmin);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"principal" | "coAdmin">("coAdmin");
-  const [permissions, setPermissions] = useState<string[]>(["mercado", "jugadores"]);
+  const [permissions, setPermissions] = useState<string[]>([
+    "mercado",
+    "jugadores",
+  ]);
   const [busy, setBusy] = useState(false);
   const now = useNow(60000);
 
@@ -1314,7 +1107,9 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
       });
       setEmail("");
     } catch (cause) {
-      toast.error("No se pudo asignar el rol", { description: errorMessage(cause) });
+      toast.error("No se pudo asignar el rol", {
+        description: errorMessage(cause),
+      });
     } finally {
       setBusy(false);
     }
@@ -1322,9 +1117,15 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
 
   return (
     <>
-      {overview.tournament ? <InviteCard code={overview.tournament.code} /> : null}
+      {overview.tournament ? (
+        <InviteCard code={overview.tournament.code} />
+      ) : null}
 
-      <SectionCard title="Presidentes del torneo" icon={Users} bodyClassName="p-0">
+      <SectionCard
+        title="Presidentes del torneo"
+        icon={Users}
+        bodyClassName="p-0"
+      >
         <div className="overflow-x-auto scroll-thin">
           <Table>
             <TableHeader>
@@ -1342,13 +1143,19 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
               {overview.presidents.map((president) => (
                 <TableRow key={president.id}>
                   <TableCell>
-                    <p className="text-sm font-semibold">{president.displayName}</p>
+                    <p className="text-sm font-semibold">
+                      {president.displayName}
+                    </p>
                     <p className="text-[11px] text-muted-foreground">
                       {president.nickname} · {president.email}
                     </p>
                   </TableCell>
-                  <TableCell className="text-sm">{president.clubName}</TableCell>
-                  <TableCell className="num text-center">{president.squadSize}</TableCell>
+                  <TableCell className="text-sm">
+                    {president.clubName}
+                  </TableCell>
+                  <TableCell className="num text-center">
+                    {president.squadSize}
+                  </TableCell>
                   <TableCell className="text-right">
                     <span className="num block font-semibold">
                       {formatMoney(president.budget)}
@@ -1375,13 +1182,17 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                           variant="ghost"
                           size="sm"
                           className="min-h-9"
-                          onClick={() => revokeAdmin({ userId: president.userId })}
+                          onClick={() =>
+                            revokeAdmin({ userId: president.userId })
+                          }
                         >
                           Retirar
                         </Button>
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Presidencia</span>
+                      <span className="text-xs text-muted-foreground">
+                        Presidencia
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -1401,7 +1212,10 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
               ))}
               {overview.presidents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={7}
+                    className="text-sm text-muted-foreground"
+                  >
                     Todavía no hay Presidentes registrados en el torneo.
                   </TableCell>
                 </TableRow>
@@ -1414,9 +1228,10 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
       <SectionCard title="Invitar a un Administrador" icon={UserPlus}>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            El rol administrativo se asigna a una cuenta existente: la persona debe registrarse
-            primero con ese correo. Puede seguir siendo Presidente de su club. Para invitar a
-            nuevos <strong>Presidentes</strong> usa el link compartible de arriba.
+            El rol administrativo se asigna a una cuenta existente: la persona
+            debe registrarse primero con ese correo. Puede seguir siendo
+            Presidente de su club. Para invitar a nuevos{" "}
+            <strong>Presidentes</strong> usa el link compartible de arriba.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -1445,7 +1260,9 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
               </FieldLabel>
               <Select
                 value={role}
-                onValueChange={(value) => setRole(value as "principal" | "coAdmin")}
+                onValueChange={(value) =>
+                  setRole(value as "principal" | "coAdmin")
+                }
               >
                 <SelectTrigger id="adminRole" className="min-h-11">
                   <SelectValue />
@@ -1510,16 +1327,27 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
         </form>
       </SectionCard>
 
-      <SectionCard title="Administradores actuales" icon={ShieldCheck} bodyClassName="p-0">
+      <SectionCard
+        title="Administradores actuales"
+        icon={ShieldCheck}
+        bodyClassName="p-0"
+      >
         <ul className="divide-y">
           {overview.admins.map((admin) => (
-            <li key={admin.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
+            <li
+              key={admin.id}
+              className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center"
+            >
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{admin.displayName}</p>
-                <p className="text-[11px] text-muted-foreground">{admin.email}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {admin.email}
+                </p>
               </div>
               <Badge variant="outline">
-                {admin.role === "principal" ? "Administrador principal" : "Co-Administrador"}
+                {admin.role === "principal"
+                  ? "Administrador principal"
+                  : "Co-Administrador"}
               </Badge>
               <p className="text-[11px] text-muted-foreground">
                 {admin.permissions.length} permiso(s)
@@ -1537,7 +1365,10 @@ function AuditList({ entries }: { entries: AdminOverviewView["activity"] }) {
   return (
     <ul className="divide-y">
       {entries.map((entry) => (
-        <li key={entry.id} className="flex flex-col gap-1 p-3 sm:flex-row sm:gap-4">
+        <li
+          key={entry.id}
+          className="flex flex-col gap-1 p-3 sm:flex-row sm:gap-4"
+        >
           <span className="num shrink-0 text-[11px] text-muted-foreground sm:w-32">
             {new Date(entry.createdAt).toLocaleString("es-ES", {
               day: "2-digit",
@@ -1548,7 +1379,9 @@ function AuditList({ entries }: { entries: AdminOverviewView["activity"] }) {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">{entry.action}</p>
-            <p className="text-xs leading-snug text-muted-foreground">{entry.detail}</p>
+            <p className="text-xs leading-snug text-muted-foreground">
+              {entry.detail}
+            </p>
           </div>
           <span className="shrink-0 text-[11px] text-muted-foreground">
             {entry.actorName} · {relativeTime(entry.createdAt, now)}

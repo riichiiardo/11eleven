@@ -19,19 +19,40 @@ import { errorMessage } from "@/lib/errors";
 import { useLocation } from "react-router";
 import { useDashboardState } from "./dashboard-context";
 import { DashboardUnavailable } from "./DashboardUnavailable";
+import {
+  additionalChecks,
+  type ConfiguredRules,
+} from "@/lib/rule-configuration";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";
 import { RuleCheckList } from "@/components/eleven/RuleCheckList";
-import { OvrBadge, PlayerAvatar, PositionPill } from "@/components/eleven/PlayerBits";
+import {
+  OvrBadge,
+  PlayerAvatar,
+  PositionPill,
+} from "@/components/eleven/PlayerBits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, RotateCcw, Search, Shirt, Sparkles, Wand2, X } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  RotateCcw,
+  Search,
+  Shirt,
+  Sparkles,
+  Wand2,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const EMPTY_SQUAD: AppStateView["squad"] = [];
 
-export default function Formation({ state: directState }: { state?: AppStateView }) {
+export default function Formation({
+  state: directState,
+}: {
+  state?: AppStateView;
+}) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
   const location = useLocation();
@@ -54,26 +75,42 @@ export default function Formation({ state: directState }: { state?: AppStateView
   const rules = state?.rules ?? null;
   const squad = state?.squad ?? EMPTY_SQUAD;
 
-  const [fc27Code, setFc27Code] = useState(() => rules?.fc27FormationCode ?? "");
+  const [fc27Code, setFc27Code] = useState(
+    () => rules?.fc27FormationCode ?? "",
+  );
   const [instructions, setInstructions] = useState(
     () => rules?.formationInstructions ?? "",
   );
   const evaluationInput = state?.evaluation;
 
-  const evaluation = useMemo(
-    () =>
-      rules && lineup
-        ? evaluateLineup(rules, squad, lineup, evaluationInput ?? undefined)
-        : null,
-    [rules, squad, lineup, evaluationInput],
-  );
+  const evaluation = useMemo(() => {
+    if (!rules || !lineup) return null;
+    const result = evaluateLineup(
+      rules,
+      squad,
+      lineup,
+      evaluationInput ?? undefined,
+    );
+    const configured = rules as ConfiguredRules;
+    if (configured.configuration)
+      result.checks = result.checks.filter(
+        (check) =>
+          check.id !== "lineup-u20" && check.id !== "lineup-club-nation",
+      );
+    result.checks.push(
+      ...additionalChecks(configured, squad, result.starters, "xi"),
+    );
+    result.valid = result.checks.every((check) => check.passed);
+    return result;
+  }, [rules, squad, lineup, evaluationInput]);
 
   const assignedIds = new Set(
     (lineup?.slots ?? [])
       .map((slot) => slot.playerId)
       .filter((id): id is string => Boolean(id)),
   );
-  const selectedPlayer = squad.find((player) => player.playerId === selectedPlayerId) ?? null;
+  const selectedPlayer =
+    squad.find((player) => player.playerId === selectedPlayerId) ?? null;
   const bench = squad
     .filter((player) => !assignedIds.has(player.playerId as string))
     .sort((a, b) => b.ovr - a.ovr);
@@ -88,10 +125,13 @@ export default function Formation({ state: directState }: { state?: AppStateView
     );
   });
 
-  if (!state || !rules || !lineup || !evaluation || !state.club) return <DashboardUnavailable title="Formación" />;
+  if (!state || !rules || !lineup || !evaluation || !state.club)
+    return <DashboardUnavailable title="Formación" />;
 
   const definition = FORMATIONS[lineup.formation];
-  const formationChanged = draft ? draft.formation !== serverLineup?.formation : false;
+  const formationChanged = draft
+    ? draft.formation !== serverLineup?.formation
+    : false;
   const isDirty = Boolean(draft);
 
   const highlight = selectedPlayer
@@ -120,9 +160,13 @@ export default function Formation({ state: directState }: { state?: AppStateView
       return;
     }
     const nextSlots = definition.slots.map((item) => {
-      const current = lineup.slots.find((entry) => entry.slotId === item.id)?.playerId ?? null;
-      if (item.id === slotId) return { slotId: item.id, playerId: selectedPlayer.playerId };
-      if (current === selectedPlayer.playerId) return { slotId: item.id, playerId: null };
+      const current =
+        lineup.slots.find((entry) => entry.slotId === item.id)?.playerId ??
+        null;
+      if (item.id === slotId)
+        return { slotId: item.id, playerId: selectedPlayer.playerId };
+      if (current === selectedPlayer.playerId)
+        return { slotId: item.id, playerId: null };
       return { slotId: item.id, playerId: current };
     });
     setDraft({ formation: lineup.formation, slots: nextSlots });
@@ -134,7 +178,8 @@ export default function Formation({ state: directState }: { state?: AppStateView
       assignToSlot(slotId);
       return;
     }
-    const playerId = lineup.slots.find((slot) => slot.slotId === slotId)?.playerId ?? null;
+    const playerId =
+      lineup.slots.find((slot) => slot.slotId === slotId)?.playerId ?? null;
     if (playerId) {
       setSelectedPlayerId(playerId);
     } else {
@@ -149,7 +194,9 @@ export default function Formation({ state: directState }: { state?: AppStateView
     setDraft({
       formation: lineup.formation,
       slots: lineup.slots.map((slot) =>
-        slot.playerId === playerId ? { slotId: slot.slotId, playerId: null } : slot,
+        slot.playerId === playerId
+          ? { slotId: slot.slotId, playerId: null }
+          : slot,
       ),
     });
     setSelectedPlayerId(null);
@@ -203,7 +250,8 @@ export default function Formation({ state: directState }: { state?: AppStateView
         u20InStartingLineup: rules.u20InStartingLineup,
         sameNationalityMin: rules.sameNationalityMin,
         sameNationalityRule: rules.sameNationalityRule,
-        sameNationalityMatchDurationMinutes: rules.sameNationalityMatchDurationMinutes,
+        sameNationalityMatchDurationMinutes:
+          rules.sameNationalityMatchDurationMinutes,
         clubNationalityMin: rules.clubNationalityMin,
       });
       setDraft(null);
@@ -225,7 +273,8 @@ export default function Formation({ state: directState }: { state?: AppStateView
       await autoFill({ formation: lineup.formation });
       setDraft(null);
       toast.success("Alineación automática aplicada", {
-        description: "El motor eligió el mejor once posible y lo validó contra las reglas.",
+        description:
+          "El motor eligió el mejor once posible y lo validó contra las reglas.",
       });
     } catch (cause) {
       toast.error("No se pudo aplicar la alineación automática", {
@@ -242,8 +291,9 @@ export default function Formation({ state: directState }: { state?: AppStateView
         <div>
           <h1 className="display text-2xl">Formación y táctica</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Selecciona un jugador y después la posición donde quieres alinearlo. No hace falta
-            arrastrar: el flujo es compatible con teclado y lectores de pantalla.
+            Selecciona un jugador y después la posición donde quieres alinearlo.
+            No hace falta arrastrar: el flujo es compatible con teclado y
+            lectores de pantalla.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -314,7 +364,9 @@ export default function Formation({ state: directState }: { state?: AppStateView
             )}
           >
             <span className="display text-sm">Automática</span>
-            <span className="text-[11px] text-muted-foreground">Sin código fijo</span>
+            <span className="text-[11px] text-muted-foreground">
+              Sin código fijo
+            </span>
           </button>
           {FORMATION_CODES.map((code) => {
             const option = FORMATIONS[code];
@@ -334,7 +386,9 @@ export default function Formation({ state: directState }: { state?: AppStateView
                 )}
               >
                 <span className="display text-sm">{option.label}</span>
-                <span className="text-[11px] text-muted-foreground">{option.shape}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {option.shape}
+                </span>
               </button>
             );
           })}
@@ -346,8 +400,9 @@ export default function Formation({ state: directState }: { state?: AppStateView
             : ""}
         </p>
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          Los 22 esquemas replican el menú de tácticas del FC 27: selecciónalos para fijar el
-          código y recolocar el once, o pulsa «Automática» para dejar el esquema libre.
+          Los {FORMATION_CODES.length} esquemas disponibles permiten fijar el
+          código y recolocar el once, o pulsa «Automática» para dejar el esquema
+          libre.
         </p>
       </SectionCard>
 
@@ -355,7 +410,10 @@ export default function Formation({ state: directState }: { state?: AppStateView
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
-              <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+              <span
+                className="size-2 rounded-full bg-primary/20"
+                aria-hidden="true"
+              />
               Código de formación FC 27
             </label>
             <Input
@@ -366,13 +424,17 @@ export default function Formation({ state: directState }: { state?: AppStateView
               className="font-mono"
             />
             <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              El código seleccionado se enlaza con los 22 esquemas del menú de tácticas del FC 27
-para generar un XI siempre legal. El estado real lo valida el motor de reglas.
+              El código seleccionado se enlaza con el catálogo de formaciones
+              para generar un XI siempre legal. El estado real lo valida el
+              motor de reglas.
             </p>
           </div>
           <div>
             <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
-              <span className="size-2 rounded-full bg-primary/20" aria-hidden="true" />
+              <span
+                className="size-2 rounded-full bg-primary/20"
+                aria-hidden="true"
+              />
               Instrucciones adicionales
             </label>
             <textarea
@@ -384,8 +446,9 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
               className="resize-y min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50"
             />
             <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              Cambios, rango de minutos, bloqueos de posiciones… El presidente los anota aquí
-              y queda registrada en la config de reglas del torneo.
+              Cambios, rango de minutos, bloqueos de posiciones… El presidente
+              los anota aquí y queda registrada en la config de reglas del
+              torneo.
             </p>
           </div>
         </div>
@@ -413,8 +476,8 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
                     Colocando a {selectedPlayer.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    {POSITION_LABEL[selectedPlayer.position]} · OVR {selectedPlayer.ovr} ·
-                    posiciones resaltadas compatibles
+                    {POSITION_LABEL[selectedPlayer.position]} · OVR{" "}
+                    {selectedPlayer.ovr} · posiciones resaltadas compatibles
                   </p>
                 </div>
                 <Button
@@ -433,7 +496,9 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
                     variant="outline"
                     size="sm"
                     className="min-h-9"
-                    onClick={() => removeFromLineup(selectedPlayer.playerId as string)}
+                    onClick={() =>
+                      removeFromLineup(selectedPlayer.playerId as string)
+                    }
                   >
                     Quitar del once
                   </Button>
@@ -441,8 +506,8 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
               </div>
             ) : (
               <p className="mb-3 rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                Selecciona una posición ocupada para editar a ese jugador, o elige un jugador en
-                el panel derecho para colocarlo en el campo.
+                Selecciona una posición ocupada para editar a ese jugador, o
+                elige un jugador en el panel derecho para colocarlo en el campo.
               </p>
             )}
 
@@ -461,14 +526,16 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
           <SectionCard title="Validación en vivo" icon={Sparkles}>
             <div className="mb-3 rounded-lg border p-3">
               <p className="display text-sm">
-                {evaluation.valid ? "Alineación válida" : "Alineación incompleta"}
+                {evaluation.valid
+                  ? "Alineación válida"
+                  : "Alineación incompleta"}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {evaluation.valid
                   ? "Puedes guardar: el once cumple posición, cupos y reglas del torneo."
-                  : evaluation.errors[0] ??
+                  : (evaluation.errors[0] ??
                     evaluation.checks.find((check) => !check.passed)?.detail ??
-                    "Completa el once para poder guardar."}
+                    "Completa el once para poder guardar.")}
               </p>
             </div>
             <RuleCheckList checks={evaluation.checks} />
@@ -494,8 +561,8 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
               )}
             </Button>
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-              El mismo motor valida en el servidor: si algo cambia mientras editas, la operación
-              se rechaza con la explicación exacta.
+              El mismo motor valida en el servidor: si algo cambia mientras
+              editas, la operación se rechaza con la explicación exacta.
             </p>
           </SectionCard>
 
@@ -524,7 +591,9 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
                 <li key={player.squadPlayerId}>
                   <button
                     type="button"
-                    onClick={() => setSelectedPlayerId(player.playerId as string)}
+                    onClick={() =>
+                      setSelectedPlayerId(player.playerId as string)
+                    }
                     aria-pressed={selectedPlayerId === player.playerId}
                     className={cn(
                       "flex min-h-14 w-full items-center gap-3 p-3 text-left transition-colors hover:bg-accent",
@@ -539,9 +608,14 @@ para generar un XI siempre legal. El estado real lo valida el motor de reglas.
                       photo={player.photo}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{player.name}</span>
+                      <span className="block truncate text-sm font-semibold">
+                        {player.name}
+                      </span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <PositionPill position={player.position} group={player.group} />
+                        <PositionPill
+                          position={player.position}
+                          group={player.group}
+                        />
                         {formatMoney(player.value)}
                       </span>
                     </span>
