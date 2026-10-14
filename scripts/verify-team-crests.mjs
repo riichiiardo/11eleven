@@ -22,6 +22,12 @@ for (const [name, entry] of Object.entries(manifest)) {
   const isWebp = bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
   assert.ok(isPng || isWebp, `${name}: invalid image signature`);
   assert.ok(bytes.length > 100, `${name}: empty image`);
+  if (process.argv.includes("--published")) {
+    const response = await fetch(`https://riichiiardo.github.io/11eleven/${entry.path}`);
+    assert.ok(response.ok, `${name}: published HTTP ${response.status}`);
+    assert.ok(response.headers.get("content-type")?.startsWith("image/"));
+    assert.ok(Buffer.from(await response.arrayBuffer()).equals(bytes), `${name}: published image differs from repository`);
+  }
   console.log(`${name}: ${entry.path} (${bytes.length} bytes)`);
 }
 console.log("18/18 club crests present and valid.");
