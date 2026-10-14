@@ -92,5 +92,14 @@ export default function DashboardLayout() {
   const fallbackPage = routePath.endsWith("/club/plantilla") ? <SquadPage />
     : routePath.endsWith("/formacion") ? <FormationPage />
       : routePath.endsWith("/club") ? <ClubPage /> : <HomePage />;
-  return <DashboardStateProvider state={state}><AppShell state={state}>{outlet ?? fallbackPage}</AppShell></DashboardStateProvider>;
+  const isCoreDashboardRoute =
+    routePath === "/dashboard" ||
+    routePath.endsWith("/dashboard/club") ||
+    routePath.endsWith("/dashboard/club/plantilla") ||
+    routePath.endsWith("/dashboard/formacion");
+  return (
+    <DashboardStateProvider state={state}>
+      <AppShell state={state}>{isCoreDashboardRoute ? fallbackPage : outlet}</AppShell>
+    </DashboardStateProvider>
+  );
 }
