@@ -3,7 +3,7 @@ import { rpc } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatMoney } from "@/convex/rulesEngine";
-import { type ReviewedEntry } from "@/lib/draft-prelist";
+import { validSofifaUrl, type ReviewedEntry } from "@/lib/draft-prelist";
 
 type ReviewEntry = ReviewedEntry & {
   name?: string;
@@ -162,7 +162,7 @@ export function DraftReviews() {
                       ? `Equipo vendedor: ${entry.seller ?? "No disponible"}`
                       : "Jugador nuevo · Datos declarados por el presidente"}
                   </p>
-                  {entry.kind === "owned" && (
+                  {validSofifaUrl(entry.sofifaUrl) && (
                     <a
                       href={entry.sofifaUrl}
                       target="_blank"

@@ -94,8 +94,8 @@ begin
     perform (item->>'id')::uuid;
     if item->>'id'=any(seen_ids) then raise exception 'Selección repetida.'; end if;
     seen_ids:=array_append(seen_ids,item->>'id');
+    if coalesce(item->>'sofifaUrl','')!~'^https://sofifa[.]com/player/[1-9][0-9]*(/[^[:space:]]*)?$' or length(item->>'sofifaUrl')>500 then raise exception 'Introduce la ficha HTTPS de SoFIFA.'; end if;
     if item->>'kind'='owned' then
-      if coalesce(item->>'sofifaUrl','')!~'^https://sofifa[.]com/player/[1-9][0-9]*(/[^[:space:]]*)?$' or length(item->>'sofifaUrl')>500 then raise exception 'Introduce la ficha HTTPS de SoFIFA.'; end if;
       select p.* into player from public.players p join public.squad_players sp on sp.player_id=p.id
         join public.presidents owner on owner.id=sp.president_id and owner.club_id=sp.club_id and owner.tournament_id=sp.tournament_id
         where p.id=(item->>'playerId')::uuid and sp.club_id=(item->>'clubId')::uuid
@@ -113,7 +113,7 @@ begin
         or exists(select 1 from jsonb_array_elements_text(item->'positions') pos where pos not in ('POR','LD','DFC','LI','MCD','MC','MCO','MD','MI','ED','EI','DC'))
         or (select count(*)<>count(distinct value) from jsonb_array_elements_text(item->'positions')) then raise exception 'Posiciones inválidas o repetidas.'; end if;
       key:=lower(trim(item->>'name'));
-      item:=jsonb_build_object('id',item->>'id','kind','new','name',trim(item->>'name'),'price',item->'price','ovr',item->'ovr','positions',item->'positions','nationality',trim(item->>'nationality'));
+      item:=jsonb_build_object('id',item->>'id','kind','new','name',trim(item->>'name'),'price',item->'price','ovr',item->'ovr','positions',item->'positions','nationality',trim(item->>'nationality'),'sofifaUrl',item->>'sofifaUrl');
     else raise exception 'Tipo de jugador no admitido.';
     end if;
     if key=any(seen) then raise exception 'Jugador repetido en la prelista.'; end if;

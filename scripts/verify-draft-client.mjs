@@ -26,6 +26,7 @@ try {
     ovr: 80,
     positions: ["MC", "MCO"],
     nationality: "Colombia",
+    sofifaUrl: "https://sofifa.com/player/12345/carlos-nuevo/",
   };
   assert.ok(prelistEntrySchema.safeParse(entry).success);
   for (const patch of [
@@ -37,6 +38,9 @@ try {
     { positions: ["MC", "MC"] },
     { nationality: "" },
     { name: "Carlos" },
+    { sofifaUrl: "" },
+    { sofifaUrl: undefined },
+    { sofifaUrl: "https://sofifa.com.evil.invalid/player/1" },
   ])
     assert.ok(!prelistEntrySchema.safeParse({ ...entry, ...patch }).success);
   assert.throws(() => validatePrelist([entry, entry], [], 6), /repetir/);

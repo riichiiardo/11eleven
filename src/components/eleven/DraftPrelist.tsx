@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { rpc } from "@/lib/supabase/client";
 import {
   DRAFT_POSITIONS,
+  validSofifaUrl,
   prelistEntrySchema,
   validatePrelist,
   type PrelistData,
@@ -101,6 +102,7 @@ export function DraftPrelist() {
             ovr: Number(ovr),
             nationality,
             positions,
+            sofifaUrl,
           },
     );
     if (!parsed.success) {
@@ -255,15 +257,6 @@ export function DraftPrelist() {
                           ))}
                       </select>
                     </label>
-                    <label className="space-y-1">
-                      Enlace actual de SoFIFA
-                      <Input
-                        type="url"
-                        value={sofifaUrl}
-                        onChange={(e) => setSofifaUrl(e.target.value)}
-                        placeholder="https://sofifa.com/player/…"
-                      />
-                    </label>
                     {player && (
                       <p className="rounded border p-3 md:col-span-2">
                         Datos de la BD:{" "}
@@ -335,6 +328,17 @@ export function DraftPrelist() {
                   </>
                 )}
                 <label className="space-y-1">
+                  Enlace actual de SoFIFA
+                  <Input
+                    type="url"
+                    required
+                    maxLength={500}
+                    value={sofifaUrl}
+                    onChange={(e) => setSofifaUrl(e.target.value)}
+                    placeholder="https://sofifa.com/player/…"
+                  />
+                </label>
+                <label className="space-y-1">
                   Precio de adquisición (€)
                   <Input
                     type="number"
@@ -383,7 +387,7 @@ export function DraftPrelist() {
                               ? `${existing.nationality} · ${existing.position} · Media ${existing.ovr}`
                               : "La propiedad del jugador ha cambiado"}
                         </p>
-                        {entry.kind === "owned" && (
+                        {validSofifaUrl(entry.sofifaUrl) && (
                           <a
                             className="text-sm underline"
                             href={entry.sofifaUrl}
@@ -402,7 +406,8 @@ export function DraftPrelist() {
                           {entry.reviewNote ? `: ${entry.reviewNote}` : ""}
                         </p>
                       </div>
-                      {entry.reviewStatus !== "approved" && (
+                      {(entry.reviewStatus !== "approved" ||
+                        !validSofifaUrl(entry.sofifaUrl)) && (
                         <Button
                           variant="outline"
                           type="button"
@@ -411,10 +416,10 @@ export function DraftPrelist() {
                             setEditingId(entry.id);
                             setKind(entry.kind);
                             setPrice(String(entry.price));
+                            setSofifaUrl(entry.sofifaUrl ?? "");
                             if (entry.kind === "owned") {
                               setClubId(entry.clubId);
                               setPlayerId(entry.playerId);
-                              setSofifaUrl(entry.sofifaUrl);
                             } else {
                               setName(entry.name);
                               setOvr(String(entry.ovr));

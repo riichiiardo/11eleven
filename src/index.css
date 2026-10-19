@@ -3,6 +3,34 @@
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 
+/* Reserve separate space for native dropdown text and the up/down indicator. */
+select:not([multiple]) {
+  appearance: none;
+  padding-inline-start: 0.75rem;
+  padding-inline-end: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='20' viewBox='0 0 16 20' fill='none' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7 3-3 3 3m-6 6 3 3 3-3'/%3E%3C/svg%3E");
+  background-position: right 0.875rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem 1.25rem;
+  text-overflow: ellipsis;
+}
+
+.dark select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='20' viewBox='0 0 16 20' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7 3-3 3 3m-6 6 3 3 3-3'/%3E%3C/svg%3E");
+}
+
+[data-slot="select-trigger"] {
+  column-gap: 0.75rem;
+  padding-inline-end: 1rem;
+}
+
+@media (forced-colors: active) {
+  select:not([multiple]) {
+    appearance: auto;
+    background-image: none;
+  }
+}
+
 /* DO NOT CHANGE */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);

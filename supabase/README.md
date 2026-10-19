@@ -90,6 +90,9 @@ Este script es idempotente; no elimina datos ni ejecuta traspasos.
 - Las respuestas se conservan por jugador; Mi club consulta cambios cada 15 segundos
   cuando no hay modificaciones sin guardar. No envía correos.
 - Los jugadores nuevos son propuestas, no inserciones en el catálogo oficial.
+- El enlace HTTPS a la ficha del jugador en SoFIFA es obligatorio tanto para
+  jugadores de otro presidente como para jugadores nuevos; se conserva en la
+  prelista y está disponible para el revisor.
 - La prelista no altera las rondas, los fichajes ni las bajas ejecutadas por el motor
   de transferencias existente. Su aprobación es exclusivamente una validación previa.
 

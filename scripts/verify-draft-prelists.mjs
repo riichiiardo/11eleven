@@ -89,6 +89,7 @@ try {
     ovr: 81,
     nationality: "Argentina",
     positions: ["MC", "MCO"],
+    sofifaUrl: `https://sofifa.com/player/${12345 + n}/nuevo-jugador/`,
   });
   const owned = {
     id: uuid(100),
@@ -137,6 +138,13 @@ try {
     /Posiciones/,
   );
   await assert.rejects(save([{ ...manual(1), ovr: 80.5 }]), /media/);
+  await assert.rejects(save([{ ...manual(1), sofifaUrl: "" }]), /SoFIFA/);
+  await assert.rejects(
+    save([
+      { ...manual(1), sofifaUrl: "https://sofifa.com.evil.invalid/player/1" },
+    ]),
+    /SoFIFA/,
+  );
   await assert.rejects(save([owned, { ...owned, id: uuid(999) }]), /repetido/);
   await assert.rejects(
     save(Array.from({ length: 7 }, (_, n) => manual(n + 1))),
@@ -157,6 +165,11 @@ try {
   assert.equal((await state()).limit, 7);
   let revision = await save(Array.from({ length: 7 }, (_, n) => manual(n + 1)));
   assert.equal(revision, 1);
+  assert.equal(
+    (await state()).entries[0].sofifaUrl,
+    manual(1).sofifaUrl,
+    "New-player SoFIFA links must survive persistence",
+  );
   await assert.rejects(save([owned], 0), /cambió/);
   revision = await save([owned, manual(1)], revision, true, [uuid(51)]);
   assert.equal((await state()).status, "submitted");
@@ -185,6 +198,11 @@ try {
   let queue = await review();
   assert.equal(queue.lists[0].entries[0].name, "Player 2");
   assert.equal(queue.lists[0].entries[0].nationality, "Colombia");
+  assert.equal(
+    queue.lists[0].entries[1].sofifaUrl,
+    manual(1).sofifaUrl,
+    "Reviewers must receive the new-player SoFIFA link",
+  );
   await db.query("select public.review_draft_entry($1,$2,$3,true,'Correcto')", [
     uuid(31),
     uuid(100),

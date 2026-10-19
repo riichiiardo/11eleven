@@ -69,6 +69,7 @@ export const prelistEntrySchema = z.discriminatedUnion("kind", [
       .max(12)
       .refine((v) => new Set(v).size === v.length, "Hay posiciones repetidas."),
     nationality: z.string().trim().min(2).max(80),
+    sofifaUrl: url,
   }),
 ]);
 export type PrelistEntry = z.infer<typeof prelistEntrySchema>;
