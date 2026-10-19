@@ -19,6 +19,7 @@ import SquadPage from "./Squad.tsx";
 import FormationPage from "./Formation.tsx";
 import { DashboardStateProvider } from "./dashboard-context";
 import { SectionErrorBoundary } from "@/components/eleven/SectionErrorBoundary";
+import { TransferNotifications } from "@/components/eleven/TransferNotifications";
 
 export default function DashboardLayout() {
   const { state, isLoading } = useTournamentState();
@@ -105,6 +106,7 @@ export default function DashboardLayout() {
   return (
     <DashboardStateProvider state={state}>
       <AppShell state={state}>
+        {!state.needsClub && <TransferNotifications />}
         <SectionErrorBoundary key={location.pathname}>
           {isCoreDashboardRoute ? fallbackPage : <Outlet context={state} />}
         </SectionErrorBoundary>

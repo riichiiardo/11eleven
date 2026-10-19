@@ -1,9 +1,15 @@
 import type { MarketPlayerView } from "@/convex/appTypes";
 import { formatMoney } from "@/convex/rulesEngine";
-import { AvailabilityBadge, OvrBadge, PlayerAvatar, PositionPill } from "./PlayerBits";
+import {
+  AvailabilityBadge,
+  OvrBadge,
+  PlayerAvatar,
+  PositionPill,
+} from "./PlayerBits";
 import { Button } from "@/components/ui/button";
 import { Lock, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { bidMoney, type DepartureBid } from "@/hooks/use-departure-bids";
 
 /**
  * Market card (prompt §17-20): everything the President needs to decide without
@@ -16,11 +22,15 @@ export function MarketPlayerCard({
   budgetAvailable,
   onOffer,
   showDetail = false,
+  bid,
+  bidsReady = true,
 }: {
   player: MarketPlayerView;
   budgetAvailable: number;
   onOffer: (player: MarketPlayerView) => void;
   showDetail?: boolean;
+  bid?: DepartureBid;
+  bidsReady?: boolean;
 }) {
   const isFree = player.kind === "libre";
   // "libre" is not a squad availability flag: free agents have no President to
@@ -101,15 +111,30 @@ export function MarketPlayerCard({
             : player.blockedReason}
         </p>
       ) : null}
+      {bid && (
+        <div className="rounded border p-2 text-xs">
+          <p>
+            {bid.closed
+              ? "Puja cerrada · acuerdo reservado"
+              : `${bid.count} equipo(s) interesado(s)`}
+          </p>
+          {bid.highestCash != null && (
+            <p>Mayor oferta: {bidMoney(bid.highestCash)}</p>
+          )}
+          {bid.myCash != null && <p>Tu oferta: {bidMoney(bid.myCash)}</p>}
+          <p>El propietario decide; no hay adjudicación automática.</p>
+        </div>
+      )}
 
       <div className="mt-auto flex items-center gap-2">
-        {player.offerable ? (
+        {player.offerable && !bid?.closed ? (
           <Button
             type="button"
             className="min-h-9 flex-1"
             onClick={() => onOffer(player)}
+            disabled={!bidsReady}
           >
-            {isFree ? "Fichar" : "Oferta"}
+            {isFree ? "Fichar" : bid ? "Pujar / mejorar oferta" : "Oferta"}
           </Button>
         ) : (
           <Button
@@ -120,7 +145,11 @@ export function MarketPlayerCard({
             title={player.blockedReason ?? undefined}
           >
             <Lock className="size-3.5" aria-hidden="true" />
-            {player.ownerIsMe ? "Tu jugador" : "No disponible"}
+            {player.ownerIsMe
+              ? "Tu jugador"
+              : bid?.closed
+                ? "Acuerdo cerrado"
+                : "No disponible"}
           </Button>
         )}
       </div>

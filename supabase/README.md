@@ -136,3 +136,28 @@ Pruebas aisladas: `node scripts/verify-draft-outgoing.mjs`. Cubren publicación,
 tope de seis, acuerdos firmes en ambos lados, ofertas abiertas, valor actualizado,
 traspasos previos, limpieza del once, aislamiento por Universo y propietario,
 permisos, rollback y ausencia de abonos duplicados. No utilizan cuentas reales.
+
+## Pujas y notificaciones de bajas anunciadas
+
+Aplicar `supabase/draft-bids.sql` después de `draft-outgoing.sql`, antes del frontend.
+No crea ofertas ni notificaciones ficticias durante la instalación.
+
+- Mi club muestra estado, clubes interesados, importes y propuestas de cada baja.
+  Los detalles de las ofertas son privados para el vendedor. Los compradores ven
+  el número de interesados y la mayor oferta individual en efectivo para competir.
+  Los paquetes y trueques se identifican como importe total, sin presentarlos
+  incorrectamente como el precio de un solo jugador.
+- Mercado permite pujar por bajas anunciadas incluso con la ventana de ejecución
+  cerrada. Solo se registran ofertas; nunca se compra ni reserva automáticamente.
+  Mejorar una puja actualiza la misma oferta y comprueba el presupuesto disponible.
+- El vendedor revisa y acepta o rechaza en Negociaciones. Puede elegir una oferta
+  menor: no hay adjudicación automática al mayor postor. Un acuerdo firme cierra
+  las ofertas competidoras que compartan jugadores y evita dobles reservas.
+- Notificaciones dentro de la app para nuevas/mejores ofertas, pujas superadas y
+  respuestas del vendedor. Lectura persistente por presidente; consulta cada
+  15 segundos. No son correos, notificaciones móviles ni avisos del navegador.
+- No cambia la regla de rescisión: solo acuerdos aceptados o reservados protegen
+  al jugador al inicio del draft, no una puja abierta.
+
+Prueba aislada: `node scripts/verify-draft-bids.mjs`. La demostración local incluye
+ofertas y avisos ficticios; `?bidder` permite revisar el formulario de puja.

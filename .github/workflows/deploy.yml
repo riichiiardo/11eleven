@@ -38,6 +38,7 @@ jobs:
         run: |
           node scripts/verify-draft-prelists.mjs
           node scripts/verify-draft-outgoing.mjs
+          node scripts/verify-draft-bids.mjs
 
       - name: Convex regression tests
         if: ${{ env.CONVEX_DEPLOYMENT != '' }}

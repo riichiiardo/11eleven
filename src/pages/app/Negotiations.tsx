@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { AppStateView, OfferView } from "@/convex/appTypes";
 import { formatMoney } from "@/convex/rulesEngine";
 import { useQuery } from "convex/react";
-import { useOutletContext } from "react-router";
+import { useOutletContext, useSearchParams } from "react-router";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { OfferCard } from "@/components/eleven/OfferCard";
 import {
@@ -28,7 +27,20 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Inbox }> = [
 
 export default function Negotiations() {
   const state = useOutletContext<AppStateView>();
-  const [tab, setTab] = useState<Tab>("recibidas");
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get("tab");
+  const tab: Tab = TABS.some((t) => t.id === requestedTab)
+    ? (requestedTab as Tab)
+    : "recibidas";
+  const setTab = (next: Tab) =>
+    setParams(
+      (previous) => {
+        const updated = new URLSearchParams(previous);
+        updated.set("tab", next);
+        return updated;
+      },
+      { replace: true },
+    );
   const overview = useQuery(api.market.overview);
 
   const offers: OfferView[] =
@@ -69,7 +81,9 @@ export default function Negotiations() {
           tone={counts.recibidas > 0 ? "gold" : "slate"}
           value={String(counts.recibidas)}
           label="Esperan tu respuesta"
-          hint={counts.recibidas > 0 ? "Alguien quiere negociar" : "Nada pendiente"}
+          hint={
+            counts.recibidas > 0 ? "Alguien quiere negociar" : "Nada pendiente"
+          }
         />
         <StatTile
           icon={Send}

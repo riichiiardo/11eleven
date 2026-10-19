@@ -30,6 +30,8 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDepartureBids } from "@/hooks/use-departure-bids";
+import { DepartureBidDialog } from "@/components/eleven/DepartureBidDialog";
 
 type BrowseScope = MarketScope | "transferibles";
 const SCOPES: BrowseScope[] = ["todos", "libre", "clubes", "transferibles"];
@@ -52,6 +54,7 @@ const GROUPS = [
 ] as const;
 
 export default function Market() {
+  const bidding = useDepartureBids();
   const state = useOutletContext<AppStateView>();
   const [scope, setScope] = useState<BrowseScope>("todos");
   const [search, setSearch] = useState("");
@@ -237,6 +240,11 @@ export default function Market() {
         </div>
       </SectionCard>
 
+      {bidding.error && (
+        <p role="alert">
+          No se pudo actualizar el estado de las pujas: {bidding.error}
+        </p>
+      )}
       <section
         aria-label="Resultados del mercado"
         className="flex flex-col gap-3"
@@ -278,6 +286,8 @@ export default function Market() {
               <li key={player.playerId}>
                 <MarketPlayerCard
                   player={player}
+                  bid={bidding.bids.find((b) => b.playerId === player.playerId)}
+                  bidsReady={!bidding.loading && !bidding.error}
                   budgetAvailable={state.budget.available}
                   onOffer={(target) => setSelected(target)}
                   showDetail
@@ -288,7 +298,15 @@ export default function Market() {
         )}
       </section>
 
-      {selected ? (
+      {selected &&
+      bidding.bids.some((b) => b.playerId === selected.playerId) ? (
+        <DepartureBidDialog
+          key={selected.playerId}
+          player={selected}
+          bid={bidding.bids.find((b) => b.playerId === selected.playerId)!}
+          onClose={() => setSelected(null)}
+        />
+      ) : selected ? (
         <OfferDialog
           key={selected.playerId}
           player={selected}

@@ -367,9 +367,9 @@ begin
   for v_blocker in
     select case
       when pl.id is null then 'Jugador desconocido en la oferta.'
-      when owned.president_id is null then null
-      when owned.president_id = v_me.id then 'No puedes pedirte un jugador a ti mismo.'
-      when owned.availability = 'intransferible' then (select name from public.players where id = sp.player_id) || ' es intransferible.'
+      when sp.president_id is null then null
+      when sp.president_id = v_me.id then 'No puedes pedirte un jugador a ti mismo.'
+      when sp.availability = 'intransferible' then (select name from public.players where id = sp.player_id) || ' es intransferible.'
       else null end
     from unnest(p_requested) as rid(pid)
     left join public.players pl on pl.id = rid.pid
@@ -382,7 +382,7 @@ begin
   -- Ofrecidos (trueques): deben ser propios y no estar comprometidos.
   for v_blocker in
     select case
-      when owned.president_id is null or owned.president_id <> v_me.id then 'Solo puedes ofrecer jugadores de tu plantilla.'
+      when sp.president_id is null or sp.president_id <> v_me.id then 'Solo puedes ofrecer jugadores de tu plantilla.'
       else null end
     from unnest(p_offered) as rid(pid)
     left join public.squad_players sp on sp.player_id = rid.pid and sp.tournament_id = v_tid

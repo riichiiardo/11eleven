@@ -49,6 +49,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
 
   return (
     <article
+      id={`oferta-${offer.id}`}
       className={cn(
         "card-soft flex flex-col gap-3 p-3.5",
         awaitingMe && "border-amber-500/45",

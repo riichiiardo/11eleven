@@ -3,6 +3,8 @@ import { rpc } from "@/lib/supabase/client";
 import type { PrelistPlayer } from "@/lib/draft-prelist";
 import { formatMoney } from "@/convex/rulesEngine";
 import { Button } from "@/components/ui/button";
+import { useDepartureBids } from "@/hooks/use-departure-bids";
+import { DepartureInterest } from "./DepartureInterest";
 
 type OutgoingState = {
   locked: boolean;
@@ -36,6 +38,7 @@ export function DraftOutgoing({
   onChange: (ids: string[]) => void;
 }) {
   const [state, setState] = useState<OutgoingState | null>(null);
+  const interests = useDepartureBids(revision);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -118,6 +121,7 @@ export function DraftOutgoing({
             >
               <input
                 type="checkbox"
+                aria-label={player.name}
                 checked={selected.includes(player.id)}
                 disabled={
                   !selected.includes(player.id) && selected.length >= cap
@@ -130,7 +134,22 @@ export function DraftOutgoing({
                   )
                 }
               />
-              {player.name}
+              <span className="flex-1">{player.name}</span>
+              {selected.includes(player.id) && (
+                <span className="text-right text-xs font-semibold">
+                  {interests.loading
+                    ? "Consultando ofertas…"
+                    : interests.error
+                      ? "Ofertas sin actualizar"
+                      : interests.bids.find((b) => b.playerId === player.id)
+                            ?.closed
+                        ? "Acuerdo cerrado"
+                        : (interests.bids.find((b) => b.playerId === player.id)
+                              ?.count ?? 0) > 0
+                          ? `${interests.bids.find((b) => b.playerId === player.id)?.count} equipo(s) interesado(s)`
+                          : "Sin ofertas activas"}
+                </span>
+              )}
             </label>
           ))}
           {!players.length && <p>No hay jugadores en tu plantilla.</p>}
@@ -139,14 +158,30 @@ export function DraftOutgoing({
       {!state?.locked && planned.length > 0 && (
         <div className="space-y-2">
           <h4 className="font-semibold">
-            Rescisión prevista al inicio del draft
+            Estado y ofertas de tus bajas anunciadas
           </h4>
+          {interests.error && (
+            <p role="alert">
+              No se pudieron actualizar las ofertas. {interests.error}
+            </p>
+          )}
           <ul className="space-y-2">
             {planned.map((player) => {
               const detail = state?.players.find((p) => p.id === player.id);
               return (
                 <li key={player.id} className="rounded border p-3 text-sm">
                   <span className="font-medium">{player.name}</span>
+                  {interests.loading ? (
+                    <p>Cargando ofertas…</p>
+                  ) : (
+                    !interests.error && (
+                      <DepartureInterest
+                        bid={interests.bids.find(
+                          (b) => b.playerId === player.id,
+                        )}
+                      />
+                    )
+                  )}
                   {detail && (
                     <>
                       <p>Valor actual: {formatMoney(detail.value)}</p>
