@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { ClipboardList } from "lucide-react";
 import { formatMoney } from "@/convex/rulesEngine";
 import { DraftReviews } from "./DraftReviews";
+import { DraftOutgoing } from "./DraftOutgoing";
 
 const selectClass = "w-full min-h-11 rounded-md border bg-background p-2";
 
@@ -151,7 +152,7 @@ export function DraftPrelist() {
       setNotice(
         submit
           ? "Prelista enviada a revisión. Recibirás aquí la aprobación o los motivos del rechazo."
-          : "Prelista guardada. No se ha ejecutado ningún fichaje ni baja.",
+          : "Prelista guardada. Bajas publicadas como transferibles. No se ha ejecutado ningún fichaje ni rescisión.",
       );
     } catch (e) {
       setError(
@@ -167,8 +168,10 @@ export function DraftPrelist() {
     <SectionCard title="Mi prelista del draft" icon={ClipboardList}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Privada para tu presidencia. Planificar no compra, reserva ni vende
-          jugadores.
+          Las altas son privadas para tu presidencia y sus revisores. Las bajas
+          se publican como transferibles al guardar. Su rescisión se procesa en
+          la primera apertura del draft, si no hay un acuerdo aceptado o
+          reservado.
         </p>
         {error && (
           <p role="alert" className="rounded border border-destructive p-3">
@@ -187,7 +190,7 @@ export function DraftPrelist() {
           <>
             <p>
               Altas: {data.entries.length}/{data.limit} · Bajas:{" "}
-              {data.outgoing.length}/{data.limit}
+              {data.outgoing.length}/{Math.min(6, data.limit)}
             </p>
             <p role="status">
               {data.status === "submitted"
@@ -449,34 +452,16 @@ export function DraftPrelist() {
                   );
                 })}
               </ul>
-              <fieldset className="space-y-2">
-                <legend>
-                  Bajas previstas de mi plantilla (opcional al preparar la
-                  lista)
-                </legend>
-                {data.ownPlayers.map((p) => (
-                  <label key={p.id} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={data.outgoing.includes(p.id)}
-                      disabled={
-                        !data.outgoing.includes(p.id) &&
-                        data.outgoing.length >= data.limit
-                      }
-                      onChange={(e) => {
-                        setData({
-                          ...data,
-                          outgoing: e.target.checked
-                            ? [...data.outgoing, p.id]
-                            : data.outgoing.filter((id) => id !== p.id),
-                        });
-                        setNotice("");
-                      }}
-                    />
-                    {p.name}
-                  </label>
-                ))}
-              </fieldset>
+              <DraftOutgoing
+                players={data.ownPlayers}
+                selected={data.outgoing}
+                limit={data.limit}
+                revision={data.revision}
+                onChange={(outgoing) => {
+                  setData({ ...data, outgoing });
+                  setNotice("");
+                }}
+              />
               <div className="flex gap-3">
                 <Button
                   type="button"

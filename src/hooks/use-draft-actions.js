@@ -34,23 +34,17 @@ export function useDraftActions() {
     };
     const prepare = (config) => wrap("prepare", () => prepareMutation(config), {
         failure: "No se pudo preparar el draft",
-        success: (result) => {
-            const { orderSize, totalSteps } = result;
+        success: () => {
             toast.success("Draft preparado", {
-                description: `${orderSize} Presidente(s) en el orden · ${totalSteps} turnos en total. Aprueba el orden y ábrelo cuando el mercado esté listo.`,
+                description: "El draft está en preparación, sin abrir. Los presidentes pueden guardar sus bajas previstas. Revisa el orden y ábrelo cuando esté listo.",
             });
         },
     });
     const open = () => wrap("open", () => openMutation(), {
         failure: "No se pudo abrir el draft",
-        success: (result) => {
-            const { executed, invalidated } = result;
-            toast.success("Draft abierto · mercado cerrado", {
-                description: executed + invalidated === 0
-                    ? "No había operaciones reservadas. El primer Presidente ya tiene el turno."
-                    : `${executed} operación(es) acordadas ejecutadas${invalidated > 0
-                        ? ` y ${invalidated} invalidadas con su motivo registrado`
-                        : ""}.`,
+        success: () => {
+            toast.success("Draft abierto", {
+                description: "En su primera apertura se procesan las bajas sin acuerdo al 75 % del valor actual. Consulta el resultado en Mi club. Los acuerdos aceptados o reservados quedan excluidos.",
             });
         },
     });

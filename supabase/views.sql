@@ -204,7 +204,7 @@ begin
     left join public.squad_players sp on sp.player_id = pl.id and sp.tournament_id = v_tid
     left join public.clubs c on c.id = sp.club_id
     left join public.presidents p on p.id = sp.president_id
-    where not exists (select 1 from public.draft_picks dp where dp.tournament_id = v_tid and dp.player_id = pl.id)
+    where sp.president_id is null or not exists (select 1 from public.draft_picks dp where dp.tournament_id = v_tid and dp.player_id = pl.id) or sp.availability = 'transferible'
   ),
   filtered as (
     select jsonb_build_object(
@@ -228,6 +228,7 @@ begin
     where ((p_scope = 'todos')
         or (p_scope = 'libres' and pool.owner_president_id is null)
         or (p_scope = 'clubes' and pool.owner_president_id is not null)
+        or (p_scope = 'transferibles' and pool.availability = 'transferible' and pool.owner_president_id <> v_me.id)
         or (p_scope = 'mios' and pool.owner_president_id = v_me.id))
       and (not p_only_affordable or pool.value <= v_me.budget)
   ),

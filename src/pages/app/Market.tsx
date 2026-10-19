@@ -4,7 +4,7 @@ import type { AppStateView, MarketPlayerView } from "@/convex/appTypes";
 import type { MarketScope } from "@/convex/marketEngine";
 import { MARKET_SCOPE_LABEL } from "@/convex/marketEngine";
 import { formatMoney } from "@/convex/rulesEngine";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/convex-compat/react";
 import { useOutletContext } from "react-router";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { OfferDialog } from "@/components/eleven/OfferDialog";
@@ -31,7 +31,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const SCOPES: MarketScope[] = ["todos", "libre", "clubes"];
+type BrowseScope = MarketScope | "transferibles";
+const SCOPES: BrowseScope[] = ["todos", "libre", "clubes", "transferibles"];
+const SCOPE_LABEL = { ...MARKET_SCOPE_LABEL, transferibles: "Transferibles" };
+const EMPTY_PLAYERS: MarketPlayerView[] = [];
 
 const SORTS = [
   { value: "ovr", label: "Mejor OVR" },
@@ -50,7 +53,7 @@ const GROUPS = [
 
 export default function Market() {
   const state = useOutletContext<AppStateView>();
-  const [scope, setScope] = useState<MarketScope>("todos");
+  const [scope, setScope] = useState<BrowseScope>("todos");
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<string>("todos");
   const [sort, setSort] = useState<string>("ovr");
@@ -61,7 +64,11 @@ export default function Market() {
 
   // browse returns { players, total, nationalities }; the list body consumes the
   // players array while total is still the server-side facet for the count.
-  const browseView = useQuery(api.market.browse, {
+  const browseView = useQuery<{
+    players: MarketPlayerView[];
+    total: number;
+    nationalities: string[];
+  }>(api.market.browse, {
     scope,
     search: search.trim() || undefined,
     group: group as "GK" | "DEF" | "MID" | "FWD" | "todos",
@@ -69,7 +76,7 @@ export default function Market() {
     onlyAffordable,
     limit: 60,
   });
-  const players: MarketPlayerView[] = browseView ? (browseView.players ?? []) : [];
+  const players: MarketPlayerView[] = browseView?.players ?? EMPTY_PLAYERS;
 
   const summary = state.market;
 
@@ -101,7 +108,11 @@ export default function Market() {
           tone={marketOpen ? "pitch" : "slate"}
           value={marketOpen ? "Abierto" : "Cerrado"}
           label="Ventana de mercado"
-          hint={marketOpen ? "Las operaciones se ejecutan" : "Solo se reservan acuerdos"}
+          hint={
+            marketOpen
+              ? "Las operaciones se ejecutan"
+              : "Solo se reservan acuerdos"
+          }
         />
         <StatTile
           icon={BadgeEuro}
@@ -136,7 +147,10 @@ export default function Market() {
       <SectionCard
         title="Explorar jugadores"
         icon={Search}
-        action={{ label: "Mis negociaciones", to: "/dashboard/mercado/negociaciones" }}
+        action={{
+          label: "Mis negociaciones",
+          to: "/dashboard/mercado/negociaciones",
+        }}
       >
         <div
           role="tablist"
@@ -157,7 +171,7 @@ export default function Market() {
                   : "border-border bg-card text-muted-foreground hover:bg-accent",
               )}
             >
-              {MARKET_SCOPE_LABEL[option]}
+              {SCOPE_LABEL[option]}
             </button>
           ))}
         </div>
@@ -223,13 +237,19 @@ export default function Market() {
         </div>
       </SectionCard>
 
-      <section aria-label="Resultados del mercado" className="flex flex-col gap-3">
+      <section
+        aria-label="Resultados del mercado"
+        className="flex flex-col gap-3"
+      >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="display flex items-center gap-2 text-sm">
-            <span aria-hidden="true" className="h-4 w-1 rounded-full bg-brand" />
+            <span
+              aria-hidden="true"
+              className="h-4 w-1 rounded-full bg-brand"
+            />
             {players === undefined
               ? "Cargando jugadores…"
-              : `${players.length} jugador(es) en ${MARKET_SCOPE_LABEL[scope].toLowerCase()}`}
+              : `${players.length} jugador(es) en ${SCOPE_LABEL[scope].toLowerCase()}`}
           </h2>
           {players !== undefined && players.length > 0 ? (
             <p className="text-[11px] text-muted-foreground">
@@ -315,11 +335,16 @@ function EmptyMarket({ onReset }: { onReset: () => void }) {
         No hay jugadores que cumplan estos filtros.
       </p>
       <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">
-        El mercado interno del torneo solo muestra jugadores de la base versionada
-        y presidencias activas. Prueba a ampliar el origen, quitar el filtro de
-        presupuesto o buscar por otro nombre.
+        El mercado interno del torneo solo muestra jugadores de la base
+        versionada y presidencias activas. Prueba a ampliar el origen, quitar el
+        filtro de presupuesto o buscar por otro nombre.
       </p>
-      <Button type="button" variant="outline" className="min-h-11" onClick={onReset}>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        onClick={onReset}
+      >
         Quitar filtros
       </Button>
     </div>

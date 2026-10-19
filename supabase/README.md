@@ -86,7 +86,8 @@ Este script es idempotente; no elimina datos ni ejecuta traspasos.
 - Administración → Draft: revisión individual con aprobación/rechazo y motivo;
   designación y revocación de revisores del mismo Universo.
 - Los designados también ven su panel de revisión en Mi club.
-- Reglas: máximo común de altas/bajas, inicialmente 6; plaza adicional opcional.
+- Reglas: límite de altas inicialmente 6, con plaza adicional opcional. Las bajas
+  tienen un tope absoluto de 6 (o el límite configurado si es menor).
 - Las respuestas se conservan por jugador; Mi club consulta cambios cada 15 segundos
   cuando no hay modificaciones sin guardar. No envía correos.
 - Los jugadores nuevos son propuestas, no inserciones en el catálogo oficial.
@@ -101,3 +102,37 @@ Verificación local sin credenciales ni acceso a producción:
 El primero ejecuta las funciones y sus controles de autorización en PostgreSQL local
 (PGlite). `node scripts/preview-draft-prelists.mjs` abre una demostración aislada con
 datos ficticios en `http://127.0.0.1:5186/draft-fixture`; no valida una conexión remota.
+
+## Bajas públicas y rescisión del draft
+
+Aplicar **`supabase/draft-outgoing.sql` al final**, después de los scripts
+anteriores. Reaplicarlo después de reemplazar funciones de `rpc.sql` o de
+`draft-prelists.sql`: integra el bloqueo transaccional entre guardar bajas,
+aceptar acuerdos y abrir el draft. El script es idempotente y no abre drafts ni
+rescinde jugadores durante su instalación.
+
+- Guardar prelista publica las bajas como `transferible`; Cancelar no publica
+  cambios. Retirar una baja y guardar restaura la disponibilidad anterior.
+- Mercado → Transferibles muestra los jugadores transferibles de otros
+  presidentes del mismo Universo, incluidos los adquiridos en un draft anterior.
+- La **primera apertura** procesa las bajas guardadas. Solo los acuerdos en estado
+  `aceptada` o `reservada` evitan la rescisión, tanto para jugadores solicitados
+  como para los ofrecidos en un trueque. Ofertas enviadas o en negociación no bastan.
+- Se abona exactamente el **75 % del valor actual del catálogo al abrir el draft**,
+  redondeado a céntimos. No se usa el valor inicial ni se duplica el ingreso de
+  jugadores ya vendidos. No se modifica el presupuesto inicial.
+- La rescisión elimina la pertenencia a la plantilla y limpia su hueco en el once;
+  conserva al jugador en el catálogo como agente libre. Invalida las ofertas
+  abiertas que lo incluyen. Los acuerdos firmes no se ejecutan por este proceso.
+- Mi club muestra recibos privados del resultado. Se cierra la selección de bajas
+  al empezar el draft; pausar, reabrir o reinstalar no vuelve a pagar.
+- Para un nuevo ciclo, Administración debe cerrar el draft anterior y pulsar
+  Preparar. No se permite preparar sobre un draft iniciado sin cerrarlo. Se
+  conservan recibos anteriores y no se abre el nuevo draft automáticamente.
+- La operación es atómica: un fallo revierte presupuesto, plantilla y apertura.
+  Las tablas internas no admiten lectura/escritura directa de usuarios.
+
+Pruebas aisladas: `node scripts/verify-draft-outgoing.mjs`. Cubren publicación,
+tope de seis, acuerdos firmes en ambos lados, ofertas abiertas, valor actualizado,
+traspasos previos, limpieza del once, aislamiento por Universo y propietario,
+permisos, rollback y ausencia de abonos duplicados. No utilizan cuentas reales.

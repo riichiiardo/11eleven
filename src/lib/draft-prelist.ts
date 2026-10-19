@@ -102,8 +102,10 @@ export function validatePrelist(
   outgoing: string[],
   limit: number,
 ) {
-  if (entries.length > limit || outgoing.length > limit)
-    throw new Error(`El máximo es ${limit} altas y ${limit} bajas.`);
+  if (entries.length > limit || outgoing.length > Math.min(6, limit))
+    throw new Error(
+      `El máximo es ${limit} altas y ${Math.min(6, limit)} bajas.`,
+    );
   entries.forEach((entry) => prelistEntrySchema.parse(entry));
   const keys = entries.map((entry) =>
     entry.kind === "owned"

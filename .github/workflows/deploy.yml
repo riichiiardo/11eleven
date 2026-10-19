@@ -34,6 +34,11 @@ jobs:
       - name: Typecheck
         run: bunx tsc -b
 
+      - name: Supabase draft regression tests (isolated)
+        run: |
+          node scripts/verify-draft-prelists.mjs
+          node scripts/verify-draft-outgoing.mjs
+
       - name: Convex regression tests
         if: ${{ env.CONVEX_DEPLOYMENT != '' }}
         run: bun run test:convex

@@ -46,6 +46,15 @@ try {
   assert.throws(() => validatePrelist([entry, entry], [], 6), /repetir/);
   assert.throws(() => validatePrelist([entry], [], 0), /máximo/);
   assert.throws(() => validatePrelist([], Array(7).fill("id"), 6), /máximo/);
+  assert.throws(
+    () =>
+      validatePrelist(
+        [],
+        Array.from({ length: 7 }, (_, i) => String(i)),
+        7,
+      ),
+    /máximo/,
+  );
   const { configurationFor, ruleConfigurationSchema } =
     await server.ssrLoadModule("/src/lib/rule-configuration.ts");
   const { DEFAULT_RULES } = await server.ssrLoadModule(
@@ -71,6 +80,21 @@ try {
   const html = renderToString(React.createElement(DraftPrelist));
   assert.ok(html.includes("Mi prelista del draft"));
   assert.ok(html.includes("Cargando prelista"));
+  const { DraftOutgoing } = await server.ssrLoadModule(
+    "/src/components/eleven/DraftOutgoing.tsx",
+  );
+  const outgoingHtml = renderToString(
+    React.createElement(DraftOutgoing, {
+      players: [],
+      selected: [],
+      limit: 7,
+      revision: 0,
+      onChange: () => {},
+    }),
+  );
+  assert.ok(outgoingHtml.includes("máximo <!-- -->6"));
+  assert.ok(outgoingHtml.includes("75 %"));
+  assert.ok(outgoingHtml.includes("aceptado o reservado"));
   const { DraftReviews } = await server.ssrLoadModule(
     "/src/components/eleven/DraftReviews.tsx",
   );

@@ -65,6 +65,17 @@ const server = await createServer({
           let result = null;
           const fn = req.url.split("/").pop();
           if (fn === "draft_prelist_state") result = saved;
+          if (fn === "draft_outgoing_state")
+            result = {
+              locked: false,
+              players: saved.ownPlayers.map((p) => ({
+                id: p.id,
+                value: 1000000,
+                compensation: 750000,
+                negotiated: false,
+              })),
+              receipts: [],
+            };
           if (fn === "save_draft_prelist") {
             if (args.p_revision !== saved.revision) {
               res.statusCode = 409;

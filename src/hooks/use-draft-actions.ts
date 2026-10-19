@@ -27,7 +27,7 @@ export function useDraftActions() {
   const pickMutation = useMutation(api.draft.pick);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  const wrap = async <T,>(
+  const wrap = async <T>(
     key: string,
     action: () => Promise<T>,
     options: { failure: string; success?: (result: T) => void },
@@ -48,13 +48,10 @@ export function useDraftActions() {
   const prepare = (config: DraftConfig) =>
     wrap("prepare", () => prepareMutation(config), {
       failure: "No se pudo preparar el draft",
-      success: (result) => {
-        const { orderSize, totalSteps } = result as {
-          orderSize: number;
-          totalSteps: number;
-        };
+      success: () => {
         toast.success("Draft preparado", {
-          description: `${orderSize} Presidente(s) en el orden · ${totalSteps} turnos en total. Aprueba el orden y ábrelo cuando el mercado esté listo.`,
+          description:
+            "El draft está en preparación, sin abrir. Los presidentes pueden guardar sus bajas previstas. Revisa el orden y ábrelo cuando esté listo.",
         });
       },
     });
@@ -62,20 +59,10 @@ export function useDraftActions() {
   const open = () =>
     wrap("open", () => openMutation(), {
       failure: "No se pudo abrir el draft",
-      success: (result) => {
-        const { executed, invalidated } = result as {
-          executed: number;
-          invalidated: number;
-        };
-        toast.success("Draft abierto · mercado cerrado", {
+      success: () => {
+        toast.success("Draft abierto", {
           description:
-            executed + invalidated === 0
-              ? "No había operaciones reservadas. El primer Presidente ya tiene el turno."
-              : `${executed} operación(es) acordadas ejecutadas${
-                  invalidated > 0
-                    ? ` y ${invalidated} invalidadas con su motivo registrado`
-                    : ""
-                }.`,
+            "En su primera apertura se procesan las bajas sin acuerdo al 75 % del valor actual. Consulta el resultado en Mi club. Los acuerdos aceptados o reservados quedan excluidos.",
         });
       },
     });
@@ -105,7 +92,8 @@ export function useDraftActions() {
       failure: "No se pudo saltar el turno",
       success: () => {
         toast.info("Turno saltado", {
-          description: "El registro de auditoría guarda a quién se le pasó el turno.",
+          description:
+            "El registro de auditoría guarda a quién se le pasó el turno.",
         });
       },
     });
@@ -122,28 +110,24 @@ export function useDraftActions() {
     });
 
   const pick = (playerId: Id<"players">) =>
-    wrap(
-      `pick-${playerId}`,
-      () => pickMutation({ playerId }),
-      {
-        failure: "No se pudo completar el fichaje",
-        success: (result) => {
-          const { playerName, price, draftClosed, nextNickname } = result as {
-            playerName: string;
-            price: number;
-            draftClosed: boolean;
-            nextNickname: string | null;
-          };
-          toast.success(`${playerName} es tuyo`, {
-            description: draftClosed
-              ? `Pagaste ${(price / 1_000_000).toFixed(1)} M€ y el draft quedó cerrado: se completaron todas las rondas.`
-              : `Pagaste ${(price / 1_000_000).toFixed(1)} M€. Ahora elige ${
-                  nextNickname ?? "el siguiente Presidente"
-                }.`,
-          });
-        },
+    wrap(`pick-${playerId}`, () => pickMutation({ playerId }), {
+      failure: "No se pudo completar el fichaje",
+      success: (result) => {
+        const { playerName, price, draftClosed, nextNickname } = result as {
+          playerName: string;
+          price: number;
+          draftClosed: boolean;
+          nextNickname: string | null;
+        };
+        toast.success(`${playerName} es tuyo`, {
+          description: draftClosed
+            ? `Pagaste ${(price / 1_000_000).toFixed(1)} M€ y el draft quedó cerrado: se completaron todas las rondas.`
+            : `Pagaste ${(price / 1_000_000).toFixed(1)} M€. Ahora elige ${
+                nextNickname ?? "el siguiente Presidente"
+              }.`,
+        });
       },
-    );
+    });
 
   return {
     prepare,
