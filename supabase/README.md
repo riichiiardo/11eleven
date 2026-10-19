@@ -50,11 +50,12 @@ las operaciones existentes. `save_rule_configuration` permite guardar solamente
 a administradores y `save_lineup` valida las reglas de la competición activa.
 Los formatos de liga, copa, liguilla y los destinos de ascenso/descenso quedan
 parametrizados; el generador de calendario existente no ejecuta todavía estas
-fases automáticamente.
-2. **Claves** (Supabase → Project Settings → API):
-   - `VITE_SUPABASE_URL` (pública, termina en `.supabase.co`)
-   - `VITE_SUPABASE_ANON_KEY` (pública)
-   - `SUPABASE_SERVICE_ROLE_KEY` — solo para el script de la Mac, **nunca** en el frontend.
+fases automáticamente. 2. **Claves** (Supabase → Project Settings → API):
+
+- `VITE_SUPABASE_URL` (pública, termina en `.supabase.co`)
+- `VITE_SUPABASE_ANON_KEY` (pública)
+- `SUPABASE_SERVICE_ROLE_KEY` — solo para el script de la Mac, **nunca** en el frontend.
+
 3. **Variables en el proyecto** (Convex ya no aporta `VITE_CONVEX_URL`):
    - En el panel de Freebuff: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 4. **Script local de la Mac** (`scripts/sync-players.py`): sin cambios, sigue
@@ -62,14 +63,38 @@ fases automáticamente.
 
 ## Fases de migración
 
-| Fase | Contenido | Estado |
-|------|-----------|--------|
-| 1 | Esquema + RLS + RPCs + cliente + auth + hooks de datos | ✅ hecha |
-| 2 | Reescribir el frontend (68 archivos, 111 funciones) sobre los nuevos hooks | ⏳ pendiente |
-| 3 | Eliminar `src/convex/`, dependencias y referencias; actualizar docs | ⏳ pendiente |
+| Fase | Contenido                                                                  | Estado       |
+| ---- | -------------------------------------------------------------------------- | ------------ |
+| 1    | Esquema + RLS + RPCs + cliente + auth + hooks de datos                     | ✅ hecha     |
+| 2    | Reescribir el frontend (68 archivos, 111 funciones) sobre los nuevos hooks | ⏳ pendiente |
+| 3    | Eliminar `src/convex/`, dependencias y referencias; actualizar docs        | ⏳ pendiente |
 
 La fase 2 debe ir página por página (Home, Mercado, Draft, …), porque cada una
 consume vistas compuestas (`AppStateView`, `MarketOverviewView`,
 `AdminOverviewView`) que en Supabase se reconstruyen con vistas SQL o RPCs de
 lectura (`tournament_state`, `market_overview`, `admin_overview`, …) que habrá
 que crear en una fase 1.5 (SQL de vistas de lectura agregadas).
+
+# Prelistas privadas y revisión del draft
+
+Aplicar `supabase/draft-prelists.sql` después de `schema.sql`, `sheet-sync.sql`,
+`rpc.sql`, `views.sql`, `rules-configuration.sql`, `club-budgets.sql` y
+`rule-edit-session.sql`, antes de publicar el frontend que las consume.
+Este script es idempotente; no elimina datos ni ejecuta traspasos.
+
+- Mi club: borrador privado, guardar, cancelar, enviar y corregir selecciones rechazadas.
+- Administración → Draft: revisión individual con aprobación/rechazo y motivo;
+  designación y revocación de revisores del mismo Universo.
+- Los designados también ven su panel de revisión en Mi club.
+- Reglas: máximo común de altas/bajas, inicialmente 6; plaza adicional opcional.
+- Las respuestas se conservan por jugador; Mi club consulta cambios cada 15 segundos
+  cuando no hay modificaciones sin guardar. No envía correos.
+- Los jugadores nuevos son propuestas, no inserciones en el catálogo oficial.
+- La prelista no altera las rondas, los fichajes ni las bajas ejecutadas por el motor
+  de transferencias existente. Su aprobación es exclusivamente una validación previa.
+
+Verificación local sin credenciales ni acceso a producción:
+`node scripts/verify-draft-prelists.mjs`, `node scripts/verify-draft-client.mjs`.
+El primero ejecuta las funciones y sus controles de autorización en PostgreSQL local
+(PGlite). `node scripts/preview-draft-prelists.mjs` abre una demostración aislada con
+datos ficticios en `http://127.0.0.1:5186/draft-fixture`; no valida una conexión remota.

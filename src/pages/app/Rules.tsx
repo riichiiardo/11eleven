@@ -622,6 +622,36 @@ export function RulesEditor({
             </select>
           </label>
         </SectionCard>
+        <SectionCard title="Draft · Altas y bajas" icon={Scale}>
+          <div className="space-y-4">
+            <Stepper
+              label="Máximo de altas y bajas por presidente"
+              value={draft.draft.maxTransfers}
+              max={100}
+              onChange={(maxTransfers) =>
+                set({ draft: { ...draft.draft, maxTransfers } })
+              }
+            />
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={draft.draft.extraPlayer}
+                onChange={(e) =>
+                  set({
+                    draft: { ...draft.draft, extraPlayer: e.target.checked },
+                  })
+                }
+              />
+              Autorizar una plaza adicional de alta y baja
+            </label>
+            <p className="text-sm text-muted-foreground">
+              Máximo vigente:{" "}
+              {draft.draft.maxTransfers + Number(draft.draft.extraPlayer)} altas
+              y otras tantas bajas. La prelista es privada y no ejecuta
+              fichajes.
+            </p>
+          </div>
+        </SectionCard>
         <SectionCard
           title="R-14 en adelante · Reglas del administrador"
           icon={Scale}

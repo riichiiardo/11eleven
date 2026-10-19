@@ -45,6 +45,12 @@ export const competitionSchema = z.object({
 });
 export const ruleConfigurationSchema = z
   .object({
+    draft: z
+      .object({
+        maxTransfers: z.number().int().min(0).max(100),
+        extraPlayer: z.boolean(),
+      })
+      .default({ maxTransfers: 6, extraPlayer: false }),
     budget: z.number().min(0).max(2000000000),
     squadSize: z.number().int().min(11).max(1000),
     groups: z.object({ GK: range, DEF: range, MID: range, FWD: range }),
@@ -99,8 +105,16 @@ export type ConfiguredRules = TournamentRules & {
 };
 
 export function configurationFor(rules: ConfiguredRules): RuleConfiguration {
-  if (rules.configuration) return rules.configuration;
+  if (rules.configuration)
+    return {
+      ...rules.configuration,
+      draft: rules.configuration.draft ?? {
+        maxTransfers: 6,
+        extraPlayer: false,
+      },
+    };
   return {
+    draft: { maxTransfers: 6, extraPlayer: false },
     budget: rules.budget,
     squadSize: rules.squadSize,
     lineupLockHours: rules.lineupLockHours,

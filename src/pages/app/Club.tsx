@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DraftPrelist } from "@/components/eleven/DraftPrelist";
 import type { AppStateView } from "@/convex/appTypes";
 import { formatMoney } from "@/convex/rulesEngine";
 import { useNavigate } from "react-router";
@@ -40,7 +41,8 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
   const club = state.club;
   const rules = state.rules;
   const stats = state.stats;
-  if (!club || !rules || !stats || !state.lineup) return <DashboardUnavailable title="Mi club" />;
+  if (!club || !rules || !stats || !state.lineup)
+    return <DashboardUnavailable title="Mi club" />;
 
   const limits = {
     GK: { min: rules.gkMin, max: rules.gkMax },
@@ -113,8 +115,17 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
           value={formatMoney(state.budget.available)}
           label="Presupuesto libre"
         />
-        <StatTile icon={Crown} value={`${stats.averageOvr}`} label="OVR medio" />
-        <StatTile icon={Activity} tone="slate" value={`${stats.averageAge}`} label="Edad media" />
+        <StatTile
+          icon={Crown}
+          value={`${stats.averageOvr}`}
+          label="OVR medio"
+        />
+        <StatTile
+          icon={Activity}
+          tone="slate"
+          value={`${stats.averageAge}`}
+          label="Edad media"
+        />
         <StatTile
           icon={Baby}
           tone="pitch"
@@ -162,11 +173,21 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
           >
             <ul className="flex flex-col gap-2.5">
               {(
-                ["transferible", "negociacion", "neutro", "intransferible"] as const
+                [
+                  "transferible",
+                  "negociacion",
+                  "neutro",
+                  "intransferible",
+                ] as const
               ).map((option) => (
-                <li key={option} className="flex items-center justify-between gap-3">
+                <li
+                  key={option}
+                  className="flex items-center justify-between gap-3"
+                >
                   <AvailabilityBadge availability={option} />
-                  <span className="num text-sm font-bold">{state.availability[option]}</span>
+                  <span className="num text-sm font-bold">
+                    {state.availability[option]}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -181,7 +202,10 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
           className="xl:col-span-2"
           action={{ label: "Ver reglas", to: "/dashboard/reglas" }}
         >
-          <RuleCheckList checks={state.evaluation?.checks ?? []} variant="full" />
+          <RuleCheckList
+            checks={state.evaluation?.checks ?? []}
+            variant="full"
+          />
         </SectionCard>
 
         <SectionCard
@@ -205,7 +229,9 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
                     photo={player.photo}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{player.name}</span>
+                    <span className="block truncate text-sm font-semibold">
+                      {player.name}
+                    </span>
                     <span className="block truncate text-[11px] text-muted-foreground">
                       {player.position} · {formatMoney(player.value)}
                     </span>
@@ -217,6 +243,8 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
           </ul>
         </SectionCard>
       </div>
+
+      <DraftPrelist key={`${state.tournament?.id}:${state.president?.id}`} />
 
       <PlayerDialog
         player={selected}

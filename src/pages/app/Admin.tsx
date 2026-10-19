@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import { useMarketActions } from "@/hooks/use-market-actions";
 import { useDraftActions } from "@/hooks/use-draft-actions";
+import { DraftReviews } from "@/components/eleven/DraftReviews";
 import { useCompetitionActions } from "@/hooks/use-competition-actions";
 import { OfferCard } from "@/components/eleven/OfferCard";
 import { OfferStatusPill } from "@/components/eleven/OfferBits";
@@ -228,6 +229,7 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="draft" className="flex flex-col gap-5">
+          <DraftReviews />
           <DraftPanel overview={overview} />
         </TabsContent>
 
