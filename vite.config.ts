@@ -9,13 +9,6 @@ export default defineConfig({
   plugins: [react(), vlyPlugin(), tailwindcss()],
   resolve: {
     alias: [
-      // Migración a Supabase: los imports de la era Convex resuelven a la
-      // capa de compatibilidad. Declarados ANTES del alias genérico "@"
-      // para que la coincidencia exacta gane.
-      { find: "@/convex/_generated/api", replacement: path.resolve(__dirname, "./src/convex-compat/api.ts") },
-      { find: "@/convex/_generated/dataModel", replacement: path.resolve(__dirname, "./src/convex-compat/dataModel.ts") },
-      { find: "convex/react", replacement: path.resolve(__dirname, "./src/convex-compat/react.tsx") },
-      { find: "@convex-dev/auth/react", replacement: path.resolve(__dirname, "./src/convex-compat/react.tsx") },
       { find: "@", replacement: path.resolve(__dirname, "./src") },
     ],
     // Force a single copy of React across all packages (including vlyPlugin).
@@ -90,18 +83,16 @@ export default defineConfig({
       'react-dom',
       'react-dom/client',
       'react-router',
-      '@convex-dev/auth/react',
       'framer-motion',
     ],
   },
   // Performance hints
   server: {
-    // Bind to all interfaces so WebContainer's server-ready event fires.
-    host: true,
+    host: "127.0.0.1",
     port: 5173,
-    // Keep HMR on, but disable full-screen error overlay
+    strictPort: true,
     hmr: {
-      overlay: false,
+      overlay: true,
     },
   },
 });

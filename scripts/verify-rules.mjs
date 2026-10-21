@@ -7,7 +7,7 @@ const server = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
 });
 try {
-  const engine = await server.ssrLoadModule("/src/convex/rulesEngine.ts");
+  const engine = await server.ssrLoadModule("/src/domain/rulesEngine.ts");
   const config = await server.ssrLoadModule("/src/lib/rule-configuration.ts");
   assert.equal(engine.FORMATION_CODES.length, 30);
   for (const code of engine.FORMATION_CODES) {

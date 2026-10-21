@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { FixtureReportSideView, FixtureReportView, FixtureView } from "@/convex/appTypes";
+import { api } from "@/services/backend/api";
+import type { Id } from "@/domain/ids";
+import type { FixtureReportSideView, FixtureReportView, FixtureView } from "@/domain/appTypes";
 import { errorMessage } from "@/lib/errors";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/services/backend/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";

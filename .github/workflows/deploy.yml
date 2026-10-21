@@ -17,36 +17,19 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    env:
-      CONVEX_DEPLOYMENT: ${{ secrets.CONVEX_DEPLOYMENT }}
     steps:
       - uses: actions/checkout@v5
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v7
         with:
-          bun-version: latest
+          node-version-file: .nvmrc
+          cache: npm
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
 
-      # src/convex/_generated is committed to the repo (Convex requires it for
-      # typechecking), so no `convex codegen`/auth is needed in CI.
-      - name: Typecheck
-        run: bunx tsc -b
-
-      - name: Supabase draft regression tests (isolated)
-        run: |
-          node scripts/verify-draft-prelists.mjs
-          node scripts/verify-draft-outgoing.mjs
-          node scripts/verify-draft-bids.mjs
-
-      - name: Convex regression tests
-        if: ${{ env.CONVEX_DEPLOYMENT != '' }}
-        run: bun run test:convex
-
-      - name: Convex regression tests skipped
-        if: ${{ env.CONVEX_DEPLOYMENT == '' }}
-        run: echo "CONVEX_DEPLOYMENT is not configured; skipping deployed Convex self-tests."
+      - name: Local verification
+        run: npm run lint && npm run typecheck && npm test
 
       - name: Validate Supabase configuration
         env:
@@ -65,14 +48,11 @@ jobs:
         # is derived from the repository name at runtime. Hardcoding it broke
         # the deploy when the repo was renamed (assets resolved to a 404 path
         # and the page rendered blank).
-        run: bunx vite build --base=/${{ github.event.repository.name }}/
+        run: npm run build -- --base=/${{ github.event.repository.name }}/
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_PUBLIC_APP_URL: https://riichiiardo.github.io/11eleven
-          # Public Convex endpoint (it ships in the client bundle anyway).
-          # Override by setting the VITE_CONVEX_URL secret in the repo.
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL || 'https://valuable-hedgehog-471.convex.cloud' }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

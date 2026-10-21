@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { rpc } from "@/lib/supabase/client";
+import { rpc } from "@/infrastructure/supabase/client";
 import type { PrelistPlayer } from "@/lib/draft-prelist";
-import { formatMoney } from "@/convex/rulesEngine";
+import { formatMoney } from "@/domain/rulesEngine";
 import { Button } from "@/components/ui/button";
 import { useDepartureBids } from "@/hooks/use-departure-bids";
 import { DepartureInterest } from "./DepartureInterest";

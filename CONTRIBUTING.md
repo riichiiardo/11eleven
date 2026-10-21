@@ -1,16 +1,24 @@
-# Contributing
+# Contribuir a 11Eleven
 
-## Source of truth
+## Fuente de verdad
 
-TypeScript is the canonical source language for application and Convex code.
-New implementation files must use `.ts` or `.tsx`. Existing JavaScript files
-are compatibility leftovers and should be migrated to TypeScript before being
-changed; do not create new `.js`/`.jsx` counterparts.
+La aplicación se implementa en TypeScript, sin emitir JavaScript dentro de
+`src/`. El dominio no depende de proveedores ni de React. Supabase se aísla
+en infraestructura y servicios; no se añaden aliases de backends retirados.
 
-Generated files under `src/convex/_generated/` are committed Convex output and
-must not be hand-edited.
+Usa npm y conserva `package-lock.json`. No añadas otros lockfiles ni carpetas
+de versiones anteriores. Git conserva el historial del proyecto.
 
-## Verification
+## Verificación y seguridad
 
-Run `bun install`, `bun run lint`, `bun run build`, and `bun run test:convex`
-with a configured Convex deployment before opening a pull request.
+Ejecuta `npm ci` y `npm run check`. Añade pruebas al cambiar reglas o contratos.
+Las pruebas locales no deben enviar peticiones a producción ni usar secretos.
+Un build correcto no prueba por sí solo autenticación ni RPCs remotas.
+
+No publiques `.env.local`, tokens ni claves de servidor. Las variables `VITE_*`
+son visibles en el navegador: nunca incluyen `service_role` ni `sb_secret_`.
+
+Verifica cambios SQL en PostgreSQL aislado, incluyendo permisos, RLS,
+pertenencia al Universo y ownership con casos negativos. Las migraciones,
+sincronizaciones y publicaciones remotas son operaciones separadas y requieren
+un destino explícito.

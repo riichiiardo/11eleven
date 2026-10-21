@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { MarketPlayerView } from "@/convex/appTypes";
+import type { MarketPlayerView } from "@/domain/appTypes";
 import { bidMoney, type DepartureBid } from "@/hooks/use-departure-bids";
-import { rpc } from "@/lib/supabase/client";
+import { rpc } from "@/infrastructure/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { GROUP_LABEL, type PositionGroup, type RuleCheck } from "@/convex/rulesEngine";
+import { GROUP_LABEL, type PositionGroup, type RuleCheck } from "@/domain/rulesEngine";
 import { AlertTriangle, Check, Lock, X } from "lucide-react";
 import { Link } from "react-router";
 

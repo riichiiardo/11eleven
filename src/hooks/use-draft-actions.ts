@@ -1,7 +1,7 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/services/backend/api";
+import type { Id } from "@/domain/ids";
 import { errorMessage } from "@/lib/errors";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { useState } from "react";
 import { toast } from "sonner";
 

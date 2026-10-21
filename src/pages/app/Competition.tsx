@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { AppStateView, FixtureView } from "@/convex/appTypes";
+import type { AppStateView, FixtureView } from "@/domain/appTypes";
 import { useOutletContext } from "react-router";
 import { SectionCard, Countdown } from "@/components/eleven/SectionCard";
 import {

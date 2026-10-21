@@ -5,7 +5,7 @@ import {
   type FormationCode,
   type Lineup,
   type SquadPlayerView,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 import { PlayerAvatar } from "./PlayerBits";
 import { Plus } from "lucide-react";
 

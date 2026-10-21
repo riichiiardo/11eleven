@@ -1,79 +1,45 @@
-# 11Eleven — Supabase como única base de datos
+# Backend Supabase de 11Eleven
 
-Este documento reemplaza la parte de Convex de `DEPLOY.md` mientras dura la
-transición. **Estado: capa Supabase construida; Convex todavía está presente
-hasta completar la migración del frontend (fase 2) y su eliminación (fase 3).**
+El cliente utiliza Supabase Auth y PostgreSQL. Los scripts de este directorio
+corresponden a la versión actual; arrancar Vite no los ejecuta.
 
-## Modelo de confianza
+## Instalación en un entorno nuevo
 
-- **Lectura**: el navegador lee directo de Postgres con la **anon key**.
-  Cada tabla tiene RLS con políticas de solo `SELECT` y cada política exige
-  pertenecer a la liga (`is_member`) o ser administrador. Nada es público.
-- **Escritura**: 100 % vía RPCs `security definer` (`supabase/rpc.sql`). El
-  cliente no tiene INSERT/UPDATE/DELETE en ninguna tabla.
-- **Auth**: `auth.users` de Supabase + trigger `handle_new_user` que crea el
-  perfil automáticamente. Sustituye a Convex Auth.
+Aplica los scripts en este orden, después de revisar el destino y sus permisos:
 
-## Setup (una vez)
+1. `schema.sql`
+2. `rpc.sql`
+3. `sheet-sync.sql`
+4. `views.sql`
+5. `rules-configuration.sql`
+6. `club-budgets.sql`
+7. `rule-edit-session.sql`
+8. `draft-prelists.sql`
+9. `draft-outgoing.sql`
+10. `draft-bids.sql`
 
-1. **SQL Editor** de tu proyecto Supabase, en orden:
-   1. `supabase/schema.sql` — tablas, RLS y trigger de perfiles.
-   2. `supabase/rpc.sql` — RPCs de escritura del juego.
-   3. `supabase/sheet-sync.sql` — columnas y catálogo del Sheets.
-   4. `supabase/views.sql` — contratos de lectura del dashboard.
-   5. `supabase/rules-configuration.sql` — reglas del Universo y competiciones.
-   6. `supabase/club-budgets.sql` — presupuesto general e importes propios por equipo.
-   7. `supabase/rule-edit-session.sql` — guardado conjunto y atómico de reglas y presupuestos.
+No hay un seed alternativo de equipos. El catálogo se carga desde la fuente
+configurada por sincronización explícita. `catalog.sql` configura staging
+para las herramientas de catálogo cuando se necesitan.
+`reset-users.sql` es una operación destructiva administrativa: no forma parte
+del arranque, instalación ni suite normal de pruebas.
 
-Reglas abre en modo lectura. Administración utiliza «Editar reglas» y luego
-«Guardar» o «Cancelar», situados al mismo nivel. Los presupuestos por equipo
-son borradores hasta guardar; cancelar restaura los valores anteriores sin
-enviar escrituras. Si falla cualquier validación, el guardado revierte todos
-los cambios de la operación.
+## Credenciales
 
-`save_rule_changes` es una RPC privilegiada: permite invocación a usuarios
-autenticados, pero comprueba el rol de administrador del Universo activo antes
-de escribir; `anon` no tiene permiso de ejecución. El aviso del asesor
-`authenticated_security_definer_function_executable` es esperado para esta
-interfaz y no sustituye esa comprobación de autorización.
+- Navegador: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (anon o publishable).
+- Herramientas de sincronización: `SUPABASE_SERVICE_ROLE_KEY`, solo en servidor.
+- No se incluyen credenciales en Git, catálogos ni componentes del frontend.
 
-`clubs.initial_budget = NULL` hereda el presupuesto general. Un importe propio
-se aplica también a equipos sin presidente. `presidents.initial_budget` conserva
-la base asignada; al editarla se ajusta el saldo por la diferencia, manteniendo
-gastos y entradas anteriores. Las reducciones que no cubren compromisos abiertos
-se rechazan. Solo un administrador del Universo activo puede editar importes.
+## Seguridad y validación
 
-El torneo existente actúa como Universo. `tournament_rules.configuration`
-conserva los límites originales, interruptores, competiciones y reglas
-personalizadas; las columnas numéricas mantienen los límites efectivos para
-las operaciones existentes. `save_rule_configuration` permite guardar solamente
-a administradores y `save_lineup` valida las reglas de la competición activa.
-Los formatos de liga, copa, liguilla y los destinos de ascenso/descenso quedan
-parametrizados; el generador de calendario existente no ejecuta todavía estas
-fases automáticamente. 2. **Claves** (Supabase → Project Settings → API):
+Las lecturas y operaciones deben respetar sesión, pertenencia al Universo y
+ownership. Las funciones privilegiadas requieren comprobar autorización; una
+clave pública no sustituye esos controles. Las pruebas de PostgreSQL embebido
+cubren estos casos sin acceder a una base remota.
 
-- `VITE_SUPABASE_URL` (pública, termina en `.supabase.co`)
-- `VITE_SUPABASE_ANON_KEY` (pública)
-- `SUPABASE_SERVICE_ROLE_KEY` — solo para el script de la Mac, **nunca** en el frontend.
-
-3. **Variables en el proyecto** (Convex ya no aporta `VITE_CONVEX_URL`):
-   - En el panel de Freebuff: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
-4. **Script local de la Mac** (`scripts/sync-players.py`): sin cambios, sigue
-   subiendo a `sofifa_players` con la service role key.
-
-## Fases de migración
-
-| Fase | Contenido                                                                  | Estado       |
-| ---- | -------------------------------------------------------------------------- | ------------ |
-| 1    | Esquema + RLS + RPCs + cliente + auth + hooks de datos                     | ✅ hecha     |
-| 2    | Reescribir el frontend (68 archivos, 111 funciones) sobre los nuevos hooks | ⏳ pendiente |
-| 3    | Eliminar `src/convex/`, dependencias y referencias; actualizar docs        | ⏳ pendiente |
-
-La fase 2 debe ir página por página (Home, Mercado, Draft, …), porque cada una
-consume vistas compuestas (`AppStateView`, `MarketOverviewView`,
-`AdminOverviewView`) que en Supabase se reconstruyen con vistas SQL o RPCs de
-lectura (`tournament_state`, `market_overview`, `admin_overview`, …) que habrá
-que crear en una fase 1.5 (SQL de vistas de lectura agregadas).
+`npm test` verifica esquema, reglas, presupuestos, prelistas, bajas y pujas.
+Reaplica los módulos posteriores si reemplazas funciones de un script previo.
+No apliques SQL remoto como efecto secundario de una refactorización local.
 
 # Prelistas privadas y revisión del draft
 

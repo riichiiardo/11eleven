@@ -6,7 +6,7 @@ import { PlayerAvatar } from "@/components/eleven/PlayerBits";
 import { RuleCheckList } from "@/components/eleven/RuleCheckList";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { RuleCheck } from "@/convex/rulesEngine";
+import type { RuleCheck } from "@/domain/rulesEngine";
 import {
   Accessibility,
   ArrowRight,

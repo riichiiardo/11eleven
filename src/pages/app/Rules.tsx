@@ -8,12 +8,12 @@ import {
   type RuleConfiguration,
   type CustomRule,
 } from "@/lib/rule-configuration";
-import { useMutation } from "@/convex-compat/react";
+import { useMutation } from "@/services/backend/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { Scale } from "lucide-react";
-import { FORMATION_CODES } from "@/convex/rulesEngine";
+import { FORMATION_CODES } from "@/domain/rulesEngine";
 import { ClubBudgets } from "@/components/eleven/admin/ClubBudgets";
 
 function Stepper({

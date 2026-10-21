@@ -8,8 +8,12 @@ const server = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
 });
 try {
-  const { adaptTournamentState } = await server.ssrLoadModule("/src/lib/supabase/adapters.ts");
-  const { DEFAULT_RULES, computeSquadStats } = await server.ssrLoadModule("/src/convex/rulesEngine.ts");
+  const { adaptTournamentState, adaptDraftPool } = await server.ssrLoadModule("/src/infrastructure/supabase/adapters.ts");
+  assert.deepEqual(adaptDraftPool({ players: [], total: 0 }), []);
+  assert.deepEqual(adaptDraftPool({ players: [{ playerId: "test" }], total: 1 }), [{ playerId: "test" }]);
+  assert.throws(() => adaptDraftPool(null), /respuesta no válida/);
+  assert.throws(() => adaptDraftPool({ players: {} }), /respuesta no válida/);
+  const { DEFAULT_RULES, computeSquadStats } = await server.ssrLoadModule("/src/domain/rulesEngine.ts");
   const raw = {
     needsLeague: false, needsClub: false,
     rules: DEFAULT_RULES, club: { name: "Test Club", shortName: "TST", country: "España", colorPrimary: "#000000", colorSecondary: "#ffffff" },

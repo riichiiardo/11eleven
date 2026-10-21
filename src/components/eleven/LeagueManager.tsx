@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { LeagueSummaryView } from "@/convex/appTypes";
+import { api } from "@/services/backend/api";
+import type { Id } from "@/domain/ids";
+import type { LeagueSummaryView } from "@/domain/appTypes";
 import { errorMessage } from "@/lib/errors";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";

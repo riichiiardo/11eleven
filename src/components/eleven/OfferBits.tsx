@@ -1,4 +1,4 @@
-import { OFFER_STATUS_META, type OfferStatus } from "@/convex/marketEngine";
+import { OFFER_STATUS_META, type OfferStatus } from "@/domain/marketEngine";
 import { cn } from "@/lib/utils";
 
 /**

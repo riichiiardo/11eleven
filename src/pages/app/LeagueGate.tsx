@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { NeedsLeagueState } from "@/convex/appTypes";
+import { api } from "@/services/backend/api";
+import type { NeedsLeagueState } from "@/domain/appTypes";
 import { errorMessage } from "@/lib/errors";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { BrandLockup } from "@/components/eleven/Brand";

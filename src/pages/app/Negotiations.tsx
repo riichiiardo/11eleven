@@ -1,7 +1,7 @@
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, OfferView } from "@/convex/appTypes";
-import { formatMoney } from "@/convex/rulesEngine";
-import { useQuery } from "convex/react";
+import { api } from "@/services/backend/api";
+import type { AppStateView, OfferView } from "@/domain/appTypes";
+import { formatMoney } from "@/domain/rulesEngine";
+import { useQuery } from "@/services/backend/react";
 import { useOutletContext, useSearchParams } from "react-router";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { OfferCard } from "@/components/eleven/OfferCard";

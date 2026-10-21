@@ -1,6 +1,6 @@
-import type { DraftTurnView } from "@/convex/appTypes";
-import { DRAFT_STATUS_META, type DraftStatus } from "@/convex/draftEngine";
-import { formatMoney } from "@/convex/rulesEngine";
+import type { DraftTurnView } from "@/domain/appTypes";
+import { DRAFT_STATUS_META, type DraftStatus } from "@/domain/draftEngine";
+import { formatMoney } from "@/domain/rulesEngine";
 import { Crest } from "./Crest";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";

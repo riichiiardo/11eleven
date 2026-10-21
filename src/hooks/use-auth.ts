@@ -1,9 +1,9 @@
-import { api } from "@/convex/_generated/api";
-import { useAuthActions } from "@/convex-compat/react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "@/services/backend/api";
+import { useAuthActions } from "@/services/backend/react";
+import { useBackendAuth, useQuery } from "@/services/backend/react";
 
 export function useAuth() {
-  const { isLoading: isAuthLoading, isAuthenticated } = useConvexAuth();
+  const { isLoading: isAuthLoading, isAuthenticated } = useBackendAuth();
   const user = useQuery(api.users.currentUser);
   const { signIn, signUp, signOut } = useAuthActions();
 

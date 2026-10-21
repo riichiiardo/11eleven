@@ -1,6 +1,6 @@
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, NeedsLeagueState } from "@/convex/appTypes";
-import { useMutation, useQuery } from "convex/react";
+import { api } from "@/services/backend/api";
+import type { AppStateView, NeedsLeagueState } from "@/domain/appTypes";
+import { useMutation, useQuery } from "@/services/backend/react";
 import { useEffect, useRef, useState } from "react";
 
 /** Ticking clock for the deadline center (lineup lock, next matchday). */

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { AppStateView } from "@/convex/appTypes";
-import { FC_VERSION, formatMoney, type SquadPlayerView } from "@/convex/rulesEngine";
+import type { AppStateView } from "@/domain/appTypes";
+import { FC_VERSION, formatMoney, type SquadPlayerView } from "@/domain/rulesEngine";
 import { useNavigate } from "react-router";
 import { useDashboardState } from "./dashboard-context";
 import { DashboardUnavailable } from "./DashboardUnavailable";

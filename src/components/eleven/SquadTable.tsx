@@ -4,7 +4,7 @@ import {
   POSITION_LABEL,
   type SquadPlayerView,
   type SquadStats,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 import {
   Table,
   TableBody,

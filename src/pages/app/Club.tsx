@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DraftPrelist } from "@/components/eleven/DraftPrelist";
-import type { AppStateView } from "@/convex/appTypes";
-import { formatMoney } from "@/convex/rulesEngine";
+import type { AppStateView } from "@/domain/appTypes";
+import { formatMoney } from "@/domain/rulesEngine";
 import { useNavigate } from "react-router";
 import { useDashboardState } from "./dashboard-context";
 import { DashboardUnavailable } from "./DashboardUnavailable";
@@ -16,7 +16,7 @@ import {
 } from "@/components/eleven/PlayerBits";
 import { PlayerDialog } from "@/components/eleven/PlayerDialog";
 import { useSquadActions } from "@/hooks/use-squad-actions";
-import type { SquadPlayerView } from "@/convex/rulesEngine";
+import type { SquadPlayerView } from "@/domain/rulesEngine";
 import { Button } from "@/components/ui/button";
 import {
   Activity,

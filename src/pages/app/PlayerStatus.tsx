@@ -1,10 +1,10 @@
-import type { AppStateView } from "@/convex/appTypes";
+import type { AppStateView } from "@/domain/appTypes";
 import {
   AVAILABILITIES,
   AVAILABILITY_META,
   formatMoney,
   type PlayerAvailability,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 import { useNavigate, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { AvailabilityBadge, PlayerAvatar, PositionPill } from "@/components/eleven/PlayerBits";

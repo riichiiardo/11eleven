@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, DraftPoolPlayerView } from "@/convex/appTypes";
+import { api } from "@/services/backend/api";
+import type { AppStateView, DraftPoolPlayerView } from "@/domain/appTypes";
 import {
   GROUP_LABEL,
   POSITION_LABEL,
   formatMoney,
   type PositionGroup,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 import { useOutletContext } from "react-router";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/services/backend/react";
 import { relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
 import { useDraftActions } from "@/hooks/use-draft-actions";

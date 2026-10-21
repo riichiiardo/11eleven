@@ -3,7 +3,7 @@ import type {
   TournamentRules,
   SquadPlayerView,
   RuleCheck,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 
 const count = z.number().int().min(0).max(1000);
 const range = z

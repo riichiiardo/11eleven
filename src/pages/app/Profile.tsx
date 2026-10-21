@@ -1,12 +1,12 @@
 import { useState } from "react";
-import type { AppStateView } from "@/convex/appTypes";
-import { api } from "@/convex/_generated/api";
-import { formatMoney } from "@/convex/rulesEngine";
+import type { AppStateView } from "@/domain/appTypes";
+import { api } from "@/services/backend/api";
+import { formatMoney } from "@/domain/rulesEngine";
 import { errorMessage, formatDate } from "@/lib/errors";
 import { COACH_AVATARS } from "@/lib/coachAvatars";
 import { fileToAvatarDataUrl } from "@/lib/images";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { toast } from "sonner";
 import { useNavigate, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";

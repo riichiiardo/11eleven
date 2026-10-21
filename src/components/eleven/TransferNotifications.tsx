@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { rpc } from "@/lib/supabase/client";
+import { rpc } from "@/infrastructure/supabase/client";
 import { Button } from "@/components/ui/button";
 type Notice = {
   id: string;

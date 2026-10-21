@@ -1,4 +1,11 @@
-.env.local
-.env.keys
-node_modules
-dist
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+.DS_Store
+coverage/
+playwright-report/
+test-results/

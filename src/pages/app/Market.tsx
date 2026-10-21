@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, MarketPlayerView } from "@/convex/appTypes";
-import type { MarketScope } from "@/convex/marketEngine";
-import { MARKET_SCOPE_LABEL } from "@/convex/marketEngine";
-import { formatMoney } from "@/convex/rulesEngine";
-import { useQuery } from "@/convex-compat/react";
+import { api } from "@/services/backend/api";
+import type { AppStateView, MarketPlayerView } from "@/domain/appTypes";
+import type { MarketScope } from "@/domain/marketEngine";
+import { MARKET_SCOPE_LABEL } from "@/domain/marketEngine";
+import { formatMoney } from "@/domain/rulesEngine";
+import { useQuery } from "@/services/backend/react";
 import { useOutletContext } from "react-router";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { OfferDialog } from "@/components/eleven/OfferDialog";

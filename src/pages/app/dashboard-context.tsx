@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useOutletContext } from "react-router";
-import type { AppStateView } from "@/convex/appTypes";
+import type { AppStateView } from "@/domain/appTypes";
 
 const DashboardStateContext = createContext<AppStateView | null>(null);
 export function DashboardStateProvider({ state, children }: { state: AppStateView; children: ReactNode }) {

@@ -14,7 +14,7 @@ import {
   supabase,
   supabaseConfigError,
   testSupabaseConnection,
-} from "@/lib/supabase/client";
+} from "@/infrastructure/supabase/client";
 import { BrandLockup } from "@/components/eleven/Brand";
 import { ArrowRight, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";

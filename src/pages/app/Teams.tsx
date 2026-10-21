@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, ClubView, TeamSquadView } from "@/convex/appTypes";
-import { formatMoney, POSITION_LABEL } from "@/convex/rulesEngine";
-import { useQuery } from "convex/react";
+import { api } from "@/services/backend/api";
+import type { AppStateView, ClubView, TeamSquadView } from "@/domain/appTypes";
+import { formatMoney, POSITION_LABEL } from "@/domain/rulesEngine";
+import { useQuery } from "@/services/backend/react";
 import { useOutletContext } from "react-router";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { Crest } from "@/components/eleven/Crest";

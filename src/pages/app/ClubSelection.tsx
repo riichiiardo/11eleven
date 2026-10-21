@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, ClubView } from "@/convex/appTypes";
-import type { Id } from "@/convex/_generated/dataModel";
-import { formatMoney } from "@/convex/rulesEngine";
+import { api } from "@/services/backend/api";
+import type { AppStateView, ClubView } from "@/domain/appTypes";
+import type { Id } from "@/domain/ids";
+import { formatMoney } from "@/domain/rulesEngine";
 import { errorMessage } from "@/lib/errors";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { Crest } from "@/components/eleven/Crest";

@@ -1,4 +1,4 @@
-import { DEFAULT_FC27_ID, FC27_COMPETITIONS, FC27_KIND_LABEL } from "@/convex/fc27Catalog";
+import { DEFAULT_FC27_ID, FC27_COMPETITIONS, FC27_KIND_LABEL } from "@/domain/fc27Catalog";
 import { Label } from "@/components/ui/label";
 import {
   Select,

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import type { AppStateView } from "@/convex/appTypes";
-import { api } from "@/convex/_generated/api";
+import type { AppStateView } from "@/domain/appTypes";
+import { api } from "@/services/backend/api";
 import {
   FORMATIONS,
   FORMATION_CODES,
@@ -12,8 +12,8 @@ import {
   POSITION_LABEL,
   type FormationCode,
   type Lineup,
-} from "@/convex/rulesEngine";
-import { useMutation } from "convex/react";
+} from "@/domain/rulesEngine";
+import { useMutation } from "@/services/backend/react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errors";
 import { useLocation } from "react-router";

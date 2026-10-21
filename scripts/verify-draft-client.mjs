@@ -58,7 +58,7 @@ try {
   const { configurationFor, ruleConfigurationSchema } =
     await server.ssrLoadModule("/src/lib/rule-configuration.ts");
   const { DEFAULT_RULES } = await server.ssrLoadModule(
-    "/src/convex/rulesEngine.ts",
+    "/src/domain/rulesEngine.ts",
   );
   const config = configurationFor(DEFAULT_RULES);
   assert.deepEqual(config.draft, { maxTransfers: 6, extraPlayer: false });

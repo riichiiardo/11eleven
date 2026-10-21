@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AppStateView, MarketPlayerView } from "@/convex/appTypes";
-import { formatMoney, TOURNAMENT_STATUS_META } from "@/convex/rulesEngine";
+import { api } from "@/services/backend/api";
+import type { AppStateView, MarketPlayerView } from "@/domain/appTypes";
+import { formatMoney, TOURNAMENT_STATUS_META } from "@/domain/rulesEngine";
 import { useNavigate, Link } from "react-router";
 import { useDashboardState } from "./dashboard-context";
 import { relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/services/backend/react";
 import { Crest } from "@/components/eleven/Crest";
 import { Countdown, SectionCard, StatTile, StatusPill, ToneDot } from "@/components/eleven/SectionCard";
 import { PitchView } from "@/components/eleven/PitchView";

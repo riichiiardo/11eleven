@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useNow } from "@/hooks/use-tournament";
-import { formatClock, formatDuration } from "@/convex/rulesEngine";
+import { formatClock, formatDuration } from "@/domain/rulesEngine";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";

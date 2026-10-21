@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { rpc } from "@/lib/supabase/client";
+import { rpc } from "@/infrastructure/supabase/client";
 import { Input } from "@/components/ui/input";
-import { formatMoney } from "@/convex/rulesEngine";
+import { formatMoney } from "@/domain/rulesEngine";
 
 type ClubBudget = {
   id: string;

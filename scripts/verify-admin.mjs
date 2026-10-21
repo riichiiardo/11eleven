@@ -10,7 +10,7 @@ const server = await createServer({
 });
 try {
   const { adaptAdminOverview } = await server.ssrLoadModule(
-    "/src/lib/supabase/adapters.ts",
+    "/src/infrastructure/supabase/adapters.ts",
   );
   assert.equal(adaptAdminOverview(null), null);
   const overview = adaptAdminOverview({

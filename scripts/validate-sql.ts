@@ -1,7 +1,7 @@
 /**
  * Validador local de los scripts SQL de supabase/ contra Postgres real (PGlite).
  * Simula el entorno de Supabase: schema auth (users + uid() + role()) y rol authenticated.
- * Uso: bun scripts/validate-sql.ts
+ * Uso: node scripts/validate-sql.ts (Node.js 24).
  */
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
@@ -83,7 +83,6 @@ await run(
   readFileSync("supabase/rules-configuration.sql", "utf8"),
   "rules-configuration.sql",
 );
-await run(readFileSync("supabase/seed.sql", "utf8"), "seed.sql");
 await run(
   readFileSync("supabase/club-budgets.sql", "utf8"),
   "club-budgets.sql",

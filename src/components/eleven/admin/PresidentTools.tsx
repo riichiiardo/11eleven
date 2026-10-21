@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AvailableTeamView, PresidentView } from "@/convex/appTypes";
-import { formatMoney } from "@/convex/rulesEngine";
+import { api } from "@/services/backend/api";
+import type { AvailableTeamView, PresidentView } from "@/domain/appTypes";
+import { formatMoney } from "@/domain/rulesEngine";
 import { errorMessage } from "@/lib/errors";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

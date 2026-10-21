@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { rpc } from "@/lib/supabase/client";
+import { rpc } from "@/infrastructure/supabase/client";
 export type DepartureBid = {
   playerId: string;
   ownerIsMe: boolean;

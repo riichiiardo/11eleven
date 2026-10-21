@@ -1,18 +1,16 @@
 import { useEffect, useRef } from "react";
-import { api } from "@/convex/_generated/api";
+import { api } from "@/services/backend/api";
 import { errorMessage } from "@/lib/errors";
 import { AppError, AppLoading, AppShell } from "@/components/eleven/AppShell";
 import {
   useEnsureTournament,
   useTournamentState,
 } from "@/hooks/use-tournament";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { toast } from "sonner";
 import { Outlet, useLocation, useSearchParams } from "react-router";
 import ClubSelection from "./ClubSelection";
 import LeagueGate from "./LeagueGate";
-// Explicit extensions are intentional: legacy transpiled .js siblings remain
-// in this repository and Vite otherwise resolves those stale modules first.
 import HomePage from "./Home.tsx";
 import ClubPage from "./Club.tsx";
 import SquadPage from "./Squad.tsx";

@@ -5,7 +5,7 @@ import {
   type PlayerAvailability,
   type PositionGroup,
   type SquadPlayerView,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { AvailabilityPicker, PlayerAvatar, PlayerFlag } from "./PlayerBits";
 import { Loader2, Shirt, Sparkles } from "lucide-react";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/domain/ids";
 
 /**
  * Deriva las seis facetas del FC (ritmo, tiro, pase, regate, defensa, físico)

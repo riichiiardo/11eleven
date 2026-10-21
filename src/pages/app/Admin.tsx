@@ -1,15 +1,15 @@
 import { useState } from "react";
-import type { AdminOverviewView, AppStateView } from "@/convex/appTypes";
-import { api } from "@/convex/_generated/api";
+import type { AdminOverviewView, AppStateView } from "@/domain/appTypes";
+import { api } from "@/services/backend/api";
 import {
   TOURNAMENT_STATUSES,
   TOURNAMENT_STATUS_META,
   formatMoney,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 import { errorMessage, relativeTime } from "@/lib/errors";
 import { RulesEditor } from "./Rules";
 import { useNow } from "@/hooks/use-tournament";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/services/backend/react";
 import { toast } from "sonner";
 import { useNavigate, useOutletContext } from "react-router";
 import { SectionCard } from "@/components/eleven/SectionCard";

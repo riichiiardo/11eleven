@@ -8,7 +8,7 @@ import {
   type PlayerAvailability,
   type Position,
   type PositionGroup,
-} from "@/convex/rulesEngine";
+} from "@/domain/rulesEngine";
 
 const GROUP_GRADIENT: Record<PositionGroup, string> = {
   GK: "from-amber-400 to-amber-600",

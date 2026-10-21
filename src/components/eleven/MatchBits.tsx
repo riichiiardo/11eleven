@@ -4,7 +4,7 @@ import type {
   FixtureView,
   MatchdayGroupView,
   StandingRowView,
-} from "@/convex/appTypes";
+} from "@/domain/appTypes";
 import { Crest } from "./Crest";
 
 /** Score chip: winner highlighted, numbers always legible (not colour-only). */

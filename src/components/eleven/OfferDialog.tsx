@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { MarketPlayerView, BudgetView } from "@/convex/appTypes";
-import { formatMoney, type SquadPlayerView } from "@/convex/rulesEngine";
+import { api } from "@/services/backend/api";
+import type { Id } from "@/domain/ids";
+import type { MarketPlayerView, BudgetView } from "@/domain/appTypes";
+import { formatMoney, type SquadPlayerView } from "@/domain/rulesEngine";
 import { useMarketActions } from "@/hooks/use-market-actions";
 import {
   Dialog,
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { RuleCheckList } from "./RuleCheckList";
 import { PlayerAvatar, PositionPill } from "./PlayerBits";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/services/backend/react";
 import { ArrowLeftRight, BadgeEuro, Coins, Loader2, Send, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 

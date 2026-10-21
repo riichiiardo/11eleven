@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { rpc } from "@/lib/supabase/client";
+import { rpc } from "@/infrastructure/supabase/client";
 import {
   DRAFT_POSITIONS,
   validSofifaUrl,
@@ -11,7 +11,7 @@ import { SectionCard } from "@/components/eleven/SectionCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ClipboardList } from "lucide-react";
-import { formatMoney } from "@/convex/rulesEngine";
+import { formatMoney } from "@/domain/rulesEngine";
 import { DraftReviews } from "./DraftReviews";
 import { DraftOutgoing } from "./DraftOutgoing";
 

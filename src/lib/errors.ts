@@ -1,13 +1,10 @@
-import { ConvexError } from "convex/values";
-
 /**
  * The backend only ever throws human explanations, never raw status codes.
  * This surfaces that sentence to the President.
  */
 export function errorMessage(error: unknown): string {
-  if (error instanceof ConvexError) {
-    const data = (error as { data?: unknown }).data;
-    if (typeof data === "string") return data;
+  if (error instanceof Error && "data" in error && typeof error.data === "string") {
+    return error.data;
   }
   if (error instanceof Error) {
     return error.message.replace(/^\[[^\]]*\]\s*/, "").trim() ||

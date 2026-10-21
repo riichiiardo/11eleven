@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
+import { api } from "@/services/backend/api";
 import { errorMessage, relativeTime } from "@/lib/errors";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useQuery } from "@/services/backend/react";
 import { toast } from "sonner";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { Badge } from "@/components/ui/badge";

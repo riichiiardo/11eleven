@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { OfferView, OfferPlayerLite } from "@/convex/appTypes";
-import { OFFER_STATUS_META, type OfferStatus } from "@/convex/marketEngine";
-import { formatMoney } from "@/convex/rulesEngine";
+import { api } from "@/services/backend/api";
+import type { OfferView, OfferPlayerLite } from "@/domain/appTypes";
+import { OFFER_STATUS_META, type OfferStatus } from "@/domain/marketEngine";
+import { formatMoney } from "@/domain/rulesEngine";
 import { useMarketActions } from "@/hooks/use-market-actions";
 import { formatDateTime, relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
@@ -18,7 +18,7 @@ import {
 import { RuleCheckList } from "./RuleCheckList";
 import { Crest } from "./Crest";
 import { OfferStatusPill } from "./OfferBits";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/services/backend/react";
 import {
   ArrowRight,
   BadgeEuro,

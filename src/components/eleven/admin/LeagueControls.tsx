@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { api } from "@/convex/_generated/api";
-import type { AdminOverviewView, TournamentView } from "@/convex/appTypes";
+import { api } from "@/services/backend/api";
+import type { AdminOverviewView, TournamentView } from "@/domain/appTypes";
 import { errorMessage } from "@/lib/errors";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/services/backend/react";
 import { toast } from "sonner";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { CompetitionPicker } from "@/components/eleven/CompetitionPicker";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fc27Competition } from "@/convex/fc27Catalog";
+import { fc27Competition } from "@/domain/fc27Catalog";
 import { FieldLabel } from "@/components/eleven/admin/AdminBits";
 import { Badge } from "@/components/ui/badge";
 import {
