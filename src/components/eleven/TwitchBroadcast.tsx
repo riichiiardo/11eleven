@@ -13,8 +13,9 @@ export function TwitchBroadcast() {
   const container = useRef<HTMLDivElement>(null);
   const playerId = useId();
   const [width, setWidth] = useState<number | null>(null);
-  const hostname = typeof window === "undefined" ? "" : window.location.hostname;
-  const [opened, setOpened] = useState(false);
+  const hostname =
+    typeof window === "undefined" ? "" : window.location.hostname;
+  const [opened, setOpened] = useState(true);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const node = container.current;
@@ -65,8 +66,9 @@ export function TwitchBroadcast() {
             role="status"
             className="rounded-lg border bg-muted/40 p-4 text-sm"
           >
-            El reproductor de Twitch necesita al menos 400 px de ancho. Amplía
-            la ventana o usa «Abrir en Twitch» para ver la transmisión.
+            El reproductor de Twitch necesita al menos 400 px de ancho. Gira el
+            dispositivo o amplía la ventana para ver la transmisión aquí, sin
+            salir de la app.
           </p>
         ) : (
           <Button
@@ -88,6 +90,23 @@ export function TwitchBroadcast() {
             {opened ? "Cerrar reproductor" : "Ver transmisión"}
           </Button>
         )}
+        {opened && !narrow && !failed ? (
+          <aside
+            role="note"
+            aria-label="Ayuda para reproducir la transmisión"
+            className="mt-3 rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm"
+          >
+            <p className="font-semibold">
+              ¿El video no se inicia automáticamente?
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              Pulsa el botón Reproducir (▶) dentro del video para verlo aquí,
+              sin salir de 11Eleven. El inicio automático puede estar bloqueado
+              en tu navegador o dispositivo. La transmisión empieza sin sonido:
+              puedes activarlo en los controles del reproductor.
+            </p>
+          </aside>
+        ) : null}
         <div id={playerId} className="mt-3" ref={container}>
           {opened && playable && !failed ? (
             <iframe
@@ -96,7 +115,7 @@ export function TwitchBroadcast() {
               width="100%"
               height="420"
               className="min-h-[300px] w-full rounded-lg border bg-black"
-              allow="fullscreen; picture-in-picture"
+              allow="autoplay; fullscreen; picture-in-picture"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
               onError={() => setFailed(true)}
@@ -107,15 +126,15 @@ export function TwitchBroadcast() {
               role="alert"
               className="rounded-lg border border-amber-500/40 p-3 text-sm"
             >
-              No se pudo cargar el reproductor. Puedes abrir el canal
-              directamente en Twitch.
+              No se pudo cargar el reproductor. Ciérralo y pulsa «Ver
+              transmisión» para reintentarlo aquí. El enlace a Twitch es una
+              alternativa opcional.
             </p>
           ) : null}
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Al abrir el reproductor te conectas con Twitch. Si no reproduce por
-          restricciones del navegador, utiliza el enlace al canal. El video no
-          modifica por sí solo los resultados del torneo.
+          El reproductor se carga automáticamente y te conecta con Twitch. El
+          video no modifica por sí solo los resultados del torneo.
         </p>
       </div>
     </section>

@@ -17,7 +17,7 @@ export function twitchEmbedUrl(hostname: string): string | null {
   url.search = new URLSearchParams({
     channel: TWITCH_CHANNEL,
     parent: hostname.toLowerCase(),
-    autoplay: "false",
+    autoplay: "true",
     muted: "true",
   }).toString();
   return url.href;

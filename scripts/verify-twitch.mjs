@@ -21,7 +21,7 @@ try {
     assert.equal(url.origin, "https://player.twitch.tv");
     assert.equal(url.searchParams.get("parent"), hostname);
     assert.equal(url.searchParams.get("channel"), "superliganova");
-    assert.equal(url.searchParams.get("autoplay"), "false");
+    assert.equal(url.searchParams.get("autoplay"), "true");
     assert.equal(url.searchParams.get("muted"), "true");
     assert.ok(!url.searchParams.has("token"));
   }
@@ -42,15 +42,33 @@ try {
   const html = renderToString(React.createElement(TwitchBroadcast));
   assert.ok(html.includes(TWITCH_CHANNEL_URL));
   assert.ok(
-    html.includes("Ver transmisión") && html.includes("Abrir en Twitch"),
+    html.includes("Cerrar reproductor") && html.includes("Abrir en Twitch"),
   );
-  assert.ok(html.includes("no modifica por sí solo"));
+  assert.ok(html.includes("los resultados del torneo"));
+  assert.ok(html.includes("se carga automáticamente"));
+  assert.ok(html.includes('role="note"'));
+  assert.ok(html.includes("Ayuda para reproducir la transmisión"));
+  assert.ok(html.includes("¿El video no se inicia automáticamente?"));
+  assert.ok(html.includes("Pulsa el botón Reproducir"));
+  assert.ok(html.includes("sin salir de 11Eleven"));
+  assert.ok(html.includes("empieza sin sonido"));
   assert.ok(html.includes("noopener noreferrer"));
   assert.ok(
     !html.includes("<iframe"),
-    "No contact with Twitch before viewer opens player",
+    "SSR waits for browser hostname and measured container before mounting iframe",
   );
   assert.ok(!html.includes("EN DIRECTO"), "Do not invent an online status");
+  const component = readFileSync(
+    "src/components/eleven/TwitchBroadcast.tsx",
+    "utf8",
+  );
+  assert.ok(
+    component.includes('allow="autoplay; fullscreen; picture-in-picture"'),
+  );
+  assert.ok(
+    !component.includes("window.location.href"),
+    "No automatic redirect to Twitch",
+  );
   const page = readFileSync("src/pages/app/Competition.tsx", "utf8");
   assert.equal(
     (page.match(/<TwitchBroadcast \/>/g) ?? []).length,
@@ -58,7 +76,7 @@ try {
     "Channel works with and without generated calendar",
   );
   console.log(
-    "PASS Twitch: channel, dynamic parent, safe URLs, no autoplay/tracking before opening, fallback link, truthful status and no dependency on calendar availability.",
+    "PASS Twitch: channel, dynamic parent, safe URLs, muted autoplay and iframe permission, no redirect, browser fallback copy, truthful status and no dependency on calendar availability.",
   );
 } finally {
   await server.close();
