@@ -67,6 +67,7 @@ Esto no sustituye la navegación autenticada contra el backend remoto.
 - `npm run preview`: sirve el build generado.
 - `npm run preview:draft`: demostración aislada del draft con datos ficticios.
 - `npm run preview:chat`: demostración aislada del chat con datos ficticios.
+- `npm run preview:broadcast`: prueba aislada del reproductor de Superliga Nova.
 - `npm run test:structure`: comprueba límites arquitectónicos y rutas internas.
 
 ## Datos y seguridad
@@ -82,7 +83,8 @@ La sincronización cambia datos y requiere una clave de servidor: ejecútala
 solo expresamente para el entorno elegido mediante `npm run sync:sheet`.
 
 Consulta [el backend](supabase/README.md), [la arquitectura](docs/architecture.md)
-y [las normas de contribución](CONTRIBUTING.md).
+y [las normas de contribución](CONTRIBUTING.md). La integración de Twitch y su
+alcance están en [transmisiones](docs/twitch-broadcast.md).
 
 ## Publicación
 

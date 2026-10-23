@@ -13,6 +13,7 @@ const suites = [
   ["scripts/verify-draft-bids.mjs"],
   ["scripts/verify-chat.mjs"],
   ["scripts/verify-chat-client.mjs"],
+  ["scripts/verify-twitch.mjs"],
 ];
 
 for (const args of suites) {
