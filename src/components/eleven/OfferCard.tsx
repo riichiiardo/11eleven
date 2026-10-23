@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "react-router";
+import { chatUrl } from "@/domain/chat";
 import { api } from "@/services/backend/api";
 import type { OfferView, OfferPlayerLite } from "@/domain/appTypes";
 import { OFFER_STATUS_META, type OfferStatus } from "@/domain/marketEngine";
@@ -139,6 +141,9 @@ export function OfferCard({ offer }: { offer: OfferView }) {
       ) : null}
 
       <footer className="flex flex-wrap items-center gap-2">
+        {offer.sellerNickname && <Button variant="outline" asChild>
+          <Link to={chatUrl({ kind: "offer", targetId: offer.id })}><MessageSquare className="size-4" aria-hidden="true" />Conversar sobre la oferta</Link>
+        </Button>}
         {offer.canRespond ? (
           <>
             <Button

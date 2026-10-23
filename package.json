@@ -16,6 +16,7 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "sync:sheet": "node scripts/sync-google-sheet.mjs",
     "preview:draft": "node scripts/preview-draft-prelists.mjs",
+    "preview:chat": "node scripts/preview-chat.mjs",
     "format": "prettier --write .",
     "preview": "vite preview"
   },

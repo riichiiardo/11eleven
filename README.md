@@ -57,7 +57,7 @@ carpetas de versiones anteriores. El historial previo permanece en Git.
 npm run check
 ```
 
-Ejecuta ESLint, TypeScript, nueve suites locales y el build de producción.
+Ejecuta ESLint, TypeScript, las suites locales y el build de producción.
 Las pruebas SQL usan PostgreSQL embebido (PGlite), sin credenciales, cuentas
 reales ni conexión a producción. Las pruebas de render cubren Inicio, Mi club,
 Plantilla, Formación, Reglas, Administración y las prelistas del draft.
@@ -66,6 +66,7 @@ Esto no sustituye la navegación autenticada contra el backend remoto.
 - `npm run build`: genera `dist/`.
 - `npm run preview`: sirve el build generado.
 - `npm run preview:draft`: demostración aislada del draft con datos ficticios.
+- `npm run preview:chat`: demostración aislada del chat con datos ficticios.
 - `npm run test:structure`: comprueba límites arquitectónicos y rutas internas.
 
 ## Datos y seguridad

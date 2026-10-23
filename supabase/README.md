@@ -17,6 +17,7 @@ Aplica los scripts en este orden, después de revisar el destino y sus permisos:
 8. `draft-prelists.sql`
 9. `draft-outgoing.sql`
 10. `draft-bids.sql`
+11. `chat.sql`
 
 No hay un seed alternativo de equipos. El catálogo se carga desde la fuente
 configurada por sincronización explícita. `catalog.sql` configura staging
@@ -127,3 +128,39 @@ No crea ofertas ni notificaciones ficticias durante la instalación.
 
 Prueba aislada: `node scripts/verify-draft-bids.mjs`. La demostración local incluye
 ofertas y avisos ficticios; `?bidder` permite revisar el formulario de puja.
+
+## Chat interno
+
+Aplicar `chat.sql` al final y antes de publicar el frontend que incorpora Chat.
+La instalación es idempotente: no borra conversaciones ni reproduce eventos
+anteriores. No modifica presupuestos, ofertas o resultados, ni crea correos.
+
+- **Conversación casual:** sala general del Universo y mensajes privados entre
+  sus presidentes. Cambiar de Universo o de usuario separa también el estado local.
+- **Ofertas:** cada nueva oferta a otro presidente crea un hilo privado entre
+  comprador y vendedor. Registra el jugador, efectivo total (distinguiendo
+  paquetes/trueques), mensaje inicial y cambios de estado o importe. El botón
+  «Conversar sobre la oferta» abre el hilo; aceptar/rechazar sigue realizándose
+  exclusivamente en Negociaciones, con las reglas y controles existentes.
+- **Bot 11Eleven:** buzón privado para los dos equipos de un partido. Avisa del
+  encuentro de la jornada activa al programarlo/cambiarlo o al avanzar de jornada,
+  sin inundar la bandeja con todo el calendario futuro. Cuando Administración registra/corrige el
+  resultado y sus goleadores. Usa los datos de `fixtures` y `fixture_reports`;
+  no se conecta al juego, no inventa goles y no retransmite partidos en vivo.
+  No hay un envío programado adicional antes del inicio ni notificaciones push.
+- Historial persistente, estado de lectura por presidente, máximo 2000 caracteres,
+  reintentos idempotentes y límite de 60 mensajes por minuto/presidente. Lectura
+  en páginas de 50 y consulta incremental para no perder ráfagas de mensajes.
+- La conversación visible consulta cada 5 segundos; la bandeja/contador cada 15.
+  Las consultas periódicas se pausan con la pestaña oculta. La bandeja muestra
+  los 100 hilos más recientes; un hilo anterior sigue accesible desde su oferta
+  o contacto. No se interpreta «sin coincidencias» como una pantalla en blanco.
+- Tablas internas con RLS y sin permisos directos de cliente. RPCs autenticadas
+  validan la presidencia y pertenencia al Universo; ser administrador no permite
+  leer privados ajenos. Ningún cliente puede publicar como bot. No necesita
+  claves nuevas, publicaciones Realtime ni exponer tablas internas al Data API.
+
+Pruebas sin credenciales ni producción:
+`node scripts/verify-chat.mjs` y `node scripts/verify-chat-client.mjs`.
+La demostración opcional usa `npm run preview:chat` y datos ficticios aislados.
+Publicación, SQL remoto y pruebas con sesiones reales son pasos separados.

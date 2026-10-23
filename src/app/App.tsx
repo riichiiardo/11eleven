@@ -21,6 +21,7 @@ const CompetitionPage = lazy(() => import("../pages/app/Competition.tsx"));
 const TeamsPage = lazy(() => import("../pages/app/Teams.tsx"));
 const RulesPage = lazy(() => import("../pages/app/Rules.tsx"));
 const ProfilePage = lazy(() => import("../pages/app/Profile.tsx"));
+const ChatPage = lazy(() => import("../pages/app/Chat.tsx"));
 const AdminPage = lazy(() => import("../pages/app/Admin.tsx"));
 const NotFound = lazy(() => import("../pages/NotFound.tsx"));
 
@@ -165,6 +166,7 @@ export function App() {
                 <Route path="equipos" element={<TeamsPage />} />
                 <Route path="reglas" element={<RulesPage />} />
                 <Route path="perfil" element={<ProfilePage />} />
+                <Route path="chat" element={<ChatPage />} />
                 <Route path="admin" element={<AdminPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

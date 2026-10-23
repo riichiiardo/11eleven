@@ -33,6 +33,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageCircle,
   Shield,
   Shirt,
   ShoppingBag,
@@ -87,6 +88,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { label: "Resultados", to: "/dashboard/competicion", icon: Swords },
       { label: "Equipos", to: "/dashboard/equipos", icon: UsersRound },
+      { label: "Chat interno", to: "/dashboard/chat", icon: MessageCircle },
       { label: "Reglas del torneo", to: "/dashboard/reglas", icon: BookOpen },
       { label: "Administración", to: "/dashboard/admin", icon: Gauge, adminOnly: true },
       { label: "Perfil", to: "/dashboard/perfil", icon: User },
