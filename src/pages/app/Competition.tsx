@@ -8,6 +8,7 @@ import {
   StandingsTable,
 } from "@/components/eleven/MatchBits";
 import { Crest } from "@/components/eleven/Crest";
+import { TwitchBroadcast } from "@/components/eleven/TwitchBroadcast";
 import {
   CalendarDays,
   History,
@@ -52,13 +53,16 @@ export default function Competition() {
 
   if (!summary.available) {
     return (
-      <SectionCard title="Calendario" icon={CalendarDays}>
-        <p className="text-sm text-muted-foreground">
-          El calendario todavía no se ha generado. Se crea automáticamente con el
-          torneo (ida y vuelta entre todos los clubes); recarga la página en
-          unos segundos.
-        </p>
-      </SectionCard>
+      <div className="flex flex-col gap-5">
+        <TwitchBroadcast />
+        <SectionCard title="Calendario" icon={CalendarDays}>
+          <p className="text-sm text-muted-foreground">
+            El calendario todavía no se ha generado. Se crea automáticamente con
+            el torneo (ida y vuelta entre todos los clubes); recarga la página
+            en unos segundos.
+          </p>
+        </SectionCard>
+      </div>
     );
   }
 
@@ -66,6 +70,7 @@ export default function Competition() {
 
   return (
     <div className="flex flex-col gap-5">
+      <TwitchBroadcast />
       {/* ------------------------------------------------ Match Center */}
       <SectionCard
         title="Match Center"
