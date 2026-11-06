@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
-import { broadcastEvidencePath } from "@/domain/broadcast";
 import { getCompetitionArchive } from "@/services/backend/competition-records";
-import type {
-  RecordedCompetition,
-  RecordedStat,
-} from "@/domain/competition-records";
+import type { RecordedCompetition } from "@/domain/competition-records";
 import { errorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/eleven/SectionCard";
-import { Trophy } from "lucide-react";
+import { Trophy, Swords, BarChart3, Users } from "lucide-react";
+import {
+  RecordedResults,
+  RecordedStandings,
+  RecordedPlayerStats,
+} from "./CompetitionTables";
 
 export function CompetitionArchive({
   universeId,
@@ -78,34 +78,6 @@ export function CompetitionArchiveView({
     data?.find((item) => item.slug === "primera") ??
     data?.[0];
   const [view, setView] = useState("matches");
-  const evidenceLink = (videoId: string, second: number) => {
-    const to = broadcastEvidencePath(videoId, second);
-    return to ? (
-      <Button asChild className="mt-3" variant="outline">
-        <Link to={to}>Ver evidencia en Transmisiones</Link>
-      </Button>
-    ) : (
-      <p className="mt-3 text-muted-foreground">
-        Grabación pendiente de catálogo.
-      </p>
-    );
-  };
-  const stats = (
-    rows: RecordedStat[] | null,
-    homeId: string,
-    home: string,
-    away: string,
-  ) =>
-    rows === null
-      ? "Sin verificar"
-      : rows.length === 0
-        ? "Ninguno, según el reporte"
-        : rows.map((r, i) => (
-            <span key={i} className="block">
-              {r.teamId === homeId ? home : away}: {r.player} ×{r.count}
-              {r.ownGoal ? " (autogol)" : ""}
-            </span>
-          ));
   return (
     <SectionCard title="Competiciones del Universo" icon={Trophy}>
       {error ? (
@@ -129,24 +101,35 @@ export function CompetitionArchiveView({
       ) : null}
       {c ? (
         <div className="flex flex-col gap-4">
-          <label className="text-sm font-semibold">
-            Competición
-            <select
-              aria-label="Competición del Universo"
-              value={c.id}
-              onChange={(e) => {
-                setSelected(e.target.value);
-                setView("matches");
-              }}
-              className="mt-1 min-h-11 w-full rounded-md border bg-background py-2 pl-3 pr-10"
-            >
-              {data?.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} · {item.season}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                Centro de competiciones
+              </p>
+              <h3 className="display mt-1 text-2xl font-bold">{c.name}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Temporada {c.season}
+              </p>
+            </div>
+            <label className="w-full text-xs font-semibold sm:w-64">
+              Elegir competición
+              <select
+                aria-label="Competición del Universo"
+                value={c.id}
+                onChange={(e) => {
+                  setSelected(e.target.value);
+                  setView("matches");
+                }}
+                className="mt-1 min-h-11 w-full rounded-md border bg-background py-2 pl-3 pr-10"
+              >
+                {data?.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.season}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <p
             role="note"
             className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"
@@ -169,29 +152,34 @@ export function CompetitionArchiveView({
             </span>
           </div>
           {c.latestRound ? (
-            <div className="flex flex-wrap gap-2">
-              {Array.from(
-                { length: Math.min(c.latestRound, 100) },
-                (_, i) => i + 1,
-              ).map((round) => {
-                const count = c.matches.filter(
-                  (m) => m.round === round && m.verified,
-                ).length;
-                return (
-                  <span
-                    key={round}
-                    className="rounded border px-2 py-1 text-xs"
-                  >
-                    J{round}:{" "}
-                    {count
-                      ? `${count} verificado(s)`
-                      : c.reviewFrom !== null && round < c.reviewFrom
-                        ? "pendiente de archivo"
-                        : "pendiente de revisión"}
-                  </span>
-                );
-              })}
-            </div>
+            <details className="rounded-xl border bg-muted/20 p-3 text-xs">
+              <summary className="cursor-pointer font-semibold text-muted-foreground">
+                Jornadas y cobertura del archivo
+              </summary>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {Array.from(
+                  { length: Math.min(c.latestRound, 100) },
+                  (_, i) => i + 1,
+                ).map((round) => {
+                  const count = c.matches.filter(
+                    (m) => m.round === round && m.verified,
+                  ).length;
+                  return (
+                    <span
+                      key={round}
+                      className="rounded border px-2 py-1 text-xs"
+                    >
+                      J{round}:{" "}
+                      {count
+                        ? `${count} verificado(s)`
+                        : c.reviewFrom !== null && round < c.reviewFrom
+                          ? "pendiente de archivo"
+                          : "pendiente de revisión"}
+                    </span>
+                  );
+                })}
+              </div>
+            </details>
           ) : (
             <p className="text-xs text-muted-foreground">
               Las fases y los cruces se completarán con evidencia; no se han
@@ -199,186 +187,41 @@ export function CompetitionArchiveView({
             </p>
           )}
           <div
-            className="flex flex-wrap gap-2"
+            className="flex gap-1 rounded-xl border bg-muted/40 p-1"
             role="group"
             aria-label="Vista de la competición"
           >
             {[
-              ["matches", "Resultados"],
-              ["standings", "Clasificación"],
-              ["players", "Estadísticas de jugadores"],
-            ].map(([value, label]) => (
+              { value: "matches", label: "Resultados", Icon: Swords },
+              { value: "standings", label: "Clasificación", Icon: BarChart3 },
+              {
+                value: "players",
+                label: "Estadísticas de jugadores",
+                Icon: Users,
+              },
+            ].map(({ value, label, Icon }) => (
               <Button
                 key={value}
                 type="button"
-                variant={view === value ? "default" : "outline"}
+                variant={view === value ? "default" : "ghost"}
+                className="min-h-11 min-w-0 flex-1 gap-1.5 whitespace-normal rounded-lg px-2 text-[11px] sm:text-sm"
                 aria-pressed={view === value}
                 onClick={() => setView(value)}
               >
+                <Icon
+                  className="hidden size-4 shrink-0 sm:block"
+                  aria-hidden="true"
+                />
                 {label}
               </Button>
             ))}
           </div>
           {view === "matches" ? (
-            c.matches.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aún no hay resultados revisados. Las grabaciones localizadas no
-                se convierten automáticamente en resultados.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {c.matches.map((m) => (
-                  <article key={m.id} className="rounded-lg border p-3 text-sm">
-                    <p className="font-semibold">
-                      {m.round ? `J${m.round} · ` : ""}
-                      {m.stage} · {m.home} {m.homeGoals ?? "—"}–
-                      {m.awayGoals ?? "—"} {m.away}
-                      {m.verified
-                        ? " · Verificado"
-                        : " · Pendiente de verificar"}
-                    </p>
-                    {m.homePenalties !== null ? (
-                      <p>
-                        Penaltis: {m.homePenalties}–{m.awayPenalties} (fuera del
-                        marcador)
-                      </p>
-                    ) : null}
-                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {[
-                        ["Goles", m.goals],
-                        ["Asistencias", m.assists],
-                        ["Amarillas", m.yellowCards],
-                        ["Rojas", m.redCards],
-                      ].map(([label, rows]) => (
-                        <div key={String(label)}>
-                          <dt className="font-semibold">{String(label)}</dt>
-                          <dd className="text-muted-foreground">
-                            {stats(
-                              rows as RecordedStat[] | null,
-                              m.homeId,
-                              m.home,
-                              m.away,
-                            )}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                    {evidenceLink(m.videoId, m.evidenceSecond)}
-                  </article>
-                ))}
-              </div>
-            )
+            <RecordedResults key={c.id} competition={c} />
           ) : null}
-          {view === "standings" ? (
-            c.format === "cup" ? (
-              <p className="text-sm text-muted-foreground">
-                Esta copa se consulta por fases y resultados; no se mezclan sus
-                encuentros con los puntos de las ligas.
-              </p>
-            ) : c.standings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Sin clasificación calculable: todavía no hay partidos
-                verificados.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[550px] text-sm">
-                  <caption className="mb-2 text-left">
-                    Clasificación provisional · solo partidos verificados
-                  </caption>
-                  <thead>
-                    <tr>
-                      {[
-                        "Equipo",
-                        "PJ",
-                        "G",
-                        "E",
-                        "P",
-                        "GF",
-                        "GC",
-                        "DG",
-                        "Pts",
-                      ].map((h) => (
-                        <th key={h} scope="col" className="p-2 text-left">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {c.standings.map((r) => (
-                      <tr key={r.team} className="border-t">
-                        {[
-                          r.team,
-                          r.played,
-                          r.won,
-                          r.drawn,
-                          r.lost,
-                          r.goalsFor,
-                          r.goalsAgainst,
-                          r.goalDifference,
-                          r.points,
-                        ].map((v, i) => (
-                          <td key={i} className="p-2">
-                            {v}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
-          ) : null}
+          {view === "standings" ? <RecordedStandings competition={c} /> : null}
           {view === "players" ? (
-            c.players.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aún no hay estadísticas individuales verificadas.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px] text-sm">
-                  <caption className="mb-2 text-left">
-                    Nombres transcritos de la evidencia, sin vincular homónimos
-                    automáticamente
-                  </caption>
-                  <thead>
-                    <tr>
-                      {[
-                        "Jugador",
-                        "Equipo",
-                        "Goles",
-                        "Asistencias",
-                        "Amarillas",
-                        "Rojas",
-                      ].map((h) => (
-                        <th key={h} scope="col" className="p-2 text-left">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {c.players.map((p, i) => (
-                      <tr key={i} className="border-t">
-                        {[
-                          p.name,
-                          p.team,
-                          p.goals ?? "—",
-                          p.assists ?? "—",
-                          p.yellowCards ?? "—",
-                          p.redCards ?? "—",
-                        ].map((v, j) => (
-                          <td key={j} className="p-2">
-                            {v}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
+            <RecordedPlayerStats key={c.id} competition={c} />
           ) : null}
         </div>
       ) : null}

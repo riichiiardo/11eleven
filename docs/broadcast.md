@@ -41,6 +41,14 @@ Asistencias y tarjetas solo se registran cuando hay evidencia; la API de YouTube
 Abrir un video o ver una jugada nunca publica un resultado.
 El calendario general anterior permanece separado para no mezclar ligas, copas o presupuestos.
 
+## Presentación de resultados
+
+Los partidos se agrupan por jornada, con filtro, escudos locales, marcador central y acta desplegable.
+La clasificación muestra posición, puntos destacados y diferencia de goles con signo; conserva el orden calculado por la base de datos.
+Las tablas permiten desplazamiento horizontal en móvil y mantienen fija su columna de identificación.
+La tabla de jugadores se puede ordenar por goles, asistencias o tarjetas; los valores desconocidos permanecen como «—» y se ordenan después de los confirmados.
+`src/lib/crests.ts` resuelve alias explícitos del histórico (Palermo, Parma y Racing Strasbourg) contra las imágenes existentes en `public/crests`, sin búsquedas aproximadas que confundan clubes.
+
 ## Instalación e importación
 
 1. Instalar el módulo SQL después de `rules-configuration.sql`.

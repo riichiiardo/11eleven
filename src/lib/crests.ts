@@ -38,7 +38,7 @@ export const CRESTS: Record<string, string> = {
   "Bologna FC": "crests/bologna-fc.png",
   "Borussia Dortmund": "crests/borussia-dortmund.png",
   "Borussia Mönchengladbach": "crests/borussia-monchengladbach.png",
-  "Bournemouth": "crests/bournemouth.png",
+  Bournemouth: "crests/bournemouth.png",
   "Brentford FC": "crests/brentford-fc.png",
   "Brighton & Hove Albion": "crests/brighton-hove-albion.png",
   "CA Osasuna": "crests/ca-osasuna.png",
@@ -47,7 +47,7 @@ export const CRESTS: Record<string, string> = {
   "Chelsea FC": "crests/chelsea-fc.png",
   "Chivas de Guadalajara": "crests/chivas-de-guadalajara.png",
   "Club América": "crests/club-america.png",
-  "Corinthians": "crests/corinthians.png",
+  Corinthians: "crests/corinthians.png",
   "Cruz Azul": "crests/cruz-azul.png",
   "Crystal Palace": "crests/crystal-palace.png",
   "Eintracht Frankfurt": "crests/eintracht-frankfurt.png",
@@ -57,17 +57,17 @@ export const CRESTS: Record<string, string> = {
   "FC Porto": "crests/fc-porto.png",
   "Fenerbahçe SK": "crests/fenerbahce-sk.png",
   "Feyenoord Rotterdam": "crests/feyenoord-rotterdam.png",
-  "Flamengo": "crests/flamengo.png",
+  Flamengo: "crests/flamengo.png",
   "Fulham FC": "crests/fulham-fc.png",
   "Galatasaray SK": "crests/galatasaray-sk.png",
   "Genoa CFC": "crests/genoa-cfc.png",
   "Getafe CF": "crests/getafe-cf.png",
-  "Grêmio": "crests/gremio.png",
+  Grêmio: "crests/gremio.png",
   "Hellas Verona": "crests/hellas-verona.png",
   "Independiente Santa Fe": "crests/independiente-santa-fe.png",
   "Inter de Milán": "crests/inter-de-milan.png",
   "Inter Miami CF": "crests/inter-miami-cf.png",
-  "Internacional": "crests/internacional.png",
+  Internacional: "crests/internacional.png",
   "Ipswich Town": "crests/ipswich-town.png",
   "Junior FC": "crests/junior-fc.png",
   "Juventus FC": "crests/juventus-fc.png",
@@ -86,7 +86,7 @@ export const CRESTS: Record<string, string> = {
   "OGC Nice": "crests/ogc-nice.png",
   "Olympique de Marsella": "crests/olympique-de-marsella.png",
   "Olympique Lyonnais": "crests/olympique-lyonnais.png",
-  "Palmeiras": "crests/palmeiras.png",
+  Palmeiras: "crests/palmeiras.png",
   "Paris Saint-Germain": "crests/paris-saint-germain.png",
   "PSV Eindhoven": "crests/psv-eindhoven.png",
   "Racing Club": "crests/racing-club.png",
@@ -127,20 +127,41 @@ export const CRESTS: Record<string, string> = {
   "Vélez Sarsfield": "crests/velez-sarsfield.png",
   "Werder Bremen": "crests/werder-bremen.png",
   "West Ham United": "crests/west-ham-united.png",
-  "Wolverhampton": "crests/wolverhampton.png",
+  Wolverhampton: "crests/wolverhampton.png",
   "Yokohama F. Marinos": "crests/yokohama-f-marinos.png",
-  ...Object.fromEntries(Object.entries(teamCrests).map(([name, entry]) => [name, entry.path])),
+  ...Object.fromEntries(
+    Object.entries(teamCrests).map(([name, entry]) => [name, entry.path]),
+  ),
 };
 
-/**
- * Ruta pública del escudo de un club, o `null` si el catálogo no lo tiene
- * (entonces `Crest` muestra las iniciales sobre los colores del club).
- * `BASE_URL` cubre tanto el dev server (`/`) como GitHub Pages (`/11eleven/`).
- */
+// Explicit aliases from the broadcast archive; never fuzzy-match different clubs.
+const CREST_ALIASES: Record<string, string> = {
+  Palermo: "Palermo FC",
+  Parma: "Parma Calcio 1913",
+  "Parma Calcio": "Parma Calcio 1913",
+  "Racing Strasbourg": "RC Strasbourg",
+  "Atlético de Madrid": "Club Atlético de Madrid",
+  "Club Atlético Madrid": "Club Atlético de Madrid",
+  "Chivas Guadalajara": "Chivas de Guadalajara",
+  PSG: "Paris Saint-Germain",
+};
+const normalize = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+const crestPaths = new Map(
+  Object.entries(CRESTS).map(([name, path]) => [normalize(name), path]),
+);
+for (const [alias, canonical] of Object.entries(CREST_ALIASES)) {
+  crestPaths.set(normalize(alias), CRESTS[canonical]);
+}
+
+/** Local assets, with Vite's base for both development and GitHub Pages. */
 export function crestFor(name?: string | null): string | null {
   if (!name) return null;
-  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-  const path = CRESTS[name.trim()] ?? Object.entries(CRESTS).find(([key]) => normalize(key) === normalize(name))?.[1];
-  if (!path) return null;
-  return `${import.meta.env.BASE_URL}${path}`;
+  const path = crestPaths.get(normalize(name));
+  return path ? `${import.meta.env.BASE_URL}${path}` : null;
 }
