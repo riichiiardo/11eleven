@@ -8,14 +8,9 @@ import {
   StandingsTable,
 } from "@/components/eleven/MatchBits";
 import { Crest } from "@/components/eleven/Crest";
-import { TwitchBroadcast } from "@/components/eleven/TwitchBroadcast";
-import {
-  CalendarDays,
-  History,
-  Info,
-  Swords,
-  Trophy,
-} from "lucide-react";
+import { CompetitionArchive } from "@/components/eleven/CompetitionArchive";
+import { Broadcast } from "@/components/eleven/Broadcast";
+import { CalendarDays, History, Info, Swords, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DATE_FORMAT = new Intl.DateTimeFormat("es-ES", {
@@ -54,12 +49,17 @@ export default function Competition() {
   if (!summary.available) {
     return (
       <div className="flex flex-col gap-5">
-        <TwitchBroadcast />
+        <Broadcast />
+        {state.tournament ? (
+          <CompetitionArchive
+            universeId={state.tournament.id}
+            scope={state.user.id}
+          />
+        ) : null}
         <SectionCard title="Calendario" icon={CalendarDays}>
           <p className="text-sm text-muted-foreground">
-            El calendario todavía no se ha generado. Se crea automáticamente con
-            el torneo (ida y vuelta entre todos los clubes); recarga la página
-            en unos segundos.
+            Consulta arriba las competiciones de este Universo. El calendario
+            general todavía no tiene partidos disponibles.
           </p>
         </SectionCard>
       </div>
@@ -70,7 +70,13 @@ export default function Competition() {
 
   return (
     <div className="flex flex-col gap-5">
-      <TwitchBroadcast />
+      <Broadcast />
+      {state.tournament ? (
+        <CompetitionArchive
+          universeId={state.tournament.id}
+          scope={state.user.id}
+        />
+      ) : null}
       {/* ------------------------------------------------ Match Center */}
       <SectionCard
         title="Match Center"
@@ -104,7 +110,9 @@ export default function Competition() {
                     {(summary.myMatch.mySide === "home"
                       ? summary.myMatch.fixture.homeGoals
                       : summary.myMatch.fixture.awayGoals) ?? "—"}
-                    <span className="mx-2 text-sm text-muted-foreground">–</span>
+                    <span className="mx-2 text-sm text-muted-foreground">
+                      –
+                    </span>
                     {(summary.myMatch.mySide === "away"
                       ? summary.myMatch.fixture.homeGoals
                       : summary.myMatch.fixture.awayGoals) ?? "—"}
@@ -239,8 +247,9 @@ export default function Competition() {
             <strong className="text-foreground">P</strong> derrotas
           </span>
           <span>
-            <strong className="text-foreground">GF/GC</strong> goles a favor y en
-            contra · <strong className="text-foreground">DIF</strong> diferencia
+            <strong className="text-foreground">GF/GC</strong> goles a favor y
+            en contra · <strong className="text-foreground">DIF</strong>{" "}
+            diferencia
           </span>
           <span>Orden: puntos, diferencia, goles, puntos fantasy</span>
         </div>
