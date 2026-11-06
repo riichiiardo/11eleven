@@ -220,6 +220,83 @@ try {
   assert.ok(result.includes("Ver evidencia en Transmisiones"));
   assert.ok(!result.includes("<iframe"));
   assert.ok(!result.includes("Seleccionar transmisión o grabación"));
+  const { crestFor } = await server.ssrLoadModule("/src/lib/crests.ts");
+  const sourceMatches = JSON.parse(
+    readFileSync("data/broadcast-results/2026-11-06.json", "utf8"),
+  ).matches;
+  const catalogTeams = Object.keys(
+    JSON.parse(readFileSync("src/lib/team-crests.json", "utf8")),
+  );
+  for (const team of new Set([
+    ...catalogTeams,
+    ...sourceMatches.flatMap((m) => [m.home, m.away]),
+  ])) {
+    const crest = crestFor(team);
+    assert.ok(crest, `No crest for ${team}`);
+    assert.ok(
+      readFileSync("public/" + crest.replace(/^\//, "")).length > 100,
+      `Missing asset for ${team}`,
+    );
+  }
+  assert.equal(crestFor("  PALERMO  "), crestFor("Palermo FC"));
+  assert.equal(crestFor("Parma"), crestFor("Parma Calcio 1913"));
+  assert.equal(crestFor("Racing Strasbourg"), crestFor("RC Strasbourg"));
+  assert.notEqual(crestFor("Racing Strasbourg"), crestFor("Racing Club"));
+  assert.equal(crestFor("Unknown test club"), null);
+  const { RecordedStandings, RecordedPlayerStats } = await server.ssrLoadModule(
+    "/src/components/eleven/CompetitionTables.tsx",
+  );
+  const designFixture = {
+    standings: [
+      {
+        team: "Palermo",
+        played: 1,
+        won: 1,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 2,
+        goalsAgainst: 0,
+        goalDifference: 2,
+        points: 3,
+      },
+    ],
+    format: "league",
+    players: [
+      {
+        name: "Fixture A",
+        team: "Parma",
+        goals: null,
+        assists: 1,
+        yellowCards: null,
+        redCards: 0,
+      },
+      {
+        name: "Fixture B",
+        team: "Racing Strasbourg",
+        goals: 2,
+        assists: 0,
+        yellowCards: 1,
+        redCards: null,
+      },
+    ],
+  };
+  const standings = renderToString(
+    React.createElement(RecordedStandings, { competition: designFixture }),
+  );
+  assert.ok(standings.includes('scope="row"'));
+  assert.ok(standings.includes("Escudo de Palermo"));
+  assert.ok(standings.includes("/crests/palermo-fc.png"));
+  assert.ok(standings.replace(/<!--.*?-->/g, "").includes("+2"));
+  const players = renderToString(
+    React.createElement(RecordedPlayerStats, { competition: designFixture }),
+  );
+  assert.ok(players.includes("/crests/parma.webp"));
+  assert.ok(players.includes("/crests/rc-strasbourg.png"));
+  assert.ok(players.includes('aria-label="Sin verificar"'));
+  assert.ok(
+    players.indexOf("Fixture B") < players.indexOf("Fixture A"),
+    "Unknown stats must not outrank confirmed goals",
+  );
   console.log(
     "PASS broadcast: YouTube channel, 17 verified video IDs, 6 competition categories, muted autoplay, origin validation, inline playback, archive selection, no redirects, separate result/broadcast routes, safe evidence links with Pages basename, deep-linked video/timestamp, safe SSR and visible playback help.",
   );
