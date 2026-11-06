@@ -16,8 +16,9 @@ export type RecordedMatch = {
   awayGoals: number | null;
   homePenalties: number | null;
   awayPenalties: number | null;
-  videoId: string;
-  evidenceSecond: number;
+  videoId: string | null;
+  evidenceSecond: number | null;
+  evidence?: { kind: "screenshots"; title: string; images: string[] } | null;
   verified: boolean;
   version: number;
   goals: RecordedStat[] | null;
@@ -31,6 +32,7 @@ export type RecordedCompetition = {
   name: string;
   format: "league" | "cup" | "league_playoffs";
   season: string;
+  rankingPhase?: string | null;
   reviewFrom: number | null;
   latestRound: number | null;
   videoCount: number;

@@ -144,11 +144,13 @@ export function CompetitionArchiveView({
             <span>· {c.verifiedMatches} partido(s) verificado(s)</span>
             <span>
               ·{" "}
-              {c.format === "cup"
-                ? "Copa: encuentros por fase"
-                : c.format === "league_playoffs"
-                  ? "Liga con fase final"
-                  : "Liga"}
+              {c.rankingPhase
+                ? `Copa · ${c.rankingPhase} · tabla única`
+                : c.format === "cup"
+                  ? "Copa: encuentros por fase"
+                  : c.format === "league_playoffs"
+                    ? "Liga con fase final"
+                    : "Liga"}
             </span>
           </div>
           {c.latestRound ? (
