@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createServer } from "vite";
 import React from "react";
+import { MemoryRouter } from "react-router";
 import { renderToString } from "react-dom/server";
 const server = await createServer({
   server: { middlewareMode: true, hmr: false },
@@ -13,6 +14,8 @@ try {
     BROADCAST_RECORDINGS,
     BROADCAST_COMPETITIONS,
     youtubeEmbedUrl,
+    parseBroadcastPlayback,
+    broadcastEvidencePath,
   } = await server.ssrLoadModule("/src/domain/broadcast.ts");
   assert.equal(BROADCAST_RECORDINGS.length, 17);
   assert.equal(new Set(BROADCAST_RECORDINGS.map((v) => v.id)).size, 17);
@@ -81,7 +84,45 @@ try {
   );
   assert.ok(!component.includes("window.location.href"));
   const page = readFileSync("src/pages/app/Competition.tsx", "utf8");
-  assert.equal((page.match(/<Broadcast \/>/g) ?? []).length, 2);
+  assert.ok(!page.includes("<Broadcast"));
+  assert.ok(!page.includes('from "@/components/eleven/Broadcast"'));
+  const query = "?video=EUpPyzN-sTU&t=4193";
+  assert.deepEqual(parseBroadcastPlayback(query), {
+    selection: "EUpPyzN-sTU",
+    second: 4193,
+  });
+  assert.equal(
+    broadcastEvidencePath("EUpPyzN-sTU", 4193),
+    "/dashboard/transmision" + query,
+  );
+  for (const invalid of ["https://evil.example", "not-a-video", "live"])
+    assert.equal(broadcastEvidencePath(invalid, 0), null);
+  for (const second of [-1, 1.5, 86401, Number.NaN])
+    assert.equal(broadcastEvidencePath("EUpPyzN-sTU", second), null);
+  assert.deepEqual(
+    parseBroadcastPlayback("?video=https%3A%2F%2Fevil.example&t=10"),
+    { selection: "live", second: 0 },
+  );
+  assert.deepEqual(parseBroadcastPlayback("?video=EUpPyzN-sTU&t=-10"), {
+    selection: "EUpPyzN-sTU",
+    second: 0,
+  });
+  const { default: BroadcastPage } = await server.ssrLoadModule(
+    "/src/pages/app/BroadcastPage.tsx",
+  );
+  const broadcastPage = renderToString(
+    React.createElement(
+      MemoryRouter,
+      {
+        basename: "/11eleven",
+        initialEntries: ["/11eleven/dashboard/transmision" + query],
+      },
+      React.createElement(BroadcastPage),
+    ),
+  );
+  assert.ok(broadcastPage.includes('<option value="EUpPyzN-sTU" selected="">'));
+  assert.ok(broadcastPage.includes('href="/11eleven/dashboard/competicion"'));
+  assert.ok(!broadcastPage.includes("Competiciones del Universo"));
   const { CompetitionArchiveView } = await server.ssrLoadModule(
     "/src/components/eleven/CompetitionArchive.tsx",
   );
@@ -122,8 +163,65 @@ try {
   assert.ok(archive.includes("pendiente de revisión"));
   assert.ok(archive.includes("Aún no hay resultados revisados"));
   assert.ok(!archive.includes("0–0"));
+  const result = renderToString(
+    React.createElement(
+      MemoryRouter,
+      {
+        basename: "/11eleven",
+        initialEntries: ["/11eleven/dashboard/competicion"],
+      },
+      React.createElement(CompetitionArchiveView, {
+        data: [
+          {
+            id: "first",
+            slug: "primera",
+            name: "Primera",
+            format: "league",
+            season: "2026",
+            reviewFrom: 9,
+            latestRound: 11,
+            videoCount: 4,
+            verifiedMatches: 1,
+            standings: [],
+            players: [],
+            matches: [
+              {
+                id: "report",
+                round: 11,
+                stage: "Regular",
+                homeId: "home",
+                awayId: "away",
+                home: "Home",
+                away: "Away",
+                homeGoals: 2,
+                awayGoals: 0,
+                homePenalties: null,
+                awayPenalties: null,
+                videoId: "EUpPyzN-sTU",
+                evidenceSecond: 4193,
+                verified: true,
+                goals: null,
+                assists: null,
+                yellowCards: null,
+                redCards: null,
+                version: 1,
+              },
+            ],
+          },
+        ],
+      }),
+    ),
+  );
+  assert.ok(
+    result.includes(
+      'href="/11eleven/dashboard/transmision?video=EUpPyzN-sTU&amp;t=4193"',
+    ),
+  );
+  assert.ok(result.includes("Ver evidencia en Transmisiones"));
+  assert.ok(!result.includes("<iframe"));
+  assert.ok(!result.includes("Seleccionar transmisión o grabación"));
   console.log(
-    "PASS broadcast: YouTube channel, 17 verified video IDs, 6 competition categories, muted autoplay, origin validation, inline playback, archive selection, no redirects, safe SSR and visible playback help.",
+    "PASS broadcast: YouTube channel, 17 verified video IDs, 6 competition categories, muted autoplay, origin validation, inline playback, archive selection, no redirects, separate result/broadcast routes, safe evidence links with Pages basename, deep-linked video/timestamp, safe SSR and visible playback help.",
   );
 } finally {
   await server.close();

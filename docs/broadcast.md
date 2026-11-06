@@ -3,12 +3,16 @@
 ## Reproductor
 
 El canal es [Super Nova League en YouTube](https://www.youtube.com/@SUPERNOVALEAGUEKTV).
-Competición muestra el reproductor incluso si no existe calendario general.
+Transmisiones (`/dashboard/transmision`) es una sección propia del menú Torneo, disponible también desde Más en móvil.
+Resultados (`/dashboard/competicion`) contiene marcadores, clasificación y estadísticas, sin cargar el reproductor.
 Solicita autoplay silenciado, permite activar el sonido y cerrar/reabrir el video.
 Si el navegador impide el inicio automático, el aviso explica cómo reproducirlo dentro de la app.
 El selector ofrece directo (cuando está disponible) y 17 grabaciones identificadas el 6 de noviembre de 2026.
 La disponibilidad del directo depende del canal; no se presenta una grabación como si fuera en vivo.
 No hay redirección automática ni se requieren credenciales de YouTube.
+«Ver evidencia en Transmisiones» navega a la sección de video con `?video=<ID>&t=<segundos>`;
+el ID y el instante se validan contra el catálogo antes de reproducir. La URL admite recarga y acceso directo.
+«Volver a resultados» regresa a las tablas. Al abandonar Transmisiones, el iframe se desmonta y se detiene el video.
 
 El contenedor exige 200 px de ancho y al menos 240 px de alto. El origen se valida antes de construir la URL.
 Los videos admitidos están definidos en `src/domain/broadcast.ts`; actualizar el catálogo exige revisar los nuevos IDs.
@@ -54,7 +58,7 @@ Los penaltis de desempate se guardan aparte del marcador del partido.
 
 - `npm run check`: lint, tipos, 13 suites y compilación de producción.
 - `node scripts/verify-competition-archive.mjs`: aislamiento entre Universos, permisos, versiones, duplicados, temporadas y estadísticas desconocidas.
-- `npm run preview:broadcast`: vista aislada del componente real, sin autenticación ni conexión a Supabase.
+- `npm run preview:broadcast`: vista aislada de las dos secciones, con navegación interna y sin autenticación ni conexión a Supabase.
   Por defecto usa `http://127.0.0.1:5189/broadcast-preview`; `BROADCAST_PREVIEW_PORT` permite otro puerto.
 - La prueba visual del 6 de noviembre confirmó reproducción de una grabación dentro del componente.
   No certifica un directo cuando el canal está desconectado.

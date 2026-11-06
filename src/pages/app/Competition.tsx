@@ -9,7 +9,6 @@ import {
 } from "@/components/eleven/MatchBits";
 import { Crest } from "@/components/eleven/Crest";
 import { CompetitionArchive } from "@/components/eleven/CompetitionArchive";
-import { Broadcast } from "@/components/eleven/Broadcast";
 import { CalendarDays, History, Info, Swords, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +48,6 @@ export default function Competition() {
   if (!summary.available) {
     return (
       <div className="flex flex-col gap-5">
-        <Broadcast />
         {state.tournament ? (
           <CompetitionArchive
             universeId={state.tournament.id}
@@ -70,7 +68,6 @@ export default function Competition() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Broadcast />
       {state.tournament ? (
         <CompetitionArchive
           universeId={state.tournament.id}
