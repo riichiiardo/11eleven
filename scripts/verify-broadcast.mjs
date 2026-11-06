@@ -297,6 +297,76 @@ try {
     players.indexOf("Fixture B") < players.indexOf("Fixture A"),
     "Unknown stats must not outrank confirmed goals",
   );
+
+  const { isCompetitionEvidencePath, competitionEvidenceImageUrl } =
+    await server.ssrLoadModule("/src/lib/competition-evidence.ts");
+  for (const bad of [
+    "../bad.png",
+    "evidence/../bad.png",
+    "https://evil.example/a.png",
+    "evidence/%2e%2e/a.png",
+    null,
+  ])
+    assert.equal(isCompetitionEvidencePath(bad), false);
+  assert.ok(
+    competitionEvidenceImageUrl(
+      "evidence/champions/2026/jornada-1-01.png",
+    ).endsWith("/evidence/champions/2026/jornada-1-01.png"),
+  );
+  const rankedCup = renderToString(
+    React.createElement(RecordedStandings, {
+      competition: {
+        ...designFixture,
+        format: "cup",
+        rankingPhase: "Fase de liga",
+      },
+    }),
+  );
+  assert.ok(rankedCup.includes("Escudo de Palermo"));
+  const plainCup = renderToString(
+    React.createElement(RecordedStandings, {
+      competition: { ...designFixture, format: "cup" },
+    }),
+  );
+  assert.ok(!plainCup.includes('scope="row"'));
+  const { RecordedResults } = await server.ssrLoadModule(
+    "/src/components/eleven/CompetitionTables.tsx",
+  );
+  const shotHtml = renderToString(
+    React.createElement(RecordedResults, {
+      competition: {
+        ...designFixture,
+        matches: [
+          {
+            id: "shot",
+            round: 1,
+            stage: "Fase de liga",
+            home: "Palermo",
+            away: "LA Galaxy",
+            homeGoals: 0,
+            awayGoals: 0,
+            videoId: null,
+            evidenceSecond: null,
+            verified: true,
+            goals: null,
+            assists: null,
+            yellowCards: null,
+            redCards: null,
+            homePenalties: null,
+            awayPenalties: null,
+            evidence: {
+              kind: "screenshots",
+              title: "J1",
+              images: ["evidence/champions/2026/jornada-1-01.png"],
+            },
+          },
+        ],
+      },
+    }),
+  );
+  assert.ok(shotHtml.includes("Ver capturas de la jornada"));
+  assert.ok(!shotHtml.includes("Ver evidencia en Transmisiones"));
+
   console.log(
     "PASS broadcast: YouTube channel, 17 verified video IDs, 6 competition categories, muted autoplay, origin validation, inline playback, archive selection, no redirects, separate result/broadcast routes, safe evidence links with Pages basename, deep-linked video/timestamp, safe SSR and visible playback help.",
   );

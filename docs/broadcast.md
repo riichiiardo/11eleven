@@ -28,10 +28,10 @@ El cambio de temporada del archivo es explícito: no sobrescribe temporadas ante
 
 La lectura usa `public.competition_archive(p_tournament_id)`, exclusiva de miembros autenticados.
 El navegador no puede ejecutar el importador `app.store_competition_result`.
-Este requiere un operador de base de datos, participantes explícitos y evidencia de video/instante.
+Este requiere un operador de base de datos, participantes explícitos y evidencia de video/instante o capturas de la jornada.
 Cada partido tiene una clave estable y una versión esperada; repetir el mismo informe no duplica puntos.
 Las correcciones conservan la versión anterior. La tabla se calcula a partir de resultados verificados.
-Las copas muestran fases y resultados, sin inventar una clasificación de liga.
+Las copas muestran fases y resultados. Una copa con `ranking_phase` explícita calcula una tabla única solo para esa fase; las eliminatorias no suman puntos en ella.
 
 Las jornadas anteriores a J9 quedan pendientes de archivo para las ligas.
 Las copas conservan su numeración propia: J5 Champions, J3 Libertadores y cuartos de FA Cup.
@@ -75,3 +75,15 @@ Los penaltis de desempate se guardan aparte del marcador del partido.
 
 - [Parámetros del reproductor](https://developers.google.com/youtube/player_parameters).
 - [API del reproductor integrado](https://developers.google.com/youtube/iframe_api_reference).
+
+## Champions: capturas de Jornada 1
+
+El manifiesto `data/competition-results/champions-2026-j1.json` conserva nueve marcadores de 18 clubes, 26 goles y tres capturas originales con SHA-256. No proporciona goleadores, asistencias ni tarjetas. Champions conserva el formato copa y usa `Fase de liga` como fase de clasificación única. Los desempates actuales son puntos, diferencia de goles, goles a favor y nombre.
+
+Generar y revisar, sin conectar ni escribir en la base de datos:
+
+```sh
+node scripts/prepare-screenshot-results.mjs --universe=<UUID> --file=data/competition-results/champions-2026-j1.json
+```
+
+El plan exige una temporada coincidente y los 18 clubes canónicos existentes en ese Universo. Vincula participantes, registra una fuente privada con las rutas de `public/evidence` y guarda cada acta con su captura concreta, sin asociar videos de otras jornadas. Repetir el plan no duplica resultados ni puntos. Las capturas se publican como archivos estáticos; no contienen credenciales. El frontend permite abrir la evidencia desde cada partido. Aplicar primero la versión actual de `competitions-archive.sql`; no requiere nuevos permisos ni secrets.

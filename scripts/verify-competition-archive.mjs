@@ -215,6 +215,10 @@ try {
       .rows[0].n === 2,
     "Past seasons preserved",
   );
+  // Rehearse the deployed video-only table shape with existing results.
+  await db.exec(
+    "alter table app.competition_results drop constraint competition_results_evidence_source;alter table app.competition_results alter column video_id set not null;alter table app.competition_results alter column evidence_second set not null;alter table app.competition_results drop column evidence_id;drop table app.competition_evidence;alter table app.universe_competitions drop column ranking_phase;",
+  );
   await db.exec(readFileSync("supabase/competitions-archive.sql", "utf8"));
   ok(
     (await db.query("select count(*)::int n from app.competition_results"))
@@ -276,6 +280,135 @@ try {
       sourceMatch.goals === null,
     "Verified score remains separate from unknown scorers",
   );
+
+  await db.exec("reset role");
+  const screenshots = JSON.parse(
+    readFileSync("data/competition-results/champions-2026-j1.json", "utf8"),
+  );
+  for (const name of screenshots.matches.flatMap((m) => [m.home, m.away]))
+    await db.query(
+      "insert into public.clubs(tournament_id,name,short_name,league,country)values($1,$2,'TEST','Test','Test')",
+      [id(10), name],
+    );
+  const screenshotPlan = runPlan("scripts/prepare-screenshot-results.mjs", [
+    `--universe=${id(10)}`,
+    "--file=data/competition-results/champions-2026-j1.json",
+  ]);
+  await db.exec(screenshotPlan);
+  await db.exec(screenshotPlan);
+  const champion = (
+    await db.query(
+      "select id from app.universe_competitions where tournament_id=$1 and slug='champions'",
+      [id(10)],
+    )
+  ).rows[0].id;
+  const reports = (
+    await db.query(
+      "select * from app.competition_results where competition_id=$1",
+      [champion],
+    )
+  ).rows;
+  ok(
+    reports.length === 9 && reports.every((m) => m.version === 1),
+    "Nine screenshot results import idempotently at version one",
+  );
+  ok(
+    reports.reduce((n, m) => n + m.home_goals + m.away_goals, 0) === 26,
+    "All nine screenshot scores total 26 goals",
+  );
+  ok(
+    (
+      await db.query(
+        "select count(*)::int n from app.competition_teams where competition_id=$1 and club_id is not null",
+        [champion],
+      )
+    ).rows[0].n === 18,
+    "All participants link to the 18 canonical clubs",
+  );
+  const sample = reports[0].payload;
+  const save = (d) =>
+    db.query("select app.store_competition_result($1,$2,1)", [champion, d]);
+  await denied(save({ ...sample, sourceImage: 4 }));
+  await denied(save({ ...sample, sourceImage: 1.5 }));
+  await denied(save({ ...sample, sourceImage: "1" }));
+  await denied(save({ ...sample, round: 2 }));
+  await denied(
+    save({ ...sample, videoId: "Ax3pHQdXZm8", evidenceSecond: 100 }),
+  );
+  await denied(
+    db.query(
+      "insert into app.competition_evidence(competition_id,season,source_key,round_number,kind,title,images)values($1,'2026','invalid',1,'screenshots','Bad',array['../bad.png'])",
+      [champion],
+    ),
+  );
+  await db.exec(readFileSync("supabase/competitions-archive.sql", "utf8"));
+  await login(1);
+  const getChampions = async () =>
+    (
+      await db.query("select public.competition_archive($1)data", [id(10)])
+    ).rows[0].data.find((c) => c.slug === "champions");
+  const ch = await getChampions();
+  ok(
+    ch.format === "cup" && ch.rankingPhase === "Fase de liga",
+    "Champions preserves cup identity with league phase",
+  );
+  ok(
+    ch.standings.length === 18 && ch.standings.every((t) => t.played === 1),
+    "One table contains 18 teams with one match each",
+  );
+  ok(
+    ch.standings.reduce((n, t) => n + t.points, 0) === 26,
+    "Three points per win, one per draw",
+  );
+  ok(
+    ch.standings[0].team === "Manchester United" &&
+      ch.standings[0].goalDifference === 5,
+    "Standings sorted by points and goal difference",
+  );
+  ok(
+    ch.matches.every(
+      (m) =>
+        m.videoId === null &&
+        m.evidenceSecond === null &&
+        m.evidence.images.length === 1,
+    ),
+    "Screenshots never receive a fake video or timestamp",
+  );
+  ok(
+    ch.matches
+      .find((m) => m.home === "Parma Calcio 1913")
+      .evidence.images[0].endsWith("03.png"),
+    "Each match shows its own source screenshot",
+  );
+  ok(
+    ch.players.length === 0 &&
+      ch.matches.every((m) => m.yellowCards === null && m.redCards === null),
+    "Unknown scorers and cards remain unknown",
+  );
+  await denied(db.query("select * from app.competition_evidence"));
+  await denied(save(sample));
+  await db.exec("reset role;begin;");
+  await db.query("select app.store_competition_result($1,$2,0)", [
+    champion,
+    { ...sample, stage: "Semifinal" },
+  ]);
+  await login(1);
+  ok(
+    JSON.stringify((await getChampions()).standings) ===
+      JSON.stringify(ch.standings),
+    "Knockout results never add league-phase points",
+  );
+  await db.exec("reset role;rollback;reset role;");
+  await db.query(
+    "update app.universe_competitions set current_season='2027' where id=$1",
+    [champion],
+  );
+  await denied(save(sample));
+  await db.query(
+    "update app.universe_competitions set current_season='2026' where id=$1",
+    [champion],
+  );
+
   console.log(
     `PASS competition archive: ${checks} assertions; tenant isolation, scoped access, validated evidence and stats, unknown values, versioned corrections, no double counting, assists/cards, cups, archiving and seasons.`,
   );

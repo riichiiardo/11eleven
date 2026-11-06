@@ -8,6 +8,7 @@ import type {
 } from "@/domain/competition-records";
 import { broadcastEvidencePath } from "@/domain/broadcast";
 import { cn } from "@/lib/utils";
+import { competitionEvidenceImageUrl } from "@/lib/competition-evidence";
 import { Crest } from "./Crest";
 
 const clubColors: [string, string] = ["#1d4ed8", "#0b1a30"];
@@ -89,7 +90,17 @@ function StatDetail({
 }
 
 function ResultCard({ match: m }: { match: RecordedMatch }) {
-  const to = broadcastEvidencePath(m.videoId, m.evidenceSecond);
+  const to =
+    m.videoId !== null && m.evidenceSecond !== null
+      ? broadcastEvidencePath(m.videoId, m.evidenceSecond)
+      : null;
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const images =
+    m.evidence?.kind === "screenshots"
+      ? m.evidence.images
+          .map(competitionEvidenceImageUrl)
+          .filter((url): url is string => url !== null)
+      : [];
   return (
     <article
       aria-label={`${m.home} contra ${m.away}`}
@@ -180,9 +191,50 @@ function ResultCard({ match: m }: { match: RecordedMatch }) {
             <PlayCircle className="size-4 shrink-0" aria-hidden="true" />
             Ver evidencia en Transmisiones
           </Link>
+        ) : images.length ? (
+          <details
+            onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}
+          >
+            <summary className="min-h-9 cursor-pointer text-xs font-semibold text-primary">
+              Ver capturas de la jornada ({images.length})
+            </summary>
+            {evidenceOpen ? (
+              <div className="mt-3 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  {m.evidence?.title}. Selecciona una imagen para ampliarla.
+                </p>
+                <div
+                  className={cn(
+                    "grid gap-3",
+                    images.length > 1 && "sm:grid-cols-3",
+                  )}
+                >
+                  {images.map((src, index) => (
+                    <a
+                      key={src}
+                      href={src}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="overflow-hidden rounded-lg border bg-muted/20"
+                    >
+                      <img
+                        src={src}
+                        alt={`Captura ${index + 1}: ${m.evidence?.title}`}
+                        loading="lazy"
+                        className="max-h-80 w-full object-contain"
+                      />
+                      <span className="block p-2 text-[10px] font-semibold text-primary">
+                        Ampliar captura {index + 1}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </details>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Grabación pendiente de catálogo.
+            Evidencia pendiente de catálogo.
           </p>
         )}
       </footer>
@@ -268,7 +320,7 @@ export function RecordedStandings({
 }: {
   competition: RecordedCompetition;
 }) {
-  if (c.format === "cup")
+  if (c.format === "cup" && !c.rankingPhase)
     return (
       <p className="rounded-xl border bg-muted/20 p-5 text-sm text-muted-foreground">
         Esta copa se consulta por fases y resultados; no se mezclan sus
@@ -291,7 +343,8 @@ export function RecordedStandings({
       >
         <table className="w-full min-w-[660px] border-separate border-spacing-0 text-sm">
           <caption className="bg-muted/30 px-4 py-3 text-left text-xs font-semibold">
-            Clasificación provisional · solo partidos verificados
+            {c.rankingPhase ? `${c.rankingPhase} · ` : ""}Clasificación
+            provisional · solo partidos verificados
           </caption>
           <thead className="bg-muted/60">
             <tr>
