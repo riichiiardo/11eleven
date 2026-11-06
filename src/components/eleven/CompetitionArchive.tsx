@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
+import { broadcastEvidencePath } from "@/domain/broadcast";
 import { getCompetitionArchive } from "@/services/backend/competition-records";
 import type {
   RecordedCompetition,
@@ -76,15 +78,17 @@ export function CompetitionArchiveView({
     data?.find((item) => item.slug === "primera") ??
     data?.[0];
   const [view, setView] = useState("matches");
-  const evidence = (videoId: string, second: number) => {
-    window.dispatchEvent(
-      new CustomEvent("eleven:broadcast-video", {
-        detail: { videoId, second },
-      }),
+  const evidenceLink = (videoId: string, second: number) => {
+    const to = broadcastEvidencePath(videoId, second);
+    return to ? (
+      <Button asChild className="mt-3" variant="outline">
+        <Link to={to}>Ver evidencia en Transmisiones</Link>
+      </Button>
+    ) : (
+      <p className="mt-3 text-muted-foreground">
+        Grabación pendiente de catálogo.
+      </p>
     );
-    document
-      .getElementById("transmision")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   const stats = (
     rows: RecordedStat[] | null,
@@ -259,14 +263,7 @@ export function CompetitionArchiveView({
                         </div>
                       ))}
                     </dl>
-                    <Button
-                      type="button"
-                      className="mt-3"
-                      variant="outline"
-                      onClick={() => evidence(m.videoId, m.evidenceSecond)}
-                    >
-                      Ver evidencia dentro de la app
-                    </Button>
+                    {evidenceLink(m.videoId, m.evidenceSecond)}
                   </article>
                 ))}
               </div>

@@ -18,6 +18,7 @@ const MarketPage = lazy(() => import("../pages/app/Market.tsx"));
 const NegotiationsPage = lazy(() => import("../pages/app/Negotiations.tsx"));
 const DraftPage = lazy(() => import("../pages/app/Draft.tsx"));
 const CompetitionPage = lazy(() => import("../pages/app/Competition.tsx"));
+const BroadcastPage = lazy(() => import("../pages/app/BroadcastPage.tsx"));
 const TeamsPage = lazy(() => import("../pages/app/Teams.tsx"));
 const RulesPage = lazy(() => import("../pages/app/Rules.tsx"));
 const ProfilePage = lazy(() => import("../pages/app/Profile.tsx"));
@@ -163,6 +164,7 @@ export function App() {
                 />
                 <Route path="draft" element={<DraftPage />} />
                 <Route path="competicion" element={<CompetitionPage />} />
+                <Route path="transmision" element={<BroadcastPage />} />
                 <Route path="equipos" element={<TeamsPage />} />
                 <Route path="reglas" element={<RulesPage />} />
                 <Route path="perfil" element={<ProfilePage />} />

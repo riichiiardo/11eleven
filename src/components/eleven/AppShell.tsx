@@ -39,6 +39,7 @@ import {
   ShoppingBag,
   Swords,
   Trophy,
+  Tv,
   User,
   Users,
   UsersRound,
@@ -87,6 +88,7 @@ const NAV_GROUPS: Array<{ title: string; items: NavItem[] }> = [
     title: "Torneo",
     items: [
       { label: "Resultados", to: "/dashboard/competicion", icon: Swords },
+      { label: "Transmisiones", to: "/dashboard/transmision", icon: Tv },
       { label: "Equipos", to: "/dashboard/equipos", icon: UsersRound },
       { label: "Chat interno", to: "/dashboard/chat", icon: MessageCircle },
       { label: "Reglas del torneo", to: "/dashboard/reglas", icon: BookOpen },

@@ -156,12 +156,7 @@ export function youtubeEmbedUrl(
     location.password
   )
     return null;
-  if (
-    selection !== "live" &&
-    !BROADCAST_RECORDINGS.some((v) => v.id === selection)
-  )
-    return null;
-  if (!Number.isInteger(second) || second < 0 || second > 86400) return null;
+  if (!validPlayback(selection, second)) return null;
   const url = new URL(
     selection === "live"
       ? "https://www.youtube.com/embed/live_stream"
@@ -180,4 +175,36 @@ export function youtubeEmbedUrl(
   }))
     url.searchParams.set(key, value);
   return url.href;
+}
+
+export type BroadcastPlayback = { selection: string; second: number };
+
+/** Only public catalog IDs and whole, nonnegative timestamps are playable. */
+export function parseBroadcastPlayback(search: string): BroadcastPlayback {
+  const params = new URLSearchParams(search);
+  const selection = params.get("video") ?? "live";
+  const rawSecond = params.get("t") ?? "0";
+  const second = /^\d+$/.test(rawSecond) ? Number(rawSecond) : 0;
+  return validPlayback(selection, second)
+    ? { selection, second }
+    : { selection: "live", second: 0 };
+}
+
+export function broadcastEvidencePath(
+  videoId: string,
+  second: number,
+): string | null {
+  if (videoId === "live" || !validPlayback(videoId, second)) return null;
+  const query = new URLSearchParams({ video: videoId, t: String(second) });
+  return `/dashboard/transmision?${query}`;
+}
+
+function validPlayback(selection: string, second: number): boolean {
+  return (
+    (selection === "live" ||
+      BROADCAST_RECORDINGS.some((v) => v.id === selection)) &&
+    Number.isInteger(second) &&
+    second >= 0 &&
+    second <= 86400
+  );
 }

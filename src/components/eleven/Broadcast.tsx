@@ -9,14 +9,20 @@ import {
 } from "@/domain/broadcast";
 
 /** Watching a video never reports a score or modifies a league. */
-export function Broadcast() {
+export function Broadcast({
+  initialSelection = "live",
+  initialSecond = 0,
+}: {
+  initialSelection?: string;
+  initialSecond?: number;
+} = {}) {
   const container = useRef<HTMLDivElement>(null);
   const playerId = useId(),
     selectId = useId();
   const [width, setWidth] = useState<number | null>(null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const [selection, setSelection] = useState("live");
-  const [second, setSecond] = useState(0);
+  const [selection, setSelection] = useState(initialSelection);
+  const [second, setSecond] = useState(initialSecond);
   const [opened, setOpened] = useState(true),
     [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -35,25 +41,6 @@ export function Broadcast() {
       window.removeEventListener("resize", measure);
     };
   }, []);
-  useEffect(() => {
-    const openEvidence = (event: Event) => {
-      const detail = (event as CustomEvent<{ videoId: string; second: number }>)
-        .detail;
-      if (
-        !detail ||
-        detail.videoId === "live" ||
-        !youtubeEmbedUrl(detail.videoId, origin, detail.second)
-      )
-        return;
-      setSelection(detail.videoId);
-      setSecond(detail.second);
-      setFailed(false);
-      setOpened(true);
-    };
-    window.addEventListener("eleven:broadcast-video", openEvidence);
-    return () =>
-      window.removeEventListener("eleven:broadcast-video", openEvidence);
-  }, [origin]);
   const source = youtubeEmbedUrl(selection, origin, second);
   const narrow = width !== null && width < BROADCAST_MIN_WIDTH;
   const playable = source !== null && width !== null && !narrow;

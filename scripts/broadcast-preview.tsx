@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Broadcast } from "../src/components/eleven/Broadcast";
+import { MemoryRouter, Routes, Route, Link } from "react-router";
+import BroadcastPage from "../src/pages/app/BroadcastPage";
 import { CompetitionArchiveView } from "../src/components/eleven/CompetitionArchive";
 import type { RecordedCompetition } from "../src/domain/competition-records";
 import "../src/index.css";
@@ -32,8 +33,22 @@ function Preview() {
         Prueba local de transmisión · Sin cambios en resultados ni conexión a
         Supabase.
       </p>
-      <Broadcast />
-      <CompetitionArchiveView data={data} error={error} />
+      <MemoryRouter initialEntries={["/dashboard/transmision"]}>
+        <nav
+          aria-label="Secciones de la prueba"
+          className="flex gap-4 text-sm underline"
+        >
+          <Link to="/dashboard/competicion">Resultados</Link>
+          <Link to="/dashboard/transmision">Transmisiones</Link>
+        </nav>
+        <Routes>
+          <Route path="/dashboard/transmision" element={<BroadcastPage />} />
+          <Route
+            path="/dashboard/competicion"
+            element={<CompetitionArchiveView data={data} error={error} />}
+          />
+        </Routes>
+      </MemoryRouter>
     </main>
   );
 }
