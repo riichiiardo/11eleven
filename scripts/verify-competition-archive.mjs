@@ -409,6 +409,45 @@ try {
     [champion],
   );
 
+  const j2plan = runPlan("scripts/prepare-screenshot-results.mjs", [
+    `--universe=${id(10)}`,
+    "--file=data/competition-results/champions-2026-j2.json",
+  ]);
+  await db.exec(j2plan);
+  await db.exec(j2plan);
+  await login(1);
+  const accumulated = await getChampions();
+  ok(
+    accumulated.matches.length === 18 &&
+      accumulated.standings.length === 18 &&
+      accumulated.standings.every((t) => t.played === 2),
+    "J1 plus J2: 18 distinct matches and two appearances for all 18 teams",
+  );
+  ok(
+    accumulated.standings.reduce((n, t) => n + t.goalsFor, 0) === 49,
+    "J1 plus J2: 49 verified goals",
+  );
+  ok(
+    accumulated.standings[0].team === "Manchester United" &&
+      accumulated.standings[0].points === 6 &&
+      accumulated.standings[0].goalDifference === 7,
+    "Manchester United leads after J2 with six points and +7",
+  );
+  ok(
+    accumulated.standings.reduce((n, t) => n + t.points, 0) === 52,
+    "Two draws and 16 victories yield 52 accumulated points",
+  );
+  ok(
+    accumulated.matches.filter((m) => m.round === 1).length === 9 &&
+      accumulated.matches.every((m) => m.version === 1),
+    "J2 replay preserves all J1 records and creates no duplicates",
+  );
+  ok(
+    accumulated.matches
+      .find((m) => m.round === 2 && m.home === "Racing Club")
+      .evidence.images[0].endsWith("jornada-2-03.png"),
+    "J2 results point to their actual screenshot",
+  );
   console.log(
     `PASS competition archive: ${checks} assertions; tenant isolation, scoped access, validated evidence and stats, unknown values, versioned corrections, no double counting, assists/cards, cups, archiving and seasons.`,
   );
