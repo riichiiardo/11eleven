@@ -164,3 +164,7 @@ Pruebas sin credenciales ni producción:
 `node scripts/verify-chat.mjs` y `node scripts/verify-chat-client.mjs`.
 La demostración opcional usa `npm run preview:chat` y datos ficticios aislados.
 Publicación, SQL remoto y pruebas con sesiones reales son pasos separados.
+
+## Archivo de competiciones y transmisiones
+
+Instalar `competitions-archive.sql` después de `rules-configuration.sql`. El módulo añade resultados privados por competición y temporada y una RPC de lectura para miembros. El plan de seis competiciones se genera con `node scripts/prepare-competition-seed.mjs --universe=<UUID>`; no se ejecuta automáticamente. Consultar [el flujo de importación y verificación](../docs/broadcast.md). No requiere nuevas claves públicas ni secrets.
