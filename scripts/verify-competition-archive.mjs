@@ -486,6 +486,43 @@ try {
     ).length === 8,
     "Eight J3 results retain their screenshot provenance",
   );
+  await db.exec("reset role");
+  for (const round of [4, 5]) {
+    const plan = runPlan("scripts/prepare-screenshot-results.mjs", [
+      `--universe=${id(10)}`,
+      `--file=data/competition-results/champions-2026-j${round}.json`,
+    ]);
+    await db.exec(plan);
+    await db.exec(plan);
+  }
+  await login(1);
+  const fiveRounds = await getChampions();
+  const reported = fiveRounds.matches.filter(
+    (m) => m.round === 4 || m.round === 5,
+  );
+  ok(
+    reported.length === 18 &&
+      reported.every(
+        (m) =>
+          m.evidence.kind === "user_report" &&
+          m.evidence.images.length === 0 &&
+          m.version === 1,
+      ),
+    "Text-only rounds import idempotently with individual written sources",
+  );
+  ok(
+    fiveRounds.matches.length === 45 &&
+      fiveRounds.standings.length === 18 &&
+      fiveRounds.standings.every((t) => t.played === 5),
+    "Five completed rounds cover all 18 clubs",
+  );
+  ok(
+    fiveRounds.standings.reduce((n, t) => n + t.goalsFor, 0) === 115 &&
+      fiveRounds.standings[0].team === "Arsenal Football Club" &&
+      fiveRounds.standings[0].points === 12 &&
+      fiveRounds.standings[0].goalDifference === 13,
+    "J4 and J5 update cumulative goals and goal difference",
+  );
   console.log(
     `PASS competition archive: ${checks} assertions; tenant isolation, scoped access, validated evidence and stats, unknown values, versioned corrections, no double counting, assists/cards, cups, archiving and seasons.`,
   );
