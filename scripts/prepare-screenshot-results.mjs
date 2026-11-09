@@ -39,6 +39,16 @@ for (const image of source.images) {
 }
 const clubs = new Set();
 for (const m of source.matches) {
+  const hasReport = m.reportedScore !== undefined;
+  const validSource = hasReport
+    ? typeof m.reportedScore === "string" &&
+      m.reportedScore.trim().length > 0 &&
+      m.reportedScore.trim().length <= 150 &&
+      m.sourceImage === undefined &&
+      source.sourceKey.length <= 89
+    : Number.isInteger(m.sourceImage) &&
+      m.sourceImage >= 1 &&
+      m.sourceImage <= source.images.length;
   if (
     !m.home?.trim() ||
     !m.away?.trim() ||
@@ -50,9 +60,7 @@ for (const m of source.matches) {
     !Number.isInteger(m.awayGoals) ||
     m.homeGoals < 0 ||
     m.awayGoals < 0 ||
-    !Number.isInteger(m.sourceImage) ||
-    m.sourceImage < 1 ||
-    m.sourceImage > source.images.length ||
+    !validSource ||
     !Number.isInteger(m.expectedVersion) ||
     m.expectedVersion < 0
   )
@@ -65,7 +73,14 @@ const q = (s) => "'" + String(s).replaceAll("'", "''") + "'",
   tid = q(args.universe) + "::uuid";
 const comp = `(select id from app.universe_competitions where tournament_id=${tid} and slug=${q(source.competition)} and current_season=${q(source.season)} and not archived)`;
 const paths = `array[${source.images.map((i) => q(i.path)).join(",")}]::text[]`;
-const evidence = `(select id from app.competition_evidence where competition_id=${comp} and season=${q(source.season)} and source_key=${q(source.sourceKey)})`;
+const addEvidence = (key, kind, title, images) => {
+  const evidence = `(select id from app.competition_evidence where competition_id=${comp} and season=${q(source.season)} and source_key=${q(key)})`;
+  sql.push(
+    `insert into app.competition_evidence(competition_id,season,source_key,round_number,kind,title,images)values(${comp},${q(source.season)},${q(key)},${source.round},${q(kind)},${q(title)},${images})on conflict(competition_id,season,source_key)do nothing;`,
+    `do ${q(`begin if not exists(select 1 from app.competition_evidence where id=${evidence} and kind=${q(kind)} and title=${q(title)} and images=${images} and round_number=${source.round})then raise exception 'La fuente existente tiene otra evidencia.';end if;end`)};`,
+  );
+  return evidence;
+};
 sql.push(
   `do $$begin if ${comp} is null then raise exception 'La competición activa o su temporada no coinciden.';end if;end $$;`,
 );
@@ -80,11 +95,11 @@ for (const club of clubs) {
     `do $$begin if not exists(select 1 from app.competition_teams t join public.clubs c on c.id=t.club_id where t.competition_id=${comp} and t.name=${q(club)} and c.tournament_id=${tid} and c.name=t.name)then raise exception 'Participante no vinculado al club canónico.';end if;end $$;`,
   );
 }
-sql.push(
-  `insert into app.competition_evidence(competition_id,season,source_key,round_number,kind,title,images)values(${comp},${q(source.season)},${q(source.sourceKey)},${source.round},'screenshots',${q(source.title)},${paths})on conflict(competition_id,season,source_key)do nothing;`,
-);
-sql.push(
-  `do $$begin if not exists(select 1 from app.competition_evidence where id=${evidence} and images=${paths} and round_number=${source.round})then raise exception 'La fuente existente tiene otra evidencia.';end if;end $$;`,
+const screenshots = addEvidence(
+  source.sourceKey,
+  "screenshots",
+  source.title,
+  paths,
 );
 if (source.rankingPhase)
   sql.push(
@@ -93,8 +108,17 @@ if (source.rankingPhase)
 sql.push(
   `update app.universe_competitions set review_from=least(coalesce(review_from,${source.round}),${source.round})where id=${comp};`,
 );
-for (const m of source.matches) {
-  const { home, away, expectedVersion, ...fields } = m;
+for (const [index, match] of source.matches.entries()) {
+  const { home, away, expectedVersion, reportedScore, ...fields } = match;
+  const evidence =
+    reportedScore === undefined
+      ? screenshots
+      : addEvidence(
+          `${source.sourceKey}-report-${index + 1}`,
+          "user_report",
+          reportedScore.trim(),
+          "array[]::text[]",
+        );
   const doc = {
     ...fields,
     round: source.round,

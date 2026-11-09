@@ -1,0 +1,138 @@
+{
+  "competition": "champions",
+  "season": "2026",
+  "round": 3,
+  "stage": "Fase de liga",
+  "rankingPhase": "Fase de liga",
+  "sourceKey": "champions-2026-j3-user-evidence",
+  "title": "Champions · Jornada 3 · Capturas compartidas por el usuario",
+  "images": [
+    {
+      "path": "evidence/champions/2026/jornada-3-01.png",
+      "sha256": "6a57a5c463685dc717f4b6606c08a3a7bf4bf1341742ff2a8dbf389bd0c3a9ce"
+    },
+    {
+      "path": "evidence/champions/2026/jornada-3-02.png",
+      "sha256": "a2e5c0e14af73935426af9e8c50b1c5344997bc48e3d8d8ed0a7cbd18a78b005"
+    }
+  ],
+  "matches": [
+    {
+      "home": "Palermo FC",
+      "away": "Sporting Clube de Portugal",
+      "homeGoals": 0,
+      "awayGoals": 0,
+      "sourceImage": 1,
+      "verified": true,
+      "goals": [],
+      "assists": [],
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Los Angeles Galaxy",
+      "away": "Club Deportivo Chivas de Guadalajara",
+      "homeGoals": 3,
+      "awayGoals": 1,
+      "sourceImage": 1,
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Leicester City Football Club",
+      "away": "Racing Club",
+      "homeGoals": 1,
+      "awayGoals": 0,
+      "sourceImage": 1,
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Manchester United",
+      "away": "Racing Club de Estrasburgo",
+      "homeGoals": 0,
+      "awayGoals": 0,
+      "sourceImage": 1,
+      "verified": true,
+      "goals": [],
+      "assists": [],
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "FC Porto",
+      "away": "Club de Fútbol Cruz Azul",
+      "homeGoals": 1,
+      "awayGoals": 3,
+      "sourceImage": 2,
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Arsenal Football Club",
+      "away": "Newcastle United Football Club",
+      "homeGoals": 6,
+      "awayGoals": 0,
+      "sourceImage": 2,
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Real Sociedad de Fútbol",
+      "away": "París Saint-Germain Football Club",
+      "homeGoals": 2,
+      "awayGoals": 0,
+      "sourceImage": 2,
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Club Atlético de Madrid",
+      "away": "Fútbol Club Barcelona",
+      "homeGoals": 0,
+      "awayGoals": 2,
+      "sourceImage": 2,
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    },
+    {
+      "home": "Bayer 04 Leverkusen",
+      "away": "Parma Calcio 1913",
+      "homeGoals": 1,
+      "awayGoals": 0,
+      "reportedScore": "Leverkusen 1-0 al Parma",
+      "verified": true,
+      "goals": null,
+      "assists": null,
+      "yellowCards": null,
+      "redCards": null,
+      "expectedVersion": 0
+    }
+  ]
+}
