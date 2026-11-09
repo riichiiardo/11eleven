@@ -5,6 +5,8 @@ import type {
   RecordedCompetition,
   RecordedMatch,
   RecordedStat,
+  ReportedLeaders,
+  ReportedLeaderMetric,
 } from "@/domain/competition-records";
 import { broadcastEvidencePath } from "@/domain/broadcast";
 import { cn } from "@/lib/utils";
@@ -463,12 +465,90 @@ const playerMetrics: { key: PlayerMetric; label: string }[] = [
   { key: "yellowCards", label: "Amarillas" },
   { key: "redCards", label: "Rojas" },
 ];
+const reportedMetrics: { key: ReportedLeaderMetric; label: string }[] = [
+  { key: "goals", label: "Goleadores" },
+  { key: "assists", label: "Asistencias" },
+  { key: "cleanSheets", label: "Porterías imbatidas" },
+];
+
+function ReportedLeaderboards({ snapshot }: { snapshot: ReportedLeaders }) {
+  return (
+    <section
+      className="space-y-4"
+      aria-label="Clasificaciones individuales informadas"
+    >
+      <p className="text-xs text-muted-foreground">
+        Totales informados por el usuario al cierre de la jornada{" "}
+        {snapshot.throughRound}. PJ indica los partidos jugados por cada
+        futbolista.
+      </p>
+      <div className="grid gap-4 xl:grid-cols-2">
+        {reportedMetrics.map(({ key, label }) => (
+          <div
+            key={key}
+            className="overflow-x-auto rounded-2xl border bg-card shadow-sm"
+            tabIndex={0}
+            role="region"
+            aria-label={label}
+          >
+            <table className="w-full min-w-[350px] text-sm">
+              <caption className="bg-muted/40 px-4 py-3 text-left font-semibold">
+                {label}
+              </caption>
+              <thead className="bg-muted/20">
+                <tr>
+                  <th scope="col" className={headerCell}>
+                    Pos.
+                  </th>
+                  <th scope="col" className={cn(headerCell, "text-left")}>
+                    Jugador y equipo
+                  </th>
+                  <th scope="col" className={headerCell}>
+                    PJ
+                  </th>
+                  <th scope="col" className={headerCell}>
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {snapshot.entries
+                  .filter((row) => row.metric === key)
+                  .map((row) => (
+                    <tr
+                      key={row.position}
+                      className="border-t border-border/60"
+                    >
+                      <td className={statCell}>{row.position}</td>
+                      <th scope="row" className="px-3 py-2 text-left">
+                        <span className="mb-1 block text-[13px]">
+                          {row.name}
+                        </span>
+                        <TeamIdentity name={row.team} />
+                      </th>
+                      <td className={statCell}>{row.played}</td>
+                      <td className={cn(statCell, "font-bold text-primary")}>
+                        {row.total}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function RecordedPlayerStats({
   competition: c,
 }: {
   competition: RecordedCompetition;
 }) {
   const [sort, setSort] = useState<PlayerMetric>("goals");
+  if (!c.players.length && c.reportedLeaders)
+    return <ReportedLeaderboards snapshot={c.reportedLeaders} />;
   if (!c.players.length)
     return (
       <div className="rounded-2xl border border-dashed bg-muted/20 px-5 py-8 text-center">
@@ -500,9 +580,12 @@ export function RecordedPlayerStats({
   );
   return (
     <div className="space-y-3">
+      {c.reportedLeaders && (
+        <ReportedLeaderboards snapshot={c.reportedLeaders} />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {players.length} jugador(es) con registros verificados
+          {players.length} jugador(es) con estadísticas de actas
         </p>
         <label className="flex items-center gap-2 text-xs font-semibold">
           Ordenar por

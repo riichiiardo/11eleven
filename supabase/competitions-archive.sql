@@ -71,6 +71,26 @@ create table if not exists app.competition_result_versions(
  report_id uuid not null references app.competition_results(id) on delete cascade,
  version integer not null,payload jsonb not null,recorded_at timestamptz not null default now(),primary key(report_id,version)
 );
+-- Reported rankings are snapshots, independent of events in individual match reports.
+create table if not exists app.competition_player_leaders (
+ competition_id uuid not null,
+ season text not null,
+ through_round integer not null check (through_round > 0),
+ metric text not null check (metric in ('goals', 'assists', 'cleanSheets')),
+ position integer not null check (position > 0),
+ team text not null,
+ player text not null check (length(btrim(player)) between 1 and 150),
+ total integer not null check (total >= 0),
+ played integer not null check (played between 1 and through_round),
+ source text not null check (source = 'user_report'),
+ primary key (competition_id, season, through_round, metric, position),
+ foreign key (competition_id, team) references app.competition_teams (competition_id, name) on update cascade on delete cascade,
+ check (metric <> 'cleanSheets' or total <= played)
+);
+create index if not exists competition_player_leaders_team on app.competition_player_leaders (competition_id, team);
+alter table app.competition_player_leaders enable row level security;
+revoke all on app.competition_player_leaders from public,anon,authenticated;
+
 alter table app.universe_competitions enable row level security;
 alter table app.competition_evidence enable row level security;
 alter table app.broadcast_sources enable row level security;
@@ -205,6 +225,15 @@ begin
   'standings',case when c.format='cup' and c.ranking_phase is null then '[]'::jsonb else(select coalesce(jsonb_agg(to_jsonb(v)order by v.points desc,v."goalDifference" desc,v."goalsFor" desc,v.team),'[]')from(
     select t.name team,s.played,s.won,s.drawn,s.lost,s.gf "goalsFor",s.ga "goalsAgainst",s.gf-s.ga "goalDifference",s.points from totals s join app.competition_teams t on t.id=s.team where s.competition_id=c.id)v)end,
   'matches',(select coalesce(jsonb_agg(jsonb_build_object('id',m.id,'round',m.round_number,'stage',m.stage,'homeId',m.home_id,'awayId',m.away_id,'home',h.name,'away',a.name,'homeGoals',m.home_goals,'awayGoals',m.away_goals,'homePenalties',m.home_penalties,'awayPenalties',m.away_penalties,'videoId',m.video_id,'evidenceSecond',m.evidence_second,'evidence',(select jsonb_build_object('kind',e.kind,'title',e.title,'images',case when e.kind='user_report' then e.images else array[e.images[coalesce((m.payload->>'sourceImage')::int,1)]] end)from app.competition_evidence e where e.id=m.evidence_id),'verified',m.verified,'goals',m.goals,'assists',m.assists,'yellowCards',m.yellow_cards,'redCards',m.red_cards,'version',m.version)order by m.round_number,m.stage,m.created_at),'[]')from matches m join app.competition_teams h on h.id=m.home_id join app.competition_teams a on a.id=m.away_id where m.competition_id=c.id),
+  'reportedLeaders',(
+   select jsonb_build_object('throughRound',p.through_round,'entries',jsonb_agg(
+    jsonb_build_object('metric',p.metric,'position',p.position,'team',p.team,'name',p.player,'total',p.total,'played',p.played)
+    order by p.metric,p.position))
+   from app.competition_player_leaders p
+   where p.competition_id=c.id and p.season=c.current_season
+    and p.through_round=(select max(latest.through_round) from app.competition_player_leaders latest where latest.competition_id=c.id and latest.season=c.current_season)
+   group by p.through_round
+  ),
   'players',(select coalesce(jsonb_agg(jsonb_build_object('team',t.name,'name',s.player,'goals',s.goals,'assists',s.assists,'yellowCards',s.yellow,'redCards',s.red)order by s.goals desc nulls last,s.player),'[]')from stats s join app.competition_teams t on t.id=s.team where s.competition_id=c.id)
  )order by c.created_at,c.name),'[]')into result from competitions c;
  return result;

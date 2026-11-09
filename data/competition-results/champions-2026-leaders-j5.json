@@ -1,0 +1,104 @@
+{
+  "competition": "champions",
+  "season": "2026",
+  "throughRound": 5,
+  "source": "user_report",
+  "rankings": {
+    "goals": [
+      {
+        "name": "Marcus Rashford",
+        "team": "Arsenal Football Club",
+        "total": 5,
+        "played": 5
+      },
+      {
+        "name": "Harry Kane",
+        "team": "Los Angeles Galaxy",
+        "total": 4,
+        "played": 4
+      },
+      {
+        "name": "Anthony Gordon",
+        "team": "Arsenal Football Club",
+        "total": 4,
+        "played": 4
+      },
+      {
+        "name": "Donyell Malen",
+        "team": "FC Porto",
+        "total": 4,
+        "played": 5
+      },
+      {
+        "name": "Dominik Szoboszlai",
+        "team": "Manchester United",
+        "total": 4,
+        "played": 5
+      }
+    ],
+    "assists": [
+      {
+        "name": "Marcus Rashford",
+        "team": "Arsenal Football Club",
+        "total": 6,
+        "played": 5
+      },
+      {
+        "name": "Paulo Dybala",
+        "team": "Racing Club",
+        "total": 5,
+        "played": 5
+      },
+      {
+        "name": "Moise Kean",
+        "team": "Club de Fútbol Cruz Azul",
+        "total": 5,
+        "played": 5
+      },
+      {
+        "name": "Désiré Doué",
+        "team": "Arsenal Football Club",
+        "total": 5,
+        "played": 5
+      },
+      {
+        "name": "Ollie Watkins",
+        "team": "Manchester United",
+        "total": 4,
+        "played": 5
+      }
+    ],
+    "cleanSheets": [
+      {
+        "name": "Jan Oblak",
+        "team": "Club Atlético de Madrid",
+        "total": 4,
+        "played": 5
+      },
+      {
+        "name": "Joan Garcia",
+        "team": "Fútbol Club Barcelona",
+        "total": 3,
+        "played": 5
+      },
+      {
+        "name": "Giorgi Mamardashvili",
+        "team": "Manchester United",
+        "total": 3,
+        "played": 5
+      },
+      {
+        "name": "Peter Gulácsi",
+        "team": "Sporting Clube de Portugal",
+        "total": 2,
+        "played": 5
+      },
+      {
+        "name": "Thibaut Courtois",
+        "team": "Bayer 04 Leverkusen",
+        "total": 2,
+        "played": 5
+      }
+    ]
+  }
+}
