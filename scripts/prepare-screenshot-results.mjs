@@ -22,12 +22,11 @@ if (
   !source.title?.trim() ||
   !/^[a-z0-9-]{1,100}$/.test(source.sourceKey) ||
   !Array.isArray(source.images) ||
-  source.images.length < 1 ||
   source.images.length > 10 ||
   !Array.isArray(source.matches) ||
   !source.matches.length
 )
-  throw Error("Fuente de capturas inválida.");
+  throw Error("Fuente de resultados inválida.");
 for (const image of source.images) {
   if (!isCompetitionEvidencePath(image.path) || !image.sha256)
     throw Error("Ruta o huella de evidencia inválida.");
@@ -95,12 +94,9 @@ for (const club of clubs) {
     `do $$begin if not exists(select 1 from app.competition_teams t join public.clubs c on c.id=t.club_id where t.competition_id=${comp} and t.name=${q(club)} and c.tournament_id=${tid} and c.name=t.name)then raise exception 'Participante no vinculado al club canónico.';end if;end $$;`,
   );
 }
-const screenshots = addEvidence(
-  source.sourceKey,
-  "screenshots",
-  source.title,
-  paths,
-);
+const screenshots = source.images.length
+  ? addEvidence(source.sourceKey, "screenshots", source.title, paths)
+  : null;
 if (source.rankingPhase)
   sql.push(
     `update app.universe_competitions set ranking_phase=${q(source.rankingPhase)} where id=${comp};`,
