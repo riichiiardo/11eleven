@@ -30,6 +30,19 @@ export type RecordedMatch = {
   yellowCards: RecordedStat[] | null;
   redCards: RecordedStat[] | null;
 };
+export type ReportedLeaderMetric = "goals" | "assists" | "cleanSheets";
+export type ReportedLeaders = {
+  throughRound: number;
+  entries: {
+    metric: ReportedLeaderMetric;
+    position: number;
+    team: string;
+    name: string;
+    total: number;
+    played: number;
+  }[];
+};
+
 export type RecordedCompetition = {
   id: string;
   slug: string;
@@ -53,6 +66,7 @@ export type RecordedCompetition = {
     points: number;
   }[];
   matches: RecordedMatch[];
+  reportedLeaders?: ReportedLeaders | null;
   players: {
     team: string;
     name: string;

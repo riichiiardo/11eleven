@@ -523,6 +523,50 @@ try {
       fiveRounds.standings[0].goalDifference === 13,
     "J4 and J5 update cumulative goals and goal difference",
   );
+  await db.exec("reset role");
+  const leadersPlan = runPlan("scripts/prepare-competition-leaderboards.mjs", [
+    `--universe=${id(10)}`,
+    "--file=data/competition-results/champions-2026-leaders-j5.json",
+  ]);
+  await db.exec(leadersPlan);
+  await db.exec(leadersPlan);
+  await login(1);
+  const withLeaders = await getChampions();
+  const leaders = withLeaders.reportedLeaders;
+  ok(
+    leaders.throughRound === 5 && leaders.entries.length === 15,
+    "Three reported rankings load without duplicates",
+  );
+  ok(
+    leaders.entries.some(
+      (row) =>
+        row.name === "Marcus Rashford" &&
+        row.metric === "assists" &&
+        row.total === 6 &&
+        row.played === 5,
+    ) &&
+      leaders.entries.some(
+        (row) =>
+          row.name === "Jan Oblak" &&
+          row.metric === "cleanSheets" &&
+          row.total === 4,
+      ),
+    "Reported totals and appearances are preserved",
+  );
+  assert.deepEqual(withLeaders.matches, fiveRounds.matches);
+  assert.deepEqual(withLeaders.standings, fiveRounds.standings);
+  assert.deepEqual(withLeaders.players, fiveRounds.players);
+  await denied(db.query("select * from app.competition_player_leaders"));
+  await db.exec("reset role");
+  await db.query(
+    "update app.universe_competitions set current_season='2027' where id=$1",
+    [champion],
+  );
+  await login(1);
+  ok(
+    (await getChampions()).reportedLeaders === null,
+    "Reported rankings stay in their own season",
+  );
   console.log(
     `PASS competition archive: ${checks} assertions; tenant isolation, scoped access, validated evidence and stats, unknown values, versioned corrections, no double counting, assists/cards, cups, archiving and seasons.`,
   );
