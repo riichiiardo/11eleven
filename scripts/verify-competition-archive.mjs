@@ -448,6 +448,44 @@ try {
       .evidence.images[0].endsWith("jornada-2-03.png"),
     "J2 results point to their actual screenshot",
   );
+  await db.exec("reset role");
+  const j3plan = runPlan("scripts/prepare-screenshot-results.mjs", [
+    `--universe=${id(10)}`,
+    "--file=data/competition-results/champions-2026-j3.json",
+  ]);
+  await db.exec(j3plan);
+  await db.exec(j3plan);
+  await login(1);
+  const threeRounds = await getChampions();
+  ok(
+    threeRounds.matches.length === 27 &&
+      threeRounds.standings.length === 18 &&
+      threeRounds.standings.every((t) => t.played === 3),
+    "J3 adds one match per club without duplicates",
+  );
+  ok(
+    threeRounds.standings.reduce((n, t) => n + t.goalsFor, 0) === 69 &&
+      threeRounds.standings[0].team === "Arsenal Football Club" &&
+      threeRounds.standings[0].points === 9,
+    "J3 updates total goals and leader",
+  );
+  const report = threeRounds.matches.find(
+    (m) => m.round === 3 && m.home === "Bayer 04 Leverkusen",
+  );
+  ok(
+    report.homeGoals === 1 &&
+      report.awayGoals === 0 &&
+      report.evidence.kind === "user_report" &&
+      report.evidence.title === "Leverkusen 1-0 al Parma" &&
+      report.evidence.images.length === 0,
+    "User-reported score has its own text evidence without a screenshot",
+  );
+  ok(
+    threeRounds.matches.filter(
+      (m) => m.round === 3 && m.evidence.kind === "screenshots",
+    ).length === 8,
+    "Eight J3 results retain their screenshot provenance",
+  );
   console.log(
     `PASS competition archive: ${checks} assertions; tenant isolation, scoped access, validated evidence and stats, unknown values, versioned corrections, no double counting, assists/cards, cups, archiving and seasons.`,
   );

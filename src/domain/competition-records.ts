@@ -18,7 +18,11 @@ export type RecordedMatch = {
   awayPenalties: number | null;
   videoId: string | null;
   evidenceSecond: number | null;
-  evidence?: { kind: "screenshots"; title: string; images: string[] } | null;
+  evidence?: {
+    kind: "screenshots" | "user_report";
+    title: string;
+    images: string[];
+  } | null;
   verified: boolean;
   version: number;
   goals: RecordedStat[] | null;

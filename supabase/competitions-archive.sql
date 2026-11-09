@@ -28,9 +28,17 @@ revoke all on function app.valid_competition_images(text[])from public,anon,auth
 create table if not exists app.competition_evidence(
  id uuid primary key default gen_random_uuid(),competition_id uuid not null references app.universe_competitions(id) on delete cascade,
  season text not null,source_key text not null check(source_key ~ '^[a-z0-9-]{1,100}$'),
- round_number integer not null check(round_number>0),kind text not null check(kind='screenshots'),
- title text not null check(length(btrim(title)) between 1 and 150),images text[] not null check(app.valid_competition_images(images)),
+ round_number integer not null check(round_number>0),kind text not null,
+ title text not null check(length(btrim(title)) between 1 and 150),images text[] not null,
  created_at timestamptz not null default now(),unique(competition_id,season,source_key)
+);
+-- A directly reported score has its own source and no attached screenshots.
+alter table app.competition_evidence drop constraint if exists competition_evidence_kind_check;
+alter table app.competition_evidence drop constraint if exists competition_evidence_images_check;
+alter table app.competition_evidence drop constraint if exists competition_evidence_source_check;
+alter table app.competition_evidence add constraint competition_evidence_source_check check(
+ (kind='screenshots' and app.valid_competition_images(images))
+ or(kind='user_report' and cardinality(images)=0)
 );
 create table if not exists app.competition_results(
  id uuid primary key default gen_random_uuid(),competition_id uuid not null references app.universe_competitions(id) on delete cascade,
@@ -112,8 +120,12 @@ begin
   if p_doc->>'videoId' is not null or p_doc->>'evidenceSecond' is not null then raise exception 'El informe debe tener una sola fuente de evidencia.';end if;
   select cardinality(images) into count_value from app.competition_evidence where id=evidence and competition_id=c.id and season=c.current_season and round_number=rd;
   if count_value is null then raise exception 'Las capturas no corresponden a la competición, temporada o jornada.';end if;
-  n:=coalesce((p_doc->>'sourceImage')::numeric,1);
-  if p_doc ?'sourceImage' and jsonb_typeof(p_doc->'sourceImage')<>'number' or n<1 or n>count_value or trunc(n)<>n then raise exception 'Captura de origen inválida.';end if;
+  if count_value=0 then
+   if p_doc ?'sourceImage' then raise exception 'Un marcador informado no tiene captura.';end if;
+  else
+   n:=coalesce((p_doc->>'sourceImage')::numeric,1);
+   if (p_doc ?'sourceImage' and jsonb_typeof(p_doc->'sourceImage')<>'number') or n<1 or n>count_value or trunc(n)<>n then raise exception 'Captura de origen inválida.';end if;
+  end if;
  else
   if not exists(select 1 from app.broadcast_sources where video_id=p_doc->>'videoId' and channel_id='UCdi3BBPwD7Y0XTp86qGCofA' and competition_slug=c.slug and(round_number is null or round_number=rd))then raise exception 'La grabación no corresponde a la competición o jornada.';end if;
   if jsonb_typeof(p_doc->'evidenceSecond')<>'number' or coalesce((p_doc->>'evidenceSecond')::numeric,-1)<0 or trunc((p_doc->>'evidenceSecond')::numeric)<>(p_doc->>'evidenceSecond')::numeric then raise exception 'Falta el instante de evidencia.';end if;
@@ -192,7 +204,7 @@ begin
   'verifiedMatches',(select count(*)from matches where competition_id=c.id and verified),
   'standings',case when c.format='cup' and c.ranking_phase is null then '[]'::jsonb else(select coalesce(jsonb_agg(to_jsonb(v)order by v.points desc,v."goalDifference" desc,v."goalsFor" desc,v.team),'[]')from(
     select t.name team,s.played,s.won,s.drawn,s.lost,s.gf "goalsFor",s.ga "goalsAgainst",s.gf-s.ga "goalDifference",s.points from totals s join app.competition_teams t on t.id=s.team where s.competition_id=c.id)v)end,
-  'matches',(select coalesce(jsonb_agg(jsonb_build_object('id',m.id,'round',m.round_number,'stage',m.stage,'homeId',m.home_id,'awayId',m.away_id,'home',h.name,'away',a.name,'homeGoals',m.home_goals,'awayGoals',m.away_goals,'homePenalties',m.home_penalties,'awayPenalties',m.away_penalties,'videoId',m.video_id,'evidenceSecond',m.evidence_second,'evidence',(select jsonb_build_object('kind',e.kind,'title',e.title,'images',array[e.images[coalesce((m.payload->>'sourceImage')::int,1)]])from app.competition_evidence e where e.id=m.evidence_id),'verified',m.verified,'goals',m.goals,'assists',m.assists,'yellowCards',m.yellow_cards,'redCards',m.red_cards,'version',m.version)order by m.round_number,m.stage,m.created_at),'[]')from matches m join app.competition_teams h on h.id=m.home_id join app.competition_teams a on a.id=m.away_id where m.competition_id=c.id),
+  'matches',(select coalesce(jsonb_agg(jsonb_build_object('id',m.id,'round',m.round_number,'stage',m.stage,'homeId',m.home_id,'awayId',m.away_id,'home',h.name,'away',a.name,'homeGoals',m.home_goals,'awayGoals',m.away_goals,'homePenalties',m.home_penalties,'awayPenalties',m.away_penalties,'videoId',m.video_id,'evidenceSecond',m.evidence_second,'evidence',(select jsonb_build_object('kind',e.kind,'title',e.title,'images',case when e.kind='user_report' then e.images else array[e.images[coalesce((m.payload->>'sourceImage')::int,1)]] end)from app.competition_evidence e where e.id=m.evidence_id),'verified',m.verified,'goals',m.goals,'assists',m.assists,'yellowCards',m.yellow_cards,'redCards',m.red_cards,'version',m.version)order by m.round_number,m.stage,m.created_at),'[]')from matches m join app.competition_teams h on h.id=m.home_id join app.competition_teams a on a.id=m.away_id where m.competition_id=c.id),
   'players',(select coalesce(jsonb_agg(jsonb_build_object('team',t.name,'name',s.player,'goals',s.goals,'assists',s.assists,'yellowCards',s.yellow,'redCards',s.red)order by s.goals desc nulls last,s.player),'[]')from stats s join app.competition_teams t on t.id=s.team where s.competition_id=c.id)
  )order by c.created_at,c.name),'[]')into result from competitions c;
  return result;

@@ -232,6 +232,10 @@ function ResultCard({ match: m }: { match: RecordedMatch }) {
               </div>
             ) : null}
           </details>
+        ) : m.evidence?.kind === "user_report" ? (
+          <p className="text-xs text-muted-foreground">
+            Marcador informado por el usuario · {m.evidence.title}
+          </p>
         ) : (
           <p className="text-xs text-muted-foreground">
             Evidencia pendiente de catálogo.
