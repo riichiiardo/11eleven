@@ -13,7 +13,7 @@ const fixture = {
   },
   load(source) {
     if (source === path.resolve("src/infrastructure/supabase/client.ts"))
-      return `export const supabaseConfigError=null;export const supabaseUrl='';export const supabase={};export async function rpc(name,args){const r=await fetch('/market-draft-fixture-api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,args})});const value=await r.json();if(!r.ok)throw Error(value.error);if(name==='change_squad_availability'&&!value.requiresWithdrawal)window.dispatchEvent(new Event('market-fixture-updated'));return value;}`;
+      return `export const supabaseConfigError=null;export const supabaseUrl='';export const supabase={};export async function rpc(name,args){const r=await fetch('/market-draft-fixture-api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,args})});const value=await r.json();if(!r.ok)throw Error(value.error);if((name==='change_squad_availability'||name==='mark_squad_player_sold')&&!value.requiresWithdrawal)window.dispatchEvent(new Event('market-fixture-updated'));return value;}`;
     if (source === "\0market-draft-fixture")
       return `
  import React,{useEffect,useState,useSyncExternalStore}from'react';import{createRoot}from'react-dom/client';import{MemoryRouter,Routes,Route,Outlet}from'react-router';import{Toaster}from'sonner';
@@ -21,7 +21,7 @@ const fixture = {
  function DashboardGate({children}){const snapshot=useSyncExternalStore(listener=>queryStore.subscribe('dashboard-fixture',listener),()=>queryStore.get('dashboard-fixture'));useEffect(()=>{void queryStore.load('dashboard-fixture',async()=>true);},[snapshot.status]);return snapshot.data?children:React.createElement('p',null,'Cargando panel de prueba…');}
  import PlayerStatus from '/src/pages/app/PlayerStatus.tsx';import{adaptTournamentState}from'/src/infrastructure/supabase/adapters.ts';import{DEFAULT_RULES,computeSquadStats}from'/src/domain/rulesEngine.ts';import'/src/index.css';
  function Fixture(){const[data,setData]=useState(null);useEffect(()=>{let active=true;const load=()=>fetch('/market-draft-fixture-api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'read_fixture'})}).then(r=>r.json()).then(v=>{if(active)setData(v);});load();window.addEventListener('market-fixture-updated',load);return()=>{active=false;window.removeEventListener('market-fixture-updated',load);};},[]);if(!data)return React.createElement('p',null,'Cargando prueba local…');
- const squad=[{squadPlayerId:'${first}',playerId:'00000000-0000-4000-8000-000000000050',name:'Jugador anunciado',position:'LI',group:'DEF',ovr:80,age:25,nationality:'España',value:10000000,availability:data.availability},{squadPlayerId:'00000000-0000-4000-8000-000000000061',playerId:'00000000-0000-4000-8000-000000000051',name:'Jugador sin baja',position:'MC',group:'MID',ovr:80,age:25,nationality:'España',value:10000000,availability:'neutro'}];
+ const squad=[{squadPlayerId:'${first}',playerId:'00000000-0000-4000-8000-000000000050',name:'Jugador anunciado',position:'LI',group:'DEF',ovr:80,age:25,nationality:'España',value:10000000,availability:data.availability==='vendido'?'intransferible':data.availability,saleStatus:data.availability==='vendido'?'vendido':null,soldToClubId:data.soldToClubId,soldToClubName:data.soldToClubName},{squadPlayerId:'00000000-0000-4000-8000-000000000061',playerId:'00000000-0000-4000-8000-000000000051',name:'Jugador sin baja',position:'MC',group:'MID',ovr:80,age:25,nationality:'España',value:10000000,availability:'neutro'}];
  const state=adaptTournamentState({needsLeague:false,needsClub:false,rules:DEFAULT_RULES,club:{id:'00000000-0000-4000-8000-000000000020',name:'Club de prueba'},squad,stats:computeSquadStats(squad),availability:{transferible:data.availability==='transferible'?1:0,neutro:1+(data.availability==='neutro'?1:0),negociacion:data.availability==='negociacion'?1:0,intransferible:data.availability==='intransferible'?1:0},budget:{available:1000},president:{nickname:'Prueba'},tournament:{status:'inscripciones',name:'Prueba'},market:{},competition:{},activity:[]});
  return React.createElement(React.Fragment,null,React.createElement('p',{className:'mx-auto my-4 max-w-5xl rounded-lg border p-4'},'Prueba local · Datos ficticios · Bajas previstas: '+(data.selected?1:0)+' · Sin conexión a Supabase'),React.createElement(Outlet,{context:state}));}
  createRoot(document.getElementById('root')).render(React.createElement(MemoryRouter,null,React.createElement(Routes,null,React.createElement(Route,{element:React.createElement(Fixture)},React.createElement(Route,{path:'*',element:React.createElement(DashboardGate,null,React.createElement(PlayerStatus))}))),React.createElement(Toaster)));
@@ -34,6 +34,14 @@ const fixture = {
         for await (const chunk of req) body += chunk;
         const { name, args } = JSON.parse(body);
         let value = current;
+        const demoOffers=[{offerId:'00000000-0000-4000-8000-000000000070',clubId:'00000000-0000-4000-8000-000000000021',clubName:'Club Comprador',manager:'Manager de prueba',status:'negociacion',cash:1000000},{offerId:'00000000-0000-4000-8000-000000000071',clubId:'00000000-0000-4000-8000-000000000022',clubName:'Club Alternativo',manager:'Otro manager',status:'enviada',cash:2000000}];
+        if(name==='squad_sale_negotiations')value=args.p_squad_player_id===first?demoOffers:[];
+        if(name==='mark_squad_player_sold'){
+          const offer=demoOffers.find(o=>o.offerId===args.p_offer_id);
+          if(!offer||args.p_squad_player_id!==first){res.statusCode=400;value={error:'Negociación no válida'};}
+          else if(current.selected&&!args.p_withdraw)value={requiresWithdrawal:true,withdrawn:false,clubName:offer.clubName};
+          else{const withdrawn=current.selected;current={availability:'vendido',selected:false,soldToClubId:offer.clubId,soldToClubName:offer.clubName};value={requiresWithdrawal:false,withdrawn,clubName:offer.clubName};}
+        }
         if (name === "change_squad_availability") {
           if (args.p_squad_player_id !== first) {
             res.statusCode = 400;

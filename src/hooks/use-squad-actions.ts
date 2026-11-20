@@ -12,7 +12,10 @@ export type AvailabilityChange = {
   playerName: string;
 };
 
+export type SaleSelection = { squadPlayerId: Id<"squadPlayers">; playerName: string };
+
 export function useSquadActions() {
+  const [pendingSale, setPendingSale] = useState<SaleSelection | null>(null);
   const setAvailabilityMutation = useMutation(api.squads.setAvailability);
   const [savingAvailability, setSavingAvailability] = useState(false);
   const [pendingAvailability, setPendingAvailability] =
@@ -24,6 +27,7 @@ export function useSquadActions() {
     playerName: string,
     withdrawFromDraft = false,
   ) => {
+    if (availability === "vendido") { setPendingSale({ squadPlayerId, playerName }); return false; }
     setSavingAvailability(true);
     try {
       const result = await setAvailabilityMutation({
@@ -63,6 +67,8 @@ export function useSquadActions() {
     if (!savingAvailability) setPendingAvailability(null);
   };
   return {
+    pendingSale,
+    cancelSale: () => setPendingSale(null),
     saveAvailability,
     savingAvailability,
     pendingAvailability,

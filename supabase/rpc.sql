@@ -297,6 +297,7 @@ begin
       when pl.id is null then 'Jugador desconocido en la oferta.'
       when sp.president_id is null then null
       when sp.president_id = v_me.id then 'No puedes pedirte un jugador a ti mismo.'
+      when sp.availability = 'vendido' then (select name from public.players where id = sp.player_id) || ' está marcado como vendido.'
       when sp.availability = 'intransferible' then (select name from public.players where id = sp.player_id) || ' es intransferible.'
       else null end
     from unnest(p_requested) as rid(pid)

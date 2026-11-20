@@ -315,7 +315,11 @@ create table if not exists squad_players (
   player_id uuid not null references players(id) on delete cascade,
   president_id uuid not null references presidents(id) on delete cascade,
   availability text not null default 'neutro'
-    check (availability in ('transferible','negociacion','neutro','intransferible')),
+    check (availability in ('transferible','negociacion','neutro','intransferible','vendido')),
+  sold_offer_id uuid,
+  sold_to_club_id uuid references clubs(id) on delete set null,
+  sold_previous_availability text,
+  sold_at timestamptz,
   ovr_at_join integer not null default 0,
   value_at_join bigint not null default 0,
   joined_at timestamptz not null default now(),

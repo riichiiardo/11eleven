@@ -133,7 +133,7 @@ export function SquadTable({
                   </span>
                 </TableCell>
                 <TableCell>
-                  <AvailabilityBadge availability={player.availability} />
+                  <AvailabilityBadge availability={player.availability} soldToClubName={player.soldToClubName} />
                 </TableCell>
                 <TableCell className="text-right">
                   {onSelect ? (

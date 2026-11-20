@@ -150,7 +150,8 @@ begin
         select 'transferible' as av, count(*) as cnt from public.squad_players sp where sp.squad_id = v_squad.id and sp.availability = 'transferible'
         union all select 'negociacion', count(*) from public.squad_players sp where sp.squad_id = v_squad.id and sp.availability = 'negociacion'
         union all select 'neutro', count(*) from public.squad_players sp where sp.squad_id = v_squad.id and sp.availability = 'neutro'
-        union all select 'intransferible', count(*) from public.squad_players sp where sp.squad_id = v_squad.id and sp.availability = 'intransferible'
+        union all select 'intransferible', count(*) from public.squad_players sp where sp.squad_id = v_squad.id and sp.availability in ('intransferible','vendido')
+        union all select 'vendido', count(*) from public.squad_players sp where sp.squad_id = v_squad.id and sp.availability = 'vendido'
       ) t
     ),
     'nextEvent', (select public.next_event_json(v_tid, v_club.id, v_rules.lineup_lock_hours)),
@@ -197,14 +198,14 @@ begin
   select * into v_me from public.presidents where user_id = v_uid and tournament_id = v_tid;
 
   with pool as (
-    select pl.*, sp.president_id as owner_president_id, sp.availability, sp.id as squad_player_id,
+    select pl.*, sp.president_id as owner_president_id, sp.availability, sp.id as squad_player_id, sp.sold_to_club_id, (select name from public.clubs where id=sp.sold_to_club_id) as sold_to_club_name,
            c.id as owner_club_id, c.name as owner_club_name, c.short_name as owner_short_name,
            c.color_primary, c.color_secondary, p.nickname as owner_nickname
     from public.players pl
     left join public.squad_players sp on sp.player_id = pl.id and sp.tournament_id = v_tid
     left join public.clubs c on c.id = sp.club_id
     left join public.presidents p on p.id = sp.president_id
-    where sp.president_id is null or not exists (select 1 from public.draft_picks dp where dp.tournament_id = v_tid and dp.player_id = pl.id) or sp.availability = 'transferible'
+    where sp.president_id is null or not exists (select 1 from public.draft_picks dp where dp.tournament_id = v_tid and dp.player_id = pl.id) or sp.availability in ('transferible','vendido')
   ),
   filtered as (
     select jsonb_build_object(
@@ -216,9 +217,10 @@ begin
       'ownerColors', case when pool.owner_club_id is null then null else jsonb_build_array(pool.color_primary, pool.color_secondary) end,
       'ownerNickname', pool.owner_nickname, 'ownerPresidentId', pool.owner_president_id,
       'ownerIsMe', pool.owner_president_id = v_me.id,
-      'availability', coalesce(pool.availability, 'libre'),
+      'availability', case when pool.availability='vendido' then 'intransferible' else coalesce(pool.availability,'libre') end, 'saleStatus',case when pool.availability='vendido' then 'vendido' else null end, 'soldToClubId',pool.sold_to_club_id,'soldToClubName',pool.sold_to_club_name,
       'offerable', (pool.owner_president_id is null or (pool.availability in ('transferible','negociacion','neutro') and pool.owner_president_id <> v_me.id)),
       'blockedReason', case when pool.owner_president_id = v_me.id then 'Es tu propio jugador'
+                            when pool.availability = 'vendido' then 'Vendido a '||coalesce(pool.sold_to_club_name,'otro equipo')
                             when pool.availability = 'intransferible' then 'Intransferible'
                             else null end,
       'committedOfferId', null, 'withinBudget', pool.value <= v_me.budget,
@@ -543,7 +545,8 @@ returns jsonb language sql stable as $$
     'ovrDelta', coalesce((select h.ovr_delta from public.player_stat_history h where h.player_id = pl.id order by h.recorded_at desc limit 1), 0),
     'valueDelta', coalesce((select h.value_delta from public.player_stat_history h where h.player_id = pl.id order by h.recorded_at desc limit 1), 0),
     'nationality', pl.nationality, 'flag', pl.flag,
-    'availability', sp.availability,
+    'availability', case when sp.availability='vendido' then 'intransferible' else sp.availability end, 'saleStatus',case when sp.availability='vendido' then 'vendido' else null end,
+    'soldToClubId', sp.sold_to_club_id, 'soldToClubName', (select name from public.clubs where id=sp.sold_to_club_id),
     'realClub', pl.real_club, 'realLeague', pl.real_league, 'fcVersion', pl.fc_version, 'photo', pl.photo
   )
   from public.players pl where pl.id = sp.player_id

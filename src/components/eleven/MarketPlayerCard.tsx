@@ -80,7 +80,7 @@ export function MarketPlayerCard({
 
       <div className="flex flex-wrap items-center gap-1.5">
         {squadAvailability ? (
-          <AvailabilityBadge availability={squadAvailability} />
+          <AvailabilityBadge availability={squadAvailability} soldToClubName={player.soldToClubName} />
         ) : (
           <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
             <Sparkles className="size-3" aria-hidden="true" />

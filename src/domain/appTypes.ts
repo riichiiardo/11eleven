@@ -230,6 +230,8 @@ export type MarketPlayerView = {
   ownerIsMe: boolean;
   /** "libre" for free agents, otherwise the owner's availability flag. */
   availability: PlayerAvailability | "libre";
+  soldToClubId?: Id<"clubs"> | null;
+  soldToClubName?: string | null;
   offerable: boolean;
   blockedReason: string | null;
   /** Operation that already holds this player (commitment). */

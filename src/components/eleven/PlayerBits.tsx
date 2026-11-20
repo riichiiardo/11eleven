@@ -215,10 +215,12 @@ export function OvrBadge({
 
 export function AvailabilityBadge({
   availability,
+  soldToClubName,
   className,
   showLabel = true,
 }: {
   availability: PlayerAvailability;
+  soldToClubName?: string | null;
   className?: string;
   showLabel?: boolean;
 }) {
@@ -236,7 +238,7 @@ export function AvailabilityBadge({
         {meta.symbol}
       </span>
       {showLabel ? (
-        <span>{meta.label}</span>
+        <span>{meta.label}{availability === "vendido" && soldToClubName ? ` · ${soldToClubName}` : ""}</span>
       ) : (
         <span className="sr-only">{meta.label}</span>
       )}

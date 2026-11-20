@@ -1,3 +1,4 @@
+import { SoldPlayerDialog } from "@/components/eleven/SoldPlayerDialog";
 import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
 import type { AppStateView } from "@/domain/appTypes";
 import {
@@ -24,13 +25,14 @@ import { cn } from "@/lib/utils";
 export default function PlayerStatus() {
   const state = useOutletContext<AppStateView>();
   const navigate = useNavigate();
-  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability } = useSquadActions();
+  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability, pendingSale, cancelSale } = useSquadActions();
 
   const stats = state.stats;
   if (!stats) return null;
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      {pendingSale ? <SoldPlayerDialog key={pendingSale.squadPlayerId} selection={pendingSale} onClose={cancelSale} /> : null}
       <AvailabilityWithdrawalDialog change={pendingAvailability} busy={savingAvailability} onCancel={cancelAvailability} onConfirm={confirmAvailability} />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -62,14 +64,14 @@ export default function PlayerStatus() {
         </div>
       </header>
 
-      <section aria-label="Leyenda de situaciones" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Leyenda de situaciones" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {AVAILABILITIES.map((option) => {
           const meta = AVAILABILITY_META[option];
           return (
             <div key={option} className="card-soft flex flex-col gap-2 p-4">
               <div className="flex items-center justify-between gap-2">
                 <AvailabilityBadge availability={option} />
-                <span className="num display text-lg">{state.availability[option]}</span>
+                <span className="num display text-lg">{state.availability[option] ?? 0}</span>
               </div>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {meta.description}
@@ -103,6 +105,7 @@ export default function PlayerStatus() {
                 />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{player.name}</p>
+                  {player.availability === "vendido" ? <p className="text-xs font-semibold text-sky-700">Vendido a {player.soldToClubName ?? "equipo por consultar"} · <button type="button" className="underline" onClick={() => void saveAvailability(player.squadPlayerId,"vendido",player.name)}>Editar venta</button></p> : null}
                   <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
                     <PositionPill position={player.position} group={player.group} />
                     {player.nationality} · {player.age} años · {formatMoney(player.value)}

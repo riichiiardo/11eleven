@@ -21,6 +21,7 @@ Aplica los scripts en este orden, después de revisar el destino y sus permisos:
 12. `market-availability.sql`
 13. `market-draft-availability.sql`
 14. `squad-tactics.sql`
+15. `market-sold.sql`
 
 No hay un seed alternativo de equipos. El catálogo se carga desde la fuente
 configurada por sincronización explícita. `catalog.sql` configura staging
@@ -240,3 +241,13 @@ Para instalaciones existentes, aplicar `market-availability.sql`; la definición
 ### Bajas previstas y cambios de mercado
 
 Aplicar `market-draft-availability.sql` después de `draft-outgoing.sql` y `market-availability.sql`. La RPC `change_squad_availability` devuelve una solicitud de confirmación si el jugador es una baja seleccionada y se pretende quitar su situación de transferible. Con confirmación explícita retira esa baja, aumenta la revisión de la prelista y guarda la disponibilidad en una única transacción. Respeta el bloqueo de draft iniciado y de prelista enviada a revisión; conserva las otras selecciones, las revisiones de sus altas y las ofertas. El acceso sigue limitado al propietario y universo activo. Para verificar cancelación, confirmación y recarga en el navegador sin tocar producción: `node scripts/preview-market-draft.mjs`.
+
+## Venta anunciada
+
+`market-sold.sql` añade el estado informativo «Vendido» y su equipo de destino.
+Se aplica después de `market-draft-availability.sql` y `draft-bids.sql`, antes del frontend.
+El propietario elige una negociación activa del mismo universo, también cuando su jugador forma parte de un intercambio. No acepta ofertas, ejecuta traspasos ni modifica presupuestos. Si está seleccionado como baja, solicita confirmación para retirarlo de la prelista; los bloqueos de revisión y draft iniciado se conservan.
+
+Cancelar o finalizar la negociación elimina la etiqueta; cambiar normalmente la disponibilidad borra el destino, y un cambio de propietario deja al nuevo dueño el jugador neutro. Los lectores JSON conservan compatibilidad con clientes antiguos: `availability` se entrega como `intransferible`, acompañado de `saleStatus: vendido` y los campos `soldToClubId` y `soldToClubName`; el cliente actual los normaliza al estado Vendido.
+
+Verificación aislada: `node scripts/verify-sold-players.mjs`. Prueba visual sin datos reales: `node scripts/preview-market-draft.mjs`.
