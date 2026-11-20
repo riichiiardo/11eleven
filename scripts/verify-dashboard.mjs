@@ -8,21 +8,43 @@ const server = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
 });
 try {
-  const { adaptTournamentState, adaptDraftPool } = await server.ssrLoadModule("/src/infrastructure/supabase/adapters.ts");
+  const { adaptTournamentState, adaptDraftPool } = await server.ssrLoadModule(
+    "/src/infrastructure/supabase/adapters.ts",
+  );
   assert.deepEqual(adaptDraftPool({ players: [], total: 0 }), []);
-  assert.deepEqual(adaptDraftPool({ players: [{ playerId: "test" }], total: 1 }), [{ playerId: "test" }]);
+  assert.deepEqual(
+    adaptDraftPool({ players: [{ playerId: "test" }], total: 1 }),
+    [{ playerId: "test" }],
+  );
   assert.throws(() => adaptDraftPool(null), /respuesta no válida/);
   assert.throws(() => adaptDraftPool({ players: {} }), /respuesta no válida/);
-  const { DEFAULT_RULES, computeSquadStats } = await server.ssrLoadModule("/src/domain/rulesEngine.ts");
+  const { DEFAULT_RULES, computeSquadStats } = await server.ssrLoadModule(
+    "/src/domain/rulesEngine.ts",
+  );
   const raw = {
-    needsLeague: false, needsClub: false,
-    rules: DEFAULT_RULES, club: { name: "Test Club", shortName: "TST", country: "España", colorPrimary: "#000000", colorSecondary: "#ffffff" },
-    squad: [], budget: { available: 350000000 },
+    needsLeague: false,
+    needsClub: false,
+    rules: DEFAULT_RULES,
+    club: {
+      name: "Test Club",
+      shortName: "TST",
+      country: "España",
+      colorPrimary: "#000000",
+      colorSecondary: "#ffffff",
+    },
+    squad: [],
+    budget: { available: 350000000 },
     president: { nickname: "Test" },
-    tournament: { status: "inscripciones", name: "Test League", currentMatchday: 1 },
-    stats: computeSquadStats([]), activity: [],
+    tournament: {
+      status: "inscripciones",
+      name: "Test League",
+      currentMatchday: 1,
+    },
+    stats: computeSquadStats([]),
+    activity: [],
     competition: { standings: [], previousMatch: null, myMatch: null },
-    market: { freeAgents: 0 }, draft: null,
+    market: { freeAgents: 0 },
+    draft: null,
     availability: {},
   };
   const ready = adaptTournamentState(raw);
@@ -32,20 +54,50 @@ try {
   assert.ok(Array.isArray(ready.actions));
   assert.deepEqual(ready.lineupEvaluation.starters, []);
   assert.equal(ready.lineupEvaluation.valid, false);
-  const saved = { formation: "4-2-3-1", slots: [{ slotId: "GK", playerId: null }] };
-  assert.deepEqual(adaptTournamentState({ ...raw, lineup: saved }).lineup, saved);
+  const saved = {
+    formation: "4-2-3-1",
+    slots: [{ slotId: "GK", playerId: null }],
+  };
+  assert.deepEqual(
+    adaptTournamentState({ ...raw, lineup: saved }).lineup,
+    saved,
+  );
   assert.equal(adaptTournamentState(null), null);
   const gate = { needsClub: true };
   assert.equal(adaptTournamentState(gate), gate);
   const { MemoryRouter } = await server.ssrLoadModule("react-router");
   for (const name of ["Home", "Club", "Squad", "Formation"]) {
-    const { default: Page } = await server.ssrLoadModule(`/src/pages/app/${name}.tsx`);
-    const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Page, { state: ready })));
+    const { default: Page } = await server.ssrLoadModule(
+      `/src/pages/app/${name}.tsx`,
+    );
+    const html = renderToString(
+      React.createElement(
+        MemoryRouter,
+        null,
+        React.createElement(Page, { state: ready }),
+      ),
+    );
+    if (name === "Formation") {
+      for (const count of [4, 3, 5])
+        assert.ok(
+          html
+            .replace(/<!--.*?-->/g, "")
+            .includes(`Líneas de ${count} defensas`),
+        );
+      assert.ok(html.includes("32 variantes organizadas"));
+    }
     assert.ok(html.length > 500, `${name} must render content`);
-    assert.ok(!html.includes("No se pudieron cargar"), `${name} must render its module rather than an error placeholder`);
-    console.log(`${name}: rendered successfully with the repaired RPC contract.`);
+    assert.ok(
+      !html.includes("No se pudieron cargar"),
+      `${name} must render its module rather than an error placeholder`,
+    );
+    console.log(
+      `${name}: rendered successfully with the repaired RPC contract.`,
+    );
   }
-  console.log("Dashboard contract: missing XI repaired, saved XI preserved, empty roster and onboarding handled.");
+  console.log(
+    "Dashboard contract: missing XI repaired, saved XI preserved, empty roster and onboarding handled.",
+  );
 } finally {
   await server.close();
 }

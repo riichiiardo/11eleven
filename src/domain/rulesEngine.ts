@@ -1,3 +1,7 @@
+import {
+  FORMATION_GROUPS,
+  type TacticalFormationCode,
+} from "./formation-catalog";
 /**
  * 11Eleven — Tournament Rule Engine
  *
@@ -739,6 +743,8 @@ export type FormationSlot = {
   id: string;
   /** Short label shown on the pitch chip, e.g. "MCO". */
   label: Position;
+  /** Rol visible; MI/MD/SD conservan compatibilidad con las posiciones del catálogo. */
+  role?: string;
   group: PositionGroup;
   /** Positions accepted in this slot. */
   accepts: Position[];
@@ -747,8 +753,9 @@ export type FormationSlot = {
   y: number;
 };
 
-/** Los 22 esquemas del menú de tácticas del FC 27. */
+/** Códigos anteriores compatibles con las alineaciones ya guardadas. */
 export type FormationCode =
+  | TacticalFormationCode
   | "3-2-2-3"
   | "3-4-2-1"
   | "3-4-3"
@@ -1387,6 +1394,47 @@ export const FORMATION_CODES: FormationCode[] = [
   "4-4-2 (2)",
   "4-5-1 (2)",
 ];
+
+// Las variantes nuevas no cambian los slots de alineaciones anteriores.
+for (const group of FORMATION_GROUPS) {
+  for (const family of group.families) {
+    for (const option of family.variants) {
+      const counters = new Map<string, number>();
+      const slots = option.rows.flatMap((row, index) =>
+        row.map((role, column) => {
+          const position: Position =
+            role === "MI" || role === "MD"
+              ? "MC"
+              : role === "SD"
+                ? "MCO"
+                : role;
+          const n = (counters.get(role) ?? 0) + 1;
+          counters.set(role, n);
+          const result = slot(
+            `${role.toLowerCase()}${n}`,
+            position,
+            row.length === 1 ? 50 : 12 + (column * 76) / (row.length - 1),
+            13 + (index * 59) / (option.rows.length - 1),
+          );
+          result.role = role;
+          if (role === "MI") result.accepts = ["MC", "EI", "MCO"];
+          if (role === "MD") result.accepts = ["MC", "ED", "MCO"];
+          if (role === "SD") result.accepts = ["DC", "MCO", "EI", "ED"];
+          return result;
+        }),
+      );
+      slots.push(slot("por1", "POR", 50, 89));
+      FORMATIONS[option.code] = {
+        code: option.code,
+        label: option.label,
+        shape: option.variant,
+        description: `${option.label} · ${option.variant}. ${group.defenders} defensas y ${slots.filter((s) => s.group === "MID").length} mediocampistas.`,
+        slots,
+      };
+      FORMATION_CODES.push(option.code);
+    }
+  }
+}
 
 /** Formation every new squad starts with. */
 export const DEFAULT_FORMATION: FormationCode = "4-2-3-1";
