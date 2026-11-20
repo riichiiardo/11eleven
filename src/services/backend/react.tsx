@@ -322,7 +322,10 @@ export function useMutation(hookRef?: unknown): unknown {
       const fn = resolveMutation(ref);
       try {
         const result = await fn(args);
-        queryStore.invalidateAll();
+        // Asking for confirmation has not changed data. Clearing the dashboard
+        // here would unmount the screen and discard its pending dialog.
+        const awaitingWithdrawal = ref === "squads.setAvailability" && result !== null && typeof result === "object" && "requiresWithdrawal" in result && result.requiresWithdrawal === true;
+        if (!awaitingWithdrawal) queryStore.invalidateAll();
         return result;
       } catch (cause) {
         throwNetwork(cause);
