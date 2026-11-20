@@ -209,7 +209,9 @@ alter table clubs enable row level security;
 -- Posiciones válidas del juego (iguales al motor de reglas de la app).
 create table if not exists players (
   id uuid primary key default gen_random_uuid(),
-  name text not null unique,
+  name text not null,
+  source_record jsonb,
+  catalog_active boolean not null default true,
   position text not null check (position in ('POR','LD','DFC','LI','MCD','MC','MCO','ED','EI','DC')),
   "group" text not null check ("group" in ('GK','DEF','MID','FWD')),
   ovr integer not null,

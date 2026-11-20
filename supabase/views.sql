@@ -71,7 +71,7 @@ begin
           'id', t.id, 'name', t.name, 'league', t.league, 'country', t.country,
           'colors', jsonb_build_array(t.color_primary, t.color_secondary),
           'crestUrl', t.crest_url,
-          'playerCount', (select count(*) from public.players p where p.real_club = t.name),
+          'playerCount', (select count(*) from public.players p where coalesce(p.source_record->>'game_team', p.real_club) = t.name),
           'takenByMe', false,
           'takenByOther', exists(select 1 from public.clubs c join public.presidents p on p.club_id = c.id where c.catalog_team_id = t.id and c.tournament_id = v_tid)
         ) order by t.name)
