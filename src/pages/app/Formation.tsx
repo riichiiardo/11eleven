@@ -1,3 +1,4 @@
+import { SquadTactics } from "@/components/eleven/SquadTactics";
 import { FormationPicker } from "@/components/eleven/FormationPicker";
 import { useMemo, useState } from "react";
 import type { AppStateView } from "@/domain/appTypes";
@@ -57,7 +58,6 @@ export default function Formation({
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
   const autoFill = useMutation(api.squads.autoFillLineup);
-  const updateRules = useMutation(api.tournament.updateRules);
 
   const serverLineup = state?.lineup ?? null;
   // "Alinear en el XI" from the squad page arrives with the player pre-selected.
@@ -74,13 +74,6 @@ export default function Formation({
   const rules = state?.rules ?? null;
   const squad = state?.squad ?? EMPTY_SQUAD;
 
-  const [guidanceEdited, setGuidanceEdited] = useState(false);
-  const [fc27Code, setFc27Code] = useState(
-    () => rules?.fc27FormationCode ?? "",
-  );
-  const [instructions, setInstructions] = useState(
-    () => rules?.formationInstructions ?? "",
-  );
   const evaluationInput = state?.evaluation;
 
   const evaluation = useMemo(() => {
@@ -229,34 +222,7 @@ export default function Formation({
         formation: lineup.formation,
         slots: lineup.slots,
       });
-      if (guidanceEdited)
-        await updateRules({
-          budget: rules.budget,
-          squadSize: rules.squadSize,
-          gkMin: rules.gkMin,
-          gkMax: rules.gkMax,
-          defMin: rules.defMin,
-          defMax: rules.defMax,
-          midMin: rules.midMin,
-          midMax: rules.midMax,
-          fwdMin: rules.fwdMin,
-          fwdMax: rules.fwdMax,
-          maxPerRealClub: rules.maxPerRealClub,
-          minOvr: rules.minOvr,
-          maxU21: rules.maxU21,
-          lineupLockHours: rules.lineupLockHours,
-          fc27FormationCode: fc27Code,
-          formationInstructions: instructions,
-          u20Min: rules.u20Min,
-          u20InStartingLineup: rules.u20InStartingLineup,
-          sameNationalityMin: rules.sameNationalityMin,
-          sameNationalityRule: rules.sameNationalityRule,
-          sameNationalityMatchDurationMinutes:
-            rules.sameNationalityMatchDurationMinutes,
-          clubNationalityMin: rules.clubNationalityMin,
-        });
       setDraft(null);
-      setGuidanceEdited(false);
       toast.success("Alineación guardada", {
         description: `${definition.label} · ${evaluation.starters.length} titulares verificados por el motor de reglas.`,
       });
@@ -365,59 +331,7 @@ export default function Formation({
         </p>
       </SectionCard>
 
-      <SectionCard title="Guión de formación" icon={Shirt} accent="pitch">
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
-              <span
-                className="size-2 rounded-full bg-primary/20"
-                aria-hidden="true"
-              />
-              Código de formación FC 27
-            </label>
-            <Input
-              value={fc27Code}
-              onChange={(event) => {
-                setFc27Code(event.target.value);
-                setGuidanceEdited(true);
-              }}
-              placeholder="ej. 4-2-3-1, 3-4-2-1, 4-1-2-1-2, 5-2-1-2…"
-              aria-label="Código de formación FC 27"
-              className="font-mono"
-            />
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              El código seleccionado se enlaza con el catálogo de formaciones
-              para generar un XI siempre legal. El estado real lo valida el
-              motor de reglas.
-            </p>
-          </div>
-          <div>
-            <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold">
-              <span
-                className="size-2 rounded-full bg-primary/20"
-                aria-hidden="true"
-              />
-              Instrucciones adicionales
-            </label>
-            <textarea
-              value={instructions}
-              onChange={(event) => {
-                setInstructions(event.target.value);
-                setGuidanceEdited(true);
-              }}
-              rows={4}
-              placeholder="Ej: cambios en los minutos 60-75, base 4-2-3-1 con delanteros más anchos, bloquear mediocentro…"
-              aria-label="Instrucciones adicionales de formación"
-              className="resize-y min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50"
-            />
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              Cambios, rango de minutos, bloqueos de posiciones… El presidente
-              los anota aquí y queda registrada en la config de reglas del
-              torneo.
-            </p>
-          </div>
-        </div>
-      </SectionCard>
+      <SquadTactics key={state.club.id} clubId={state.club.id} />
 
       <div className="grid gap-5 xl:grid-cols-3">
         <div className="flex flex-col gap-5 xl:col-span-2">

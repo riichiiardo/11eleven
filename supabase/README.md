@@ -225,3 +225,7 @@ fallida conserva la anterior o muestra iniciales. El rostro mantiene su borde
 circular y los overlays existentes de valoración y capitán.
 
 Las importaciones completas guardan la cabecera del respaldo en `app.pool_import_snapshots`. Si `format = rows`, las fichas anteriores completas se conservan por separado en `app.pool_import_player_snapshots` (`job`, `player_id`, `record`); `players` en la cabecera queda vacío. Los respaldos anteriores con `format = json` mantienen sus jugadores en la cabecera. Las plantillas y sus asignaciones se conservan en `squads` y `squad_players` de la cabecera en ambos formatos. Estas tablas son privadas, sin acceso desde el cliente.
+
+### Código táctico por equipo
+
+Instalar `squad-tactics.sql` después de `schema.sql` y `rpc.sql`. Guarda el código de importación de FC 27 y las instrucciones en la plantilla del presidente; es independiente de `squads.formation`, del once y de las reglas generales. Las RPC comprueban propiedad y universo activo. El formulario tiene su propio botón Guardar, también disponible con un once incompleto y sin permisos de administrador. Los códigos antiguos de reglas no se copian porque representaban esquemas, no códigos de importación.

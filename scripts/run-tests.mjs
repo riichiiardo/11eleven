@@ -17,6 +17,7 @@ const suites = [
   ["scripts/verify-competition-archive.mjs"],
   ["scripts/verify-player-pool.mjs"],
   ["scripts/verify-player-images.mjs"],
+  ["scripts/verify-squad-tactics.mjs"],
 ];
 
 for (const args of suites) {
