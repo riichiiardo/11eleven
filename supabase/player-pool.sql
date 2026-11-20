@@ -21,6 +21,12 @@ create table if not exists app.pool_import_snapshots(
  job uuid primary key references app.pool_imports(id),recorded_at timestamptz not null default now(),
  players jsonb not null,squad_players jsonb not null,squads jsonb not null
 );
+alter table app.pool_import_snapshots add column if not exists format text not null default 'json';
+create table if not exists app.pool_import_player_snapshots(
+ job uuid not null references app.pool_import_snapshots(job),player_id uuid not null,record jsonb not null,primary key(job,player_id)
+);
+alter table app.pool_import_player_snapshots enable row level security;
+revoke all on app.pool_import_player_snapshots from public,anon,authenticated;
 alter table app.pool_import_snapshots enable row level security;
 revoke all on app.pool_import_snapshots from public,anon,authenticated;
 alter table app.pool_imports enable row level security;
@@ -107,10 +113,11 @@ begin
  if v_job.status='applied' then return v_job.summary;end if;
  if (select count(*) from app.pool_import_rows where job=p_job)<>v_job.expected then raise exception 'Faltan lotes por cargar.';end if;
  lock table public.players in share row exclusive mode;
- insert into app.pool_import_snapshots(job,players,squad_players,squads)
- select p_job,(select coalesce(jsonb_agg(to_jsonb(p)),'[]') from public.players p),
+ insert into app.pool_import_snapshots(job,format,players,squad_players,squads)
+ select p_job,'rows','[]'::jsonb,
  (select coalesce(jsonb_agg(to_jsonb(sp)),'[]') from public.squad_players sp),
  (select coalesce(jsonb_agg(to_jsonb(s)),'[]') from public.squads s);
+ insert into app.pool_import_player_snapshots(job,player_id,record) select p_job,p.id,to_jsonb(p) from public.players p;
  create temporary table pool_import_resolution on commit drop as
  with incoming as materialized (
  select r.*,count(*) over(partition by lower(btrim(payload->>'name')),lower(btrim(payload->>'nationality'))) identity_count
