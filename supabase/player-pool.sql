@@ -21,6 +21,12 @@ create table if not exists app.pool_import_snapshots(
  job uuid primary key references app.pool_imports(id),recorded_at timestamptz not null default now(),
  players jsonb not null,squad_players jsonb not null,squads jsonb not null
 );
+alter table app.pool_import_snapshots add column if not exists format text not null default 'json';
+create table if not exists app.pool_import_player_snapshots(
+ job uuid not null references app.pool_import_snapshots(job),player_id uuid not null,record jsonb not null,primary key(job,player_id)
+);
+alter table app.pool_import_player_snapshots enable row level security;
+revoke all on app.pool_import_player_snapshots from public,anon,authenticated;
 alter table app.pool_import_snapshots enable row level security;
 revoke all on app.pool_import_snapshots from public,anon,authenticated;
 alter table app.pool_imports enable row level security;
@@ -97,7 +103,7 @@ begin
 end$$;
 
 create or replace function public.pool_import_finish(p_job uuid) returns jsonb
-language plpgsql security definer set search_path='' set statement_timeout='55s' as $$
+language plpgsql security definer set search_path='' set statement_timeout='55s' set enable_nestloop=off as $$
 declare v_job app.pool_imports%rowtype;new_count integer;updated_count integer;result jsonb;
 begin
  perform app.require_pool_admin();
@@ -107,30 +113,32 @@ begin
  if v_job.status='applied' then return v_job.summary;end if;
  if (select count(*) from app.pool_import_rows where job=p_job)<>v_job.expected then raise exception 'Faltan lotes por cargar.';end if;
  lock table public.players in share row exclusive mode;
- insert into app.pool_import_snapshots(job,players,squad_players,squads)
- select p_job,(select coalesce(jsonb_agg(to_jsonb(p)),'[]') from public.players p),
+ insert into app.pool_import_snapshots(job,format,players,squad_players,squads)
+ select p_job,'rows','[]'::jsonb,
  (select coalesce(jsonb_agg(to_jsonb(sp)),'[]') from public.squad_players sp),
  (select coalesce(jsonb_agg(to_jsonb(s)),'[]') from public.squads s);
+ insert into app.pool_import_player_snapshots(job,player_id,record) select p_job,p.id,to_jsonb(p) from public.players p;
  create temporary table pool_import_resolution on commit drop as
- with incoming as (
+ with incoming as materialized (
  select r.*,count(*) over(partition by lower(btrim(payload->>'name')),lower(btrim(payload->>'nationality'))) identity_count
  from app.pool_import_rows r where r.job=p_job
+ ), legacy_identity as materialized (
+ select lower(btrim(name)) name,lower(btrim(nationality)) nationality,count(*) total,(array_agg(id))[1] id
+ from public.players where sofifa_id is null group by 1,2
  )
  select r.row_no,r.payload,
   coalesce(identified.id,explicit.id,case when names.total=1 then names.id end,gen_random_uuid()) player_id,
-  identified.id is null and explicit.id is null and names.total<>1 is_new,
-  case when identified.id is not null or explicit.id is not null then 0 else names.total end ambiguous,
+  identified.id is null and explicit.id is null and coalesce(names.total,0)<>1 is_new,
+  case when identified.id is not null or explicit.id is not null then 0 else coalesce(names.total,0) end ambiguous,
   nullif(r.payload->>'poolId','') is not null and coalesce(identified.id,explicit.id) is distinct from (r.payload->>'poolId')::uuid invalid_id
  from incoming r
  left join public.players identified on identified.sofifa_id=(r.payload->>'sourceId')::bigint
  left join public.players explicit on explicit.id=nullif(r.payload->>'poolId','')::uuid and explicit.sofifa_id is null
- cross join lateral(
-  select count(*) total,(array_agg(p.id))[1] id from public.players p
-  where r.identity_count=1 and p.sofifa_id is null and lower(btrim(p.name))=lower(btrim(r.payload->>'name')) and lower(btrim(p.nationality))=lower(btrim(r.payload->>'nationality'))
- ) names where r.job=p_job;
+ left join legacy_identity names on r.identity_count=1 and names.name=lower(btrim(r.payload->>'name')) and names.nationality=lower(btrim(r.payload->>'nationality')) where r.job=p_job;
  if exists(select 1 from pg_temp.pool_import_resolution where invalid_id) then raise exception 'Hay un ID Pool inválido o asociado a otro ID SoFIFA.';end if;
  if exists(select 1 from pg_temp.pool_import_resolution group by player_id having count(*)>1) then raise exception 'Dos filas identifican la misma ficha del pool.';end if;
  create unique index on pg_temp.pool_import_resolution(player_id);
+ analyze pg_temp.pool_import_resolution;
  select count(*) filter(where is_new),count(*) filter(where not is_new) into new_count,updated_count from pg_temp.pool_import_resolution;
  update public.players p set
   sofifa_id=(r.payload->>'sourceId')::bigint,name=r.payload->>'name',position=r.payload->>'position',"group"=r.payload->>'group',

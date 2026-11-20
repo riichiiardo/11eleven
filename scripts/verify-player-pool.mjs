@@ -310,6 +310,10 @@ try {
     assert.equal(again.inserted, 0);
     assert.equal(again.updated, all.length);
     await db.exec("reset role");
+    assert.equal((await db.query("select format from app.pool_import_snapshots where job=$1",[replay])).rows[0].format,"rows");
+    assert.equal((await db.query("select count(*) n from app.pool_import_player_snapshots where job=$1",[replay])).rows[0].n,(await db.query("select count(*) n from public.players")).rows[0].n);
+    assert.equal((await db.query("select count(*) n from app.pool_import_player_snapshots s join public.players p on p.id=s.player_id where s.job=$1 and (s.record->>'sofifa_id')::bigint is distinct from p.sofifa_id",[replay])).rows[0].n,0);
+    await db.exec("reset role");
     assert.equal(
       (
         await db.query(

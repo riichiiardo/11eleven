@@ -23,19 +23,39 @@ revoke all on function app.mirror_player_portrait() from public,anon,authenticat
 drop trigger if exists mirror_player_portrait on public.players;
 create trigger mirror_player_portrait before insert or update of "Imagen_URL",photo on public.players for each row execute function app.mirror_player_portrait();
 
-create or replace function app.enqueue_player_portrait() returns trigger language plpgsql security invoker set search_path='' as $$
-declare link text:=nullif(new.source_record->>'imageUrl','');parts text[];
+create or replace function app.enqueue_portrait_batch(p_rows jsonb) returns void language plpgsql security invoker set search_path='' as $$
 begin
- if link is null then return new;end if;
- parts:=regexp_match(link,'^https://cdn\.sofifa\.net/players/([0-9]{3})/([0-9]{3})/[0-9]+_(60|120|240)\.png$');
- if parts is null or new.sofifa_id is null or (parts[1]||parts[2])::bigint<>new.sofifa_id then raise exception 'Imagen_URL no corresponde al ID de SoFIFA.';end if;
- insert into app.player_image_jobs(player_id,source_url)values(new.id,link)
+ if p_rows is null then return;end if;
+ if exists(select 1 from jsonb_to_recordset(p_rows) x(id uuid,sofifa_id bigint,url text)
+ where x.url !~ '^https://cdn\.sofifa\.net/players/[0-9]{3}/[0-9]{3}/[0-9]+_(60|120|240)\.png$'
+ or x.sofifa_id is null or x.sofifa_id not between 1 and 999999 or regexp_replace(split_part(x.url,'/players/',2),'/.*$','')||split_part(split_part(x.url,'/players/',2),'/',2) <> lpad(x.sofifa_id::text,6,'0')) then raise exception 'Imagen_URL no corresponde al ID de SoFIFA.';end if;
+ insert into app.player_image_jobs(player_id,source_url)
+ select id,url from jsonb_to_recordset(p_rows) x(id uuid,sofifa_id bigint,url text)
  on conflict(player_id)do update set source_url=excluded.source_url,status='pending',attempts=0,lease=null,locked_at=null,last_error=null,updated_at=now();
- return new;
+end$$;
+revoke all on function app.enqueue_portrait_batch(jsonb) from public,anon,authenticated;
+
+create or replace function app.enqueue_player_portrait() returns trigger language plpgsql security invoker set search_path='' as $$
+declare rows jsonb; previous jsonb;
+begin
+ if tg_op='INSERT' then
+  select jsonb_agg(jsonb_build_object('id',n.id,'sofifa_id',n.sofifa_id,'url',n.source_record->>'imageUrl')) into rows
+  from portrait_new n where nullif(n.source_record->>'imageUrl','') is not null;
+ else
+  select jsonb_object_agg(o.id::text,jsonb_build_object('record',o.source_record,'sofifa_id',o.sofifa_id)) into previous from portrait_old o;
+  select jsonb_agg(jsonb_build_object('id',n.id,'sofifa_id',n.sofifa_id,'url',n.source_record->>'imageUrl')) into rows
+  from portrait_new n
+  where nullif(n.source_record->>'imageUrl','') is not null and (n.source_record is distinct from previous->n.id::text->'record' or to_jsonb(n.sofifa_id) is distinct from previous->n.id::text->'sofifa_id');
+ end if;
+ perform app.enqueue_portrait_batch(rows);
+ return null;
 end$$;
 revoke all on function app.enqueue_player_portrait() from public,anon,authenticated;
 drop trigger if exists enqueue_player_portrait on public.players;
-create trigger enqueue_player_portrait after insert or update of source_record on public.players for each row execute function app.enqueue_player_portrait();
+drop trigger if exists enqueue_player_portrait_insert on public.players;
+drop trigger if exists enqueue_player_portrait_update on public.players;
+create trigger enqueue_player_portrait_insert after insert on public.players referencing new table as portrait_new for each statement execute function app.enqueue_player_portrait();
+create trigger enqueue_player_portrait_update after update on public.players referencing new table as portrait_new old table as portrait_old for each statement execute function app.enqueue_player_portrait();
 
 create or replace function public.player_images_status() returns jsonb language plpgsql stable security definer set search_path='' as $$
 begin

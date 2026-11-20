@@ -223,3 +223,5 @@ Administración → Catálogo muestra guardadas, pendientes, en proceso y errore
 permite comprobar una foto antes de importar y reintentar descargas. Una foto
 fallida conserva la anterior o muestra iniciales. El rostro mantiene su borde
 circular y los overlays existentes de valoración y capitán.
+
+Las importaciones completas guardan la cabecera del respaldo en `app.pool_import_snapshots`. Si `format = rows`, las fichas anteriores completas se conservan por separado en `app.pool_import_player_snapshots` (`job`, `player_id`, `record`); `players` en la cabecera queda vacío. Los respaldos anteriores con `format = json` mantienen sus jugadores en la cabecera. Las plantillas y sus asignaciones se conservan en `squads` y `squad_players` de la cabecera en ambos formatos. Estas tablas son privadas, sin acceso desde el cliente.
