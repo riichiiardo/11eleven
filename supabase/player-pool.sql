@@ -97,7 +97,7 @@ begin
 end$$;
 
 create or replace function public.pool_import_finish(p_job uuid) returns jsonb
-language plpgsql security definer set search_path='' set statement_timeout='55s' as $$
+language plpgsql security definer set search_path='' set statement_timeout='55s' set enable_nestloop=off as $$
 declare v_job app.pool_imports%rowtype;new_count integer;updated_count integer;result jsonb;
 begin
  perform app.require_pool_admin();
