@@ -29,7 +29,7 @@ export async function downloadPortrait(
     });
     if (response.status === 403 || response.status === 429)
       throw new SourceBlocked(
-        `El CDN de SoFIFA rechazó la descarga (HTTP ${response.status}). No se intentará eludir el bloqueo.`,
+        `El CDN de SoFIFA rechazó la descarga (HTTP ${response.status}). Puedes reintentar más tarde.`,
       );
     if (response.status === 404) continue;
     if (!response.ok)
