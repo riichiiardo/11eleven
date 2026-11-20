@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { rpc } from "@/infrastructure/supabase/client";
+import { rpc, supabase } from "@/infrastructure/supabase/client";
 import { parsePoolCsv, type PoolImportRow } from "@/domain/player-pool";
 import { SectionCard } from "@/components/eleven/SectionCard";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,26 @@ type Status = {
   pending: Player[];
   candidates: Player[];
 };
+type ImageStatus = {
+  pending: number;
+  processing: number;
+  ready: number;
+  error: number;
+  lastError: string | null;
+};
+type ImageResult = {
+  ready: number;
+  errors: number;
+  blocked: boolean;
+  lastError: string | null;
+  ok?: boolean;
+  error?: string;
+};
 type ImportSummary = { total: number; inserted: number; updated: number };
 export function CatalogPanel() {
+  const [images, setImages] = useState<ImageStatus | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageNotice, setImageNotice] = useState("");
   const [status, setStatus] = useState<Status | null>(null),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
@@ -38,11 +56,16 @@ export function CatalogPanel() {
   const reload = async () => {
     const next = await rpc<Status>("pool_status");
     setStatus(next);
+    setImages(await rpc<ImageStatus>("player_images_status"));
   };
   useEffect(() => {
     let active = true;
-    rpc<Status>("pool_status")
-      .then((next) => {
+    Promise.all([
+      rpc<Status>("pool_status"),
+      rpc<ImageStatus>("player_images_status"),
+    ])
+      .then(([next, nextImages]) => {
+        if (active) setImages(nextImages);
         if (active) setStatus(next);
       })
       .catch((e) => {
@@ -95,11 +118,73 @@ export function CatalogPanel() {
       setRows([]);
       setConfirm(false);
       await reload();
+      if (rows.some((row) => row.imageUrl)) await processImages();
     } catch (e) {
       fail(e);
     } finally {
       setBusy(false);
       setProgress("");
+    }
+  };
+  const processImages = async () => {
+    setImageBusy(true);
+    setError("");
+    setImageNotice("");
+    try {
+      await rpc("player_images_retry");
+      while (true) {
+        const current = await rpc<ImageStatus>("player_images_status");
+        setImages(current);
+        if (!current.pending) break;
+        setImageNotice(
+          `${current.ready} rostros guardados · ${current.pending} pendientes`,
+        );
+        const result = await supabase.functions.invoke<ImageResult>(
+          "player-portraits",
+          { body: {} },
+        );
+        if (result.error || result.data?.error)
+          throw Error(
+            result.data?.error ?? result.error?.message ?? "Error de imágenes.",
+          );
+        if (result.data?.blocked) {
+          setImageNotice(
+            result.data.lastError ??
+              "El origen bloqueó la descarga. Puedes reintentar más tarde.",
+          );
+          break;
+        }
+        if (!result.data || (!result.data.ready && !result.data.errors)) break;
+      }
+      setImages(await rpc<ImageStatus>("player_images_status"));
+    } catch (e) {
+      fail(e);
+    } finally {
+      setImageBusy(false);
+    }
+  };
+  const probeImage = async () => {
+    const sample = rows.find((row) => row.imageUrl);
+    if (!sample) return;
+    setImageBusy(true);
+    setError("");
+    try {
+      const result = await supabase.functions.invoke<ImageResult>(
+        "player-portraits",
+        {
+          body: { probe: { url: sample.imageUrl, sofifaId: sample.sourceId } },
+        },
+      );
+      if (result.error) throw result.error;
+      setImageNotice(
+        result.data?.ok
+          ? "El servidor puede descargar la foto. Listo para importar."
+          : (result.data?.error ?? "No se pudo descargar la foto."),
+      );
+    } catch (e) {
+      fail(e);
+    } finally {
+      setImageBusy(false);
     }
   };
   const find = async () => {
@@ -177,7 +262,7 @@ export function CatalogPanel() {
             <Input
               type="file"
               accept=".csv,text/csv"
-              disabled={busy}
+              disabled={busy || imageBusy}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 setRows([]);
@@ -204,14 +289,62 @@ export function CatalogPanel() {
             <input
               type="checkbox"
               checked={confirm}
-              disabled={busy}
+              disabled={busy || imageBusy}
               onChange={(e) => setConfirm(e.target.checked)}
             />
             Confirmo que este archivo contiene el pool completo a activar.
           </label>
-          <Button disabled={busy || !rows.length || !confirm} onClick={upload}>
+          <Button
+            disabled={busy || imageBusy || !rows.length || !confirm}
+            onClick={upload}
+          >
             {busy ? progress || "Procesando…" : "Actualizar pool completo"}
           </Button>
+        </div>
+        <div className="space-y-3 rounded-xl border p-4">
+          <h3 className="font-semibold">Rostros de jugadores</h3>
+          <p className="text-sm text-muted-foreground">
+            La columna opcional Imagen_URL se descarga a Supabase. Se intenta
+            240 px y se conserva 120 px si no existe. Las fotos faltantes
+            mantienen las iniciales; una descarga fallida no borra una foto
+            guardada.
+          </p>
+          {images && (
+            <p>
+              {images.ready} guardados · {images.pending} pendientes ·{" "}
+              {images.processing} en proceso · {images.error} con error
+            </p>
+          )}
+          {imageNotice && (
+            <p role="status" className="rounded-lg border p-3 text-sm">
+              {imageNotice}
+            </p>
+          )}
+          {images?.lastError && (
+            <p className="text-sm text-destructive">{images.lastError}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={probeImage}
+              disabled={busy || imageBusy || !rows.some((row) => row.imageUrl)}
+            >
+              Probar una foto del archivo
+            </Button>
+            <Button
+              variant="outline"
+              onClick={processImages}
+              disabled={
+                busy ||
+                imageBusy ||
+                !images ||
+                !(images.pending + images.error + images.processing)
+              }
+            >
+              {imageBusy
+                ? "Procesando rostros…"
+                : "Descargar / reintentar rostros"}
+            </Button>
+          </div>
         </div>
         <div className="space-y-3 rounded-xl border p-4">
           <h3 className="font-semibold">Conciliar un jugador de un equipo</h3>
@@ -225,7 +358,7 @@ export function CatalogPanel() {
             <select
               aria-label="Jugador pendiente"
               className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 pr-10"
-              disabled={busy}
+              disabled={busy || imageBusy}
               value={preserve}
               onChange={(e) => {
                 setPreserve(e.target.value);
@@ -256,7 +389,7 @@ export function CatalogPanel() {
             <select
               aria-label="Ficha correcta del pool"
               className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 pr-10"
-              disabled={busy}
+              disabled={busy || imageBusy}
               value={source}
               onChange={(e) => {
                 setSource(e.target.value);
@@ -276,13 +409,15 @@ export function CatalogPanel() {
             <input
               type="checkbox"
               checked={manualConfirm}
-              disabled={busy}
+              disabled={busy || imageBusy}
               onChange={(e) => setManualConfirm(e.target.checked)}
             />
             Confirmo que ambas fichas corresponden al mismo jugador.
           </label>
           <Button
-            disabled={busy || !preserve || !source || !manualConfirm}
+            disabled={
+              busy || imageBusy || !preserve || !source || !manualConfirm
+            }
             onClick={reconcile}
           >
             Vincular ficha al jugador del equipo

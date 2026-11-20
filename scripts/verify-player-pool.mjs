@@ -54,7 +54,7 @@ const load = async (rows) => {
 };
 try {
   await db.exec(
-    "create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');create function auth.uid()returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claims',true)::jsonb->>'sub','')::uuid$$;create role authenticated;create role anon;grant usage on schema auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;",
+    "create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');create function auth.uid()returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claims',true)::jsonb->>'sub','')::uuid$$;create role authenticated;create role anon;create role service_role;grant usage on schema auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;",
   );
   for (const f of [
     "schema",
@@ -65,6 +65,7 @@ try {
     "club-budgets",
     "csv-catalog",
     "player-pool",
+    "player-images",
   ])
     await db.exec(readFileSync(`supabase/${f}.sql`, "utf8"));
   await db.exec(
@@ -184,6 +185,100 @@ try {
       ])
     ).rows[0].sofifa_id,
     null,
+  );
+  await login(1);
+  const portrait = "https://cdn.sofifa.net/players/000/200/27_120.png";
+  await load([{ ...player("200", "Portrait Player"), imageUrl: portrait }]);
+  assert.equal((await rpc("player_images_status")).pending, 1);
+  await assert.rejects(rpc("player_images_claim", [1]));
+  await login(2);
+  await assert.rejects(rpc("player_images_retry"));
+  await login(null, "service_role");
+  const claimed = await rpc("player_images_claim", [1]);
+  assert.equal(claimed.length, 1);
+  await rpc("player_images_complete", [
+    claimed[0].playerId,
+    claimed[0].lease,
+    null,
+    "HTTP 403",
+  ]);
+  await login(1);
+  assert.equal((await rpc("player_images_status")).error, 1);
+  await rpc("player_images_retry");
+  await login(null, "service_role");
+  const second = await rpc("player_images_claim", [1]);
+  const stored =
+    "https://usbchyviwsggqjbeqsit.supabase.co/storage/v1/object/public/player-faces/200/" +
+    "a".repeat(64) +
+    ".png";
+  assert.equal(
+    await rpc("player_images_complete", [
+      second[0].playerId,
+      second[0].lease,
+      stored,
+      null,
+    ]),
+    true,
+  );
+  await db.exec("reset role");
+  const photo = (
+    await db.query(
+      'select "Imagen_URL",photo from public.players where id=$1',
+      [id(50)],
+    )
+  ).rows[0];
+  assert.equal(photo.Imagen_URL, stored);
+  assert.equal(photo.photo, stored);
+  assert.equal(
+    (
+      await db.query(
+        "select public.squad_player_json(sp)->>'photo' photo from public.squad_players sp where player_id=$1",
+        [id(50)],
+      )
+    ).rows[0].photo,
+    stored,
+  );
+  await login(1);
+  await load([player("200", "Preserved Portrait")]);
+  await db.exec("reset role");
+  assert.equal(
+    (
+      await db.query('select "Imagen_URL" from public.players where id=$1', [
+        id(50),
+      ])
+    ).rows[0].Imagen_URL,
+    stored,
+  );
+  await login(1);
+  await load([{ ...player("200", "Portrait Player"), imageUrl: portrait }]);
+  await login(null, "service_role");
+  const stale = await rpc("player_images_claim", [1]);
+  await login(1);
+  await load([
+    {
+      ...player("200", "Portrait Player"),
+      imageUrl: portrait.replace("27_", "28_"),
+    },
+  ]);
+  await login(null, "service_role");
+  assert.equal(
+    await rpc("player_images_complete", [
+      stale[0].playerId,
+      stale[0].lease,
+      stored,
+      null,
+    ]),
+    false,
+  );
+  await login(1);
+  await assert.rejects(load([{ ...player("201"), imageUrl: portrait }]));
+  await db.exec("reset role");
+  assert.deepEqual(
+    (await db.query("select * from public.squad_players")).rows,
+    before,
+  );
+  console.log(
+    "PASS portrait SQL: image identity, admin-only retry, service-only claims, leases, failure preservation, canonical Imagen_URL/photo alias, absent-column compatibility and preserved ownership.",
   );
   if (process.env.POOL_CSV) {
     const all = parsePoolCsv(readFileSync(process.env.POOL_CSV, "utf8"));

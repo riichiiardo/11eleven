@@ -98,6 +98,38 @@ try {
         option.code,
       );
   }
+  const { PitchView } = await server.ssrLoadModule(
+    "/src/components/eleven/PitchView.tsx",
+  );
+  const portraitCode = "4-3-3 · FC27";
+  const portraitSlots = engine.FORMATIONS[portraitCode].slots;
+  const faces = portraitSlots.map((slot, index) => ({
+    playerId: `face-${index}`,
+    name: `Player ${index}`,
+    position: slot.label,
+    group: slot.group,
+    ovr: index === 1 ? 86 : index === 2 ? 85 : 83,
+    photo: `https://example.invalid/${index}.png`,
+    flag: "",
+  }));
+  const faceHtml = renderToString(
+    React.createElement(PitchView, {
+      formation: portraitCode,
+      lineup: {
+        formation: portraitCode,
+        slots: portraitSlots.map((slot, index) => ({
+          slotId: slot.id,
+          playerId: `face-${index}`,
+        })),
+      },
+      squad: faces,
+    }),
+  );
+  assert.equal((faceHtml.match(/border-radius:50%/g) || []).length, 11);
+  assert.ok(faceHtml.includes('src="https://example.invalid/0.png"'));
+  for (const rating of [83, 86, 85])
+    assert.ok(faceHtml.includes(String(rating)));
+  assert.ok(/>C<\//.test(faceHtml));
   const roles = (code) =>
     engine.FORMATIONS[code].slots.map((s) => s.role ?? s.label);
   assert.equal(

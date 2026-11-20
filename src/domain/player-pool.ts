@@ -1,5 +1,7 @@
+import { normalizePlayerImage } from "./player-image.ts";
 export type PoolImportRow = {
   sourceId: string;
+  imageUrl?: string;
   poolId?: string;
   name: string;
   nationality: string;
@@ -135,6 +137,7 @@ export function parsePoolCsv(text: string): PoolImportRow[] {
       throw Error(`ID Pool inválido en fila ${index + 2}.`);
     return {
       sourceId,
+      imageUrl: normalizePlayerImage(original.Imagen_URL ?? "", sourceId),
       poolId,
       name: original["Nombre y Apellido"],
       nationality: original.Nacionalidad,
