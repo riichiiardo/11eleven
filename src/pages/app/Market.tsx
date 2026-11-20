@@ -61,6 +61,7 @@ export default function Market() {
   const [group, setGroup] = useState<string>("todos");
   const [sort, setSort] = useState<string>("ovr");
   const [onlyAffordable, setOnlyAffordable] = useState(false);
+  const [advancedOffer, setAdvancedOffer] = useState(false);
   const [selected, setSelected] = useState<MarketPlayerView | null>(null);
 
   const marketOpen = state.tournament?.marketOpen ?? false;
@@ -289,7 +290,7 @@ export default function Market() {
                   bid={bidding.bids.find((b) => b.playerId === player.playerId)}
                   bidsReady={!bidding.loading && !bidding.error}
                   budgetAvailable={state.budget.available}
-                  onOffer={(target) => setSelected(target)}
+                  onOffer={(target) => { setAdvancedOffer(false); setSelected(target); }}
                   showDetail
                 />
               </li>
@@ -299,12 +300,13 @@ export default function Market() {
       </section>
 
       {selected &&
-      bidding.bids.some((b) => b.playerId === selected.playerId) ? (
+      !advancedOffer && bidding.bids.some((b) => b.playerId === selected.playerId) ? (
         <DepartureBidDialog
           key={selected.playerId}
           player={selected}
           bid={bidding.bids.find((b) => b.playerId === selected.playerId)!}
           onClose={() => setSelected(null)}
+          onChooseExchange={() => setAdvancedOffer(true)}
         />
       ) : selected ? (
         <OfferDialog

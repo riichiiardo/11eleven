@@ -277,6 +277,7 @@ export type OfferView = {
   offered: OfferPlayerLite[];
   canRespond: boolean;
   canCancel: boolean;
+  canCancelSale?: boolean;
   /** Why a reserved operation cannot execute right now. */
   blockers: string[];
   invalidReason: string | null;

@@ -15,10 +15,12 @@ export function DepartureBidDialog({
   player,
   bid,
   onClose,
+  onChooseExchange,
 }: {
   player: MarketPlayerView;
   bid: DepartureBid;
   onClose: () => void;
+  onChooseExchange?: () => void;
 }) {
   const [amount, setAmount] = useState(
     String(Math.max(bid.highestCash ?? 0, bid.myCash ?? 0) + 1),
@@ -97,8 +99,10 @@ export function DepartureBidDialog({
           tuya debes superar tu importe anterior. La oferta no evita la
           rescisión hasta que sea aceptada o reservada.
         </p>
+        {bid.closed ? <p className="text-sm">Hay un acuerdo reservado. Puedes enviar otra propuesta; el propietario debe cancelar la venta anterior antes de aprobar una nueva.</p> : null}
+        {onChooseExchange ? <Button variant="outline" disabled={busy} onClick={onChooseExchange}>Proponer intercambio con o sin dinero</Button> : null}
         <div className="flex gap-2">
-          <Button disabled={busy || bid.closed} onClick={() => void send()}>
+          <Button disabled={busy} onClick={() => void send()}>
             {busy
               ? "Enviando…"
               : bid.myCash != null

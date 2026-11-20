@@ -20,6 +20,7 @@ const suites = [
   ["scripts/verify-squad-tactics.mjs"],
   ["scripts/verify-squad-availability.mjs"],
   ["scripts/verify-sold-players.mjs"],
+  ["scripts/verify-transfer-modes.mjs"],
 ];
 
 for (const args of suites) {

@@ -242,8 +242,9 @@ function resolveRead(
         adaptAdminOverview,
       );
     case "market.validateOffer":
+      return rpc("transfer_offer_check", { p_offer_id: args?.offerId });
     case "market.guidance":
-      return Promise.resolve(null);
+      return rpc("transfer_quote", { p_requested: args?.requestedPlayerIds ?? [], p_offered: args?.offeredPlayerIds ?? [], p_cash: args?.cash ?? 0 });
     default:
       return Promise.reject(new Error(`Lectura no soportada: ${ref}`));
   }
@@ -457,7 +458,7 @@ function resolveMutation(
         return { lineup: filled };
       },
       "market.createOffer": (a) =>
-        rpc<string>("create_offer", {
+        rpc("create_transfer", {
           p_type:
             a.type ??
             (Array.isArray(a.offeredPlayerIds) && a.offeredPlayerIds.length > 0

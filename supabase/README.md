@@ -22,6 +22,7 @@ Aplica los scripts en este orden, después de revisar el destino y sus permisos:
 13. `market-draft-availability.sql`
 14. `squad-tactics.sql`
 15. `market-sold.sql`
+16. `transfer-modes.sql`
 
 No hay un seed alternativo de equipos. El catálogo se carga desde la fuente
 configurada por sincronización explícita. `catalog.sql` configura staging
@@ -251,3 +252,13 @@ El propietario elige una negociación activa del mismo universo, también cuando
 Cancelar o finalizar la negociación elimina la etiqueta; cambiar normalmente la disponibilidad borra el destino, y un cambio de propietario deja al nuevo dueño el jugador neutro. Los lectores JSON conservan compatibilidad con clientes antiguos: `availability` se entrega como `intransferible`, acompañado de `saleStatus: vendido` y los campos `soldToClubId` y `soldToClubName`; el cliente actual los normaliza al estado Vendido.
 
 Verificación aislada: `node scripts/verify-sold-players.mjs`. Prueba visual sin datos reales: `node scripts/preview-market-draft.mjs`.
+
+## Modalidades y aprobación de traspasos
+
+Aplicar `transfer-modes.sql` después de `market-sold.sql` antes de publicar el frontend. Las operaciones se guardan como efectivo (`cash`) o intercambio (`trade`), y su motivo se deduce sin duplicar la fuente: libre sin vendedor, compra a otro equipo, intercambio 1 a 1 con 0 €, o intercambio 1 a 1 con importe adicional positivo. Las prelistas conservan `transferMode` y `offeredPlayerId`; la revisión administrativa de una prelista no sustituye la aprobación del propietario.
+
+`create_transfer` cobra el valor exacto actual del libre y registra las otras solicitudes pendientes. `respond_offer` exige al propietario del universo activo para aprobar y reserva el acuerdo. Solo Administración ejecuta los reservados; mueve ambos lados del intercambio y el dinero una vez y limpia las alineaciones afectadas. Las ofertas alternativas se conservan hasta que se ejecuta un acuerdo; no existe adjudicación automática al mayor importe.
+
+El propietario puede cancelar una venta aprobada mediante `cancel_sale`, seleccionando una propuesta activa de otro manager por el mismo jugador y explicando por qué la considera mejor. Se verifica presupuesto y propiedad de la alternativa. Esto solo cancela la venta anterior: la nueva requiere aprobación separada. El comprador puede retirar una propuesta pendiente, pero no una compra ya aprobada. Una operación ejecutada no admite esta cancelación. No se reactivan ofertas invalidadas antes de esta mejora.
+
+Pruebas aisladas: `node scripts/verify-transfer-modes.mjs`; formulario con datos ficticios: `node scripts/preview-transfer-modes.mjs`. Ninguna de estas pruebas modifica producción.

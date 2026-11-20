@@ -28,7 +28,7 @@ import { useQuery } from "@/services/backend/react";
 import { ArrowLeftRight, BadgeEuro, Coins, Loader2, Send, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Mode = "cash" | "trade";
+type Mode = "cash" | "trade" | "trade_cash";
 
 /**
  * The offer builder. It never waits for "Guardar" to validate: the same rule
@@ -54,14 +54,14 @@ export function OfferDialog({
   const [mode, setMode] = useState<Mode>("cash");
   const [offeredId, setOfferedId] = useState<string>("");
   const [cashInput, setCashInput] = useState(() =>
-    player.kind === "libre" ? (player.value / 1_000_000).toFixed(1) : "0",
+    player.kind === "libre" ? String(player.value) : "0",
   );
   const [message, setMessage] = useState("");
 
-  const cash = Math.max(0, Math.round((Number(cashInput) || 0) * 1_000_000));
+  const cash = isFree ? player.value : mode === "trade" ? 0 : Math.max(0, Math.round(Number(cashInput) || 0));
   const offeredPlayerIds = useMemo<Id<"players">[]>(
     () =>
-      mode === "trade" && offeredId
+      mode !== "cash" && offeredId
         ? [offeredId as Id<"players">]
         : [],
     [mode, offeredId],
@@ -78,9 +78,9 @@ export function OfferDialog({
       : "skip",
   );
 
-  const tradeNeedsPlayer = mode === "trade" && offeredPlayerIds.length === 0;
+  const tradeNeedsPlayer = mode !== "cash" && offeredPlayerIds.length === 0;
   const blocked = guidance ? !guidance.passed : true;
-  const canSubmit = !blocked && !tradeNeedsPlayer && busyKey !== "crear";
+  const canSubmit = !blocked && !tradeNeedsPlayer && (isFree || mode === "trade" || cash > 0) && busyKey !== "crear";
   const committedInOffers = guidance
     ? Math.max(0, budget.available - guidance.spendable)
     : 0;
@@ -160,22 +160,23 @@ export function OfferDialog({
               <ModeButton
                 active={mode === "cash"}
                 icon={BadgeEuro}
-                title="Solo dinero"
+                title="Compra a otro equipo"
                 description="Ofreces presupuesto al club de este jugador."
                 onClick={() => setMode("cash")}
               />
               <ModeButton
                 active={mode === "trade"}
                 icon={ArrowLeftRight}
-                title="Intercambio"
-                description="Ofreces un jugador de tu plantilla, con o sin dinero."
-                onClick={() => setMode("trade")}
+                title="Intercambio 1 a 1"
+                description="Un jugador por otro, sin dinero de por medio."
+                onClick={() => { setMode("trade"); setCashInput("0"); }}
               />
+              <ModeButton active={mode === "trade_cash"} icon={Coins} title="Intercambio 1 a 1 + dinero" description="Entregas un jugador y un importe adicional al otro manager." onClick={() => { setMode("trade_cash"); setCashInput("0"); }} />
             </div>
           </div>
-        ) : null}
+        ) : <p className="text-sm font-semibold">Motivo: Jugador libre · pago de su valor actual</p>}
 
-        {mode === "trade" ? (
+        {mode !== "cash" ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor="offer-player">Jugador que ofreces</Label>
             <Select value={offeredId} onValueChange={setOfferedId}>
@@ -192,9 +193,9 @@ export function OfferDialog({
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground">
-              Ofrecer un jugador libera una plaza y su valor deja de contar en tu
-              plantilla; el motor comprueba los cupos en ambos clubes antes de
-              aceptar la operación.
+              El jugador sigue en tu plantilla hasta la ejecución. El propietario
+              debe aprobar el intercambio; Administración ejecuta el acuerdo
+              cuando abre la ventana.
             </p>
           </div>
         ) : null}
@@ -202,7 +203,7 @@ export function OfferDialog({
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="offer-cash">
-              {isFree ? "Coste de firma (M€)" : "Dinero añadido (M€)"}
+              {isFree ? "Valor actual (€)" : mode === "cash" ? "Precio propuesto al propietario (€)" : "Dinero adicional que entregarás (€)"}
             </Label>
             <div className="relative">
               <Coins
@@ -213,10 +214,10 @@ export function OfferDialog({
                 id="offer-cash"
                 type="number"
                 min={0}
-                step={0.5}
+                step={1}
                 inputMode="decimal"
-                value={cashInput}
-                disabled={isFree}
+                value={mode === "trade" ? "0" : cashInput}
+                disabled={isFree || mode === "trade"}
                 aria-describedby={isFree ? "offer-cash-hint" : undefined}
                 onChange={(event) => setCashInput(event.target.value)}
                 className="num h-11 w-full rounded-lg border bg-card pl-9 pr-3 text-sm font-semibold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted"
@@ -251,7 +252,7 @@ export function OfferDialog({
 
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Validación del motor de reglas
+            Comprobaciones de la solicitud
           </p>
           {!guidance ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -282,7 +283,7 @@ export function OfferDialog({
             <span>
               {guidance.passed
                 ? isFree
-                  ? "La operación cumple el reglamento: si el mercado está abierto se ejecuta de inmediato; si no, queda reservada."
+                  ? "La solicitud supera las comprobaciones iniciales. La propiedad y el presupuesto se verifican de nuevo al confirmar."
                   : `Oferta lista para enviar a ${guidance.sellerClubName ?? "el club"}. El acuerdo se reserva y se valida otra vez antes de ejecutarse.`
                 : guidance.blockers[0]}
             </span>

@@ -1,3 +1,4 @@
+import { TRANSFER_MODES } from "@/domain/transfer-modes";
 import { useEffect, useState } from "react";
 import { rpc } from "@/infrastructure/supabase/client";
 import {
@@ -25,6 +26,8 @@ export function DraftPrelist() {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [kind, setKind] = useState<"owned" | "new">("owned");
+  const [transferMode, setTransferMode] = useState<"purchase" | "exchange" | "exchange_cash">("purchase");
+  const [offeredPlayerId, setOfferedPlayerId] = useState("");
   const [clubId, setClubId] = useState("");
   const [playerId, setPlayerId] = useState("");
   const [price, setPrice] = useState("");
@@ -61,6 +64,8 @@ export function DraftPrelist() {
     JSON.stringify([data?.entries, data?.outgoing]) !==
     JSON.stringify([saved?.entries, saved?.outgoing]);
   const resetForm = () => {
+    setTransferMode("purchase");
+    setOfferedPlayerId("");
     setEditingId(null);
     setPlayerId("");
     setPrice("");
@@ -95,9 +100,10 @@ export function DraftPrelist() {
     if (!data) return;
     const parsed = prelistEntrySchema.safeParse(
       kind === "owned"
-        ? { kind, clubId, playerId, price: Number(price), sofifaUrl }
+        ? { kind, clubId, playerId, price: transferMode === "exchange" ? 0 : Number(price), sofifaUrl, transferMode, ...(transferMode !== "purchase" ? {offeredPlayerId} : {}) }
         : {
             kind,
+            transferMode: "free",
             name,
             price: Number(price),
             ovr: Number(ovr),
@@ -124,8 +130,9 @@ export function DraftPrelist() {
       const entries = editingId
         ? data.entries.map((e) => (e.id === editingId ? item : e))
         : [...data.entries, item];
-      validatePrelist(entries, data.outgoing, data.limit);
-      setData({ ...data, entries });
+      const outgoing = kind === "owned" && transferMode !== "purchase" ? [...new Set([...data.outgoing, offeredPlayerId])] : data.outgoing;
+      validatePrelist(entries, outgoing, data.limit);
+      setData({ ...data, entries, outgoing });
       setError("");
       setNotice("");
       resetForm();
@@ -168,7 +175,7 @@ export function DraftPrelist() {
     <SectionCard title="Mi prelista del draft" icon={ClipboardList}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Las altas son privadas para tu presidencia y sus revisores. Las bajas
+          La prelista expresa una intención; la aprobación del administrador no sustituye la aceptación del propietario en Negociaciones. Las altas son privadas para tu presidencia y sus revisores. Las bajas
           se publican como transferibles al guardar. Su rescisión se procesa en
           la primera apertura del draft, si no hay un acuerdo aceptado o
           reservado.
@@ -218,6 +225,10 @@ export function DraftPrelist() {
                     <option value="new">Jugador nuevo</option>
                   </select>
                 </label>
+                {kind === "owned" ? <>
+                  <label className="space-y-1">Motivo del ingreso<select className={selectClass} value={transferMode} onChange={e=>{setTransferMode(e.target.value as typeof transferMode);setPrice("");}}>{(["purchase","exchange","exchange_cash"] as const).map(mode=><option key={mode} value={mode}>{TRANSFER_MODES[mode]}</option>)}</select></label>
+                  {transferMode !== "purchase" ? <label className="space-y-1">Jugador propio que entregarás (baja)<select className={selectClass} value={offeredPlayerId} onChange={e=>setOfferedPlayerId(e.target.value)}><option value="">Selecciona tu jugador</option>{data.ownPlayers.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>:null}
+                </> : <p>Motivo del ingreso: Jugador libre. Propuesta pendiente de revisión; no registra un fichaje.</p>}
                 {kind === "owned" ? (
                   <>
                     <label className="space-y-1">
@@ -342,13 +353,14 @@ export function DraftPrelist() {
                   />
                 </label>
                 <label className="space-y-1">
-                  Precio de adquisición (€)
+                  {kind === "owned" && transferMode !== "purchase" ? "Dinero adicional que entregarás (€)" : "Precio de adquisición (€)"}
                   <Input
                     type="number"
-                    min="0.01"
+                    min={kind === "owned" && transferMode === "exchange" ? "0" : "0.01"}
+                    disabled={kind === "owned" && transferMode === "exchange"}
                     max="2000000000"
                     step="0.01"
-                    value={price}
+                    value={kind === "owned" && transferMode === "exchange" ? "0" : price}
                     onChange={(e) => setPrice(e.target.value)}
                   />
                 </label>
@@ -382,7 +394,8 @@ export function DraftPrelist() {
                           ? entry.name
                           : (existing?.name ??
                             "Jugador ya no disponible: elimina o revisa esta selección")}{" "}
-                        · {formatMoney(entry.price)}
+                        · {TRANSFER_MODES[entry.transferMode ?? (entry.kind === "new" ? "free" : "purchase")]} · {formatMoney(entry.price)}
+                        {entry.kind === "owned" && entry.offeredPlayerId ? <p className="text-sm">Sale por intercambio: {data.ownPlayers.find(p=>p.id===entry.offeredPlayerId)?.name ?? "Jugador ya no disponible"}</p> : null}
                         <p className="text-sm text-muted-foreground">
                           {entry.kind === "new"
                             ? `${entry.nationality} · ${entry.positions.join(" / ")} · Media ${entry.ovr} · Datos propuestos`
@@ -418,6 +431,8 @@ export function DraftPrelist() {
                             resetForm();
                             setEditingId(entry.id);
                             setKind(entry.kind);
+                            setTransferMode(entry.kind === "owned" ? entry.transferMode ?? "purchase" : "purchase");
+                            setOfferedPlayerId(entry.kind === "owned" ? entry.offeredPlayerId ?? "" : "");
                             setPrice(String(entry.price));
                             setSofifaUrl(entry.sofifaUrl ?? "");
                             if (entry.kind === "owned") {
@@ -453,6 +468,7 @@ export function DraftPrelist() {
                 })}
               </ul>
               <DraftOutgoing
+              reasons={Object.fromEntries(data.entries.filter(e => e.kind === "owned" && e.offeredPlayerId).map(e => [e.kind === "owned" ? e.offeredPlayerId! : "", TRANSFER_MODES[e.transferMode ?? "purchase"]]))}
                 players={data.ownPlayers}
                 selected={data.outgoing}
                 limit={data.limit}

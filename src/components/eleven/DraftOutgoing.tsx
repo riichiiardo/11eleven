@@ -30,12 +30,14 @@ export function DraftOutgoing({
   limit,
   revision,
   onChange,
+  reasons = {},
 }: {
   players: PrelistPlayer[];
   selected: string[];
   limit: number;
   revision: number;
   onChange: (ids: string[]) => void;
+  reasons?: Record<string, string>;
 }) {
   const [state, setState] = useState<OutgoingState | null>(null);
   const interests = useDepartureBids(revision);
@@ -134,7 +136,7 @@ export function DraftOutgoing({
                   )
                 }
               />
-              <span className="flex-1">{player.name}</span>
+              <span className="flex-1">{player.name}{selected.includes(player.id) ? <small className="block text-muted-foreground">Motivo previsto: {reasons[player.id] ?? "Venta pendiente; rescisión si no hay acuerdo"}</small> : null}</span>
               {selected.includes(player.id) && (
                 <span className="text-right text-xs font-semibold">
                   {interests.loading
