@@ -1,11 +1,10 @@
+import { FORMATION_GROUPS } from "@/domain/formation-catalog";
 import { useMemo, useState } from "react";
 import type { AppStateView } from "@/domain/appTypes";
 import { api } from "@/services/backend/api";
 import {
   FORMATIONS,
-  FORMATION_CODES,
   evaluateLineup,
-  isFormationCode,
   formatMoney,
   remapLineup,
   autoLineup,
@@ -45,6 +44,12 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 
 const EMPTY_SQUAD: AppStateView["squad"] = [];
 
@@ -75,6 +80,7 @@ export default function Formation({
   const rules = state?.rules ?? null;
   const squad = state?.squad ?? EMPTY_SQUAD;
 
+  const [guidanceEdited, setGuidanceEdited] = useState(false);
   const [fc27Code, setFc27Code] = useState(
     () => rules?.fc27FormationCode ?? "",
   );
@@ -229,32 +235,34 @@ export default function Formation({
         formation: lineup.formation,
         slots: lineup.slots,
       });
-      await updateRules({
-        budget: rules.budget,
-        squadSize: rules.squadSize,
-        gkMin: rules.gkMin,
-        gkMax: rules.gkMax,
-        defMin: rules.defMin,
-        defMax: rules.defMax,
-        midMin: rules.midMin,
-        midMax: rules.midMax,
-        fwdMin: rules.fwdMin,
-        fwdMax: rules.fwdMax,
-        maxPerRealClub: rules.maxPerRealClub,
-        minOvr: rules.minOvr,
-        maxU21: rules.maxU21,
-        lineupLockHours: rules.lineupLockHours,
-        fc27FormationCode: fc27Code,
-        formationInstructions: instructions,
-        u20Min: rules.u20Min,
-        u20InStartingLineup: rules.u20InStartingLineup,
-        sameNationalityMin: rules.sameNationalityMin,
-        sameNationalityRule: rules.sameNationalityRule,
-        sameNationalityMatchDurationMinutes:
-          rules.sameNationalityMatchDurationMinutes,
-        clubNationalityMin: rules.clubNationalityMin,
-      });
+      if (guidanceEdited)
+        await updateRules({
+          budget: rules.budget,
+          squadSize: rules.squadSize,
+          gkMin: rules.gkMin,
+          gkMax: rules.gkMax,
+          defMin: rules.defMin,
+          defMax: rules.defMax,
+          midMin: rules.midMin,
+          midMax: rules.midMax,
+          fwdMin: rules.fwdMin,
+          fwdMax: rules.fwdMax,
+          maxPerRealClub: rules.maxPerRealClub,
+          minOvr: rules.minOvr,
+          maxU21: rules.maxU21,
+          lineupLockHours: rules.lineupLockHours,
+          fc27FormationCode: fc27Code,
+          formationInstructions: instructions,
+          u20Min: rules.u20Min,
+          u20InStartingLineup: rules.u20InStartingLineup,
+          sameNationalityMin: rules.sameNationalityMin,
+          sameNationalityRule: rules.sameNationalityRule,
+          sameNationalityMatchDurationMinutes:
+            rules.sameNationalityMatchDurationMinutes,
+          clubNationalityMin: rules.clubNationalityMin,
+        });
       setDraft(null);
+      setGuidanceEdited(false);
       toast.success("Alineación guardada", {
         description: `${definition.label} · ${evaluation.starters.length} titulares verificados por el motor de reglas.`,
       });
@@ -345,64 +353,98 @@ export default function Formation({
       </header>
 
       <SectionCard title="Esquema táctico" icon={Shirt} accent="pitch">
-        <div
-          role="radiogroup"
-          aria-label="Formación"
-          className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
-        >
-          <button
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 p-3">
+          <p className="text-sm">
+            Esquema actual:{" "}
+            <strong>
+              {definition.label} · {definition.shape}
+            </strong>
+          </p>
+          <Button
             type="button"
-            role="radio"
-            aria-checked={!isFormationCode(lineup.formation)}
+            variant="outline"
+            disabled={!isDirty || busy}
             onClick={keepAutomaticFormation}
-            title="Mantiene el esquema actual sin fijar un código del FC 27"
-            className={cn(
-              "flex min-h-11 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors",
-              !isFormationCode(lineup.formation)
-                ? "border-primary bg-primary/5 ring-1 ring-primary/40"
-                : "border-border hover:bg-accent",
-            )}
           >
-            <span className="display text-sm">Automática</span>
-            <span className="text-[11px] text-muted-foreground">
-              Sin código fijo
-            </span>
-          </button>
-          {FORMATION_CODES.map((code) => {
-            const option = FORMATIONS[code];
-            const active = code === lineup.formation;
-            return (
-              <button
-                key={code}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => changeFormation(code)}
-                className={cn(
-                  "flex min-h-11 flex-col items-start rounded-lg border px-3 py-2 text-left transition-colors",
-                  active
-                    ? "border-primary bg-primary/5 ring-1 ring-primary/40"
-                    : "border-border hover:bg-accent",
-                )}
-              >
-                <span className="display text-sm">{option.label}</span>
-                <span className="text-[11px] text-muted-foreground">
-                  {option.shape}
-                </span>
-              </button>
-            );
-          })}
+            Restaurar formación guardada
+          </Button>
         </div>
+        <Accordion
+          type="multiple"
+          defaultValue={[`defenders-${Number(lineup.formation[0])}`]}
+          className="space-y-3"
+        >
+          {FORMATION_GROUPS.map((group) => (
+            <AccordionItem
+              key={group.defenders}
+              value={`defenders-${group.defenders}`}
+              className="rounded-xl border px-4 last:border-b"
+            >
+              <AccordionTrigger className="min-h-14 font-semibold">
+                Líneas de {group.defenders} defensas
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4">
+                  {group.families.map((family) => (
+                    <fieldset
+                      key={family.name}
+                      className="rounded-lg border p-3"
+                    >
+                      <legend className="px-2 font-semibold">
+                        {family.name}
+                      </legend>
+                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                        {family.variants.map((option) => (
+                          <label
+                            key={option.code}
+                            className={cn(
+                              "flex min-h-16 cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                              option.code === lineup.formation
+                                ? "border-primary bg-primary/5 ring-1 ring-primary/40"
+                                : "hover:bg-accent",
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="formation"
+                              value={option.code}
+                              checked={option.code === lineup.formation}
+                              disabled={busy}
+                              onChange={() => changeFormation(option.code)}
+                              aria-label={`${option.label} · ${option.variant}`}
+                              className="mt-1 accent-primary"
+                            />
+                            <span>
+                              <span className="block font-semibold">
+                                {option.label} · {option.variant}
+                              </span>
+                              <span className="mt-1 block text-xs text-muted-foreground">
+                                {option.rows
+                                  .slice(0, -1)
+                                  .map((row) => row.join(" / "))
+                                  .reverse()
+                                  .join(" → ")}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           {definition.description}
           {formationChanged
             ? " Al cambiar de esquema el motor recoloca a los jugadores compatibles y deja libres las posiciones que nadie puede cubrir."
             : ""}
         </p>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-          Los {FORMATION_CODES.length} esquemas disponibles permiten fijar el
-          código y recolocar el once, o pulsa «Automática» para dejar el esquema
-          libre.
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          32 variantes organizadas por línea defensiva. Selecciona una, revisa
+          el once y pulsa Guardar para aplicarla.
         </p>
       </SectionCard>
 
@@ -418,7 +460,10 @@ export default function Formation({
             </label>
             <Input
               value={fc27Code}
-              onChange={(event) => setFc27Code(event.target.value)}
+              onChange={(event) => {
+                setFc27Code(event.target.value);
+                setGuidanceEdited(true);
+              }}
               placeholder="ej. 4-2-3-1, 3-4-2-1, 4-1-2-1-2, 5-2-1-2…"
               aria-label="Código de formación FC 27"
               className="font-mono"
@@ -439,7 +484,10 @@ export default function Formation({
             </label>
             <textarea
               value={instructions}
-              onChange={(event) => setInstructions(event.target.value)}
+              onChange={(event) => {
+                setInstructions(event.target.value);
+                setGuidanceEdited(true);
+              }}
               rows={4}
               placeholder="Ej: cambios en los minutos 60-75, base 4-2-3-1 con delanteros más anchos, bloquear mediocentro…"
               aria-label="Instrucciones adicionales de formación"

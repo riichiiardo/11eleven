@@ -36,12 +36,16 @@ export function PitchView({
   className?: string;
 }) {
   const definition = FORMATIONS[formation];
-  const byId = new Map(squad.map((player) => [player.playerId as string, player]));
+  const byId = new Map(
+    squad.map((player) => [player.playerId as string, player]),
+  );
   const assigned = lineup.slots
     .map((slot) => byId.get(slot.playerId ?? ""))
     .filter((player): player is SquadPlayerView => Boolean(player));
   const averageOvr = assigned.length
-    ? Math.round((assigned.reduce((sum, p) => sum + p.ovr, 0) / assigned.length) * 10) / 10
+    ? Math.round(
+        (assigned.reduce((sum, p) => sum + p.ovr, 0) / assigned.length) * 10,
+      ) / 10
     : 0;
   const captainId = assigned.length
     ? [...assigned].sort((a, b) => b.ovr - a.ovr)[0].playerId
@@ -70,8 +74,14 @@ export function PitchView({
         style={{ aspectRatio: "4 / 5", minHeight: 420 }}
       >
         {/* Pitch markings */}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-2.5 rounded-md border-2 border-white/22" />
-        <span aria-hidden="true" className="pointer-events-none absolute left-2.5 right-2.5 top-1/2 border-t-2 border-white/18" />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-2.5 rounded-md border-2 border-white/22"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2.5 right-2.5 top-1/2 border-t-2 border-white/18"
+        />
         <span
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-1/2 size-[26%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/18"
@@ -91,7 +101,8 @@ export function PitchView({
 
         {definition.slots.map((slot) => {
           const player = byId.get(
-            lineup.slots.find((item) => item.slotId === slot.id)?.playerId ?? "",
+            lineup.slots.find((item) => item.slotId === slot.id)?.playerId ??
+              "",
           );
           const isCaptain = player && player.playerId === captainId;
           const state = highlight
@@ -109,11 +120,11 @@ export function PitchView({
               onClick={() => onSlotClick?.(slot.id)}
               aria-label={
                 player
-                  ? `${player.name}, ${POSITION_LABEL[player.position]}, OVR ${player.ovr}. Ocupa la posición ${slot.label}.`
-                  : `Posición ${POSITION_LABEL[slot.label]} vacía.`
+                  ? `${player.name}, ${POSITION_LABEL[player.position]}, OVR ${player.ovr}. Ocupa la posición ${slot.role ?? slot.label}.`
+                  : `Posición ${slot.role ?? POSITION_LABEL[slot.label]} vacía.`
               }
               className={cn(
-                "absolute flex w-[74px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-lg p-1 transition",
+                "absolute flex w-[17%] max-w-[74px] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1 rounded-lg p-1 transition",
                 mode === "edit" && "hover:bg-white/10",
                 state === "valid" && "bg-white/15 ring-2 ring-emerald-300",
                 state === "invalid" && "opacity-45",
@@ -147,7 +158,7 @@ export function PitchView({
                     {lastNameOf(player.name)}
                   </span>
                   <span className="text-[9px] font-semibold uppercase tracking-wide text-white/75">
-                    {slot.label}
+                    {slot.role ?? slot.label}
                   </span>
                 </>
               ) : (
@@ -159,7 +170,7 @@ export function PitchView({
                     <Plus className="size-4" />
                   </span>
                   <span className="w-full truncate rounded-md bg-black/25 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white/80">
-                    {slot.label}
+                    {slot.role ?? slot.label}
                   </span>
                   <span className="text-[9px] font-semibold uppercase tracking-wide text-white/60">
                     vacío
@@ -172,18 +183,22 @@ export function PitchView({
       </div>
 
       {caption ? (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">{caption}</p>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {caption}
+        </p>
       ) : null}
 
       {/* Text alternative for the lineup (WCAG 1.1.1) */}
       <ol className="sr-only">
         {definition.slots.map((slot) => {
           const player = byId.get(
-            lineup.slots.find((item) => item.slotId === slot.id)?.playerId ?? "",
+            lineup.slots.find((item) => item.slotId === slot.id)?.playerId ??
+              "",
           );
           return (
             <li key={slot.id}>
-              {POSITION_LABEL[slot.label]}: {player ? player.name : "sin asignar"}
+              {slot.role ?? POSITION_LABEL[slot.label]}:{" "}
+              {player ? player.name : "sin asignar"}
             </li>
           );
         })}
