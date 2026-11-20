@@ -1,3 +1,4 @@
+import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
 import { useState } from "react";
 import { DraftPrelist } from "@/components/eleven/DraftPrelist";
 import type { AppStateView } from "@/domain/appTypes";
@@ -33,7 +34,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
   const navigate = useNavigate();
-  const { saveAvailability, savingAvailability } = useSquadActions();
+  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
 
   if (!state) return <DashboardUnavailable title="Mi club" />;
@@ -53,6 +54,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      <AvailabilityWithdrawalDialog change={pendingAvailability} busy={savingAvailability} onCancel={cancelAvailability} onConfirm={confirmAvailability} />
       <section className="card-soft flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Crest
@@ -247,7 +249,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
       <DraftPrelist key={`${state.tournament?.id}:${state.president?.id}`} />
 
       <PlayerDialog
-        player={selected}
+        player={state.squad.find((player) => player.squadPlayerId === selected?.squadPlayerId) ?? selected}
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
         saving={savingAvailability}

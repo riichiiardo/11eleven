@@ -1,3 +1,4 @@
+import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
 import type { AppStateView } from "@/domain/appTypes";
 import {
   AVAILABILITIES,
@@ -23,13 +24,14 @@ import { cn } from "@/lib/utils";
 export default function PlayerStatus() {
   const state = useOutletContext<AppStateView>();
   const navigate = useNavigate();
-  const { saveAvailability, savingAvailability } = useSquadActions();
+  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability } = useSquadActions();
 
   const stats = state.stats;
   if (!stats) return null;
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      <AvailabilityWithdrawalDialog change={pendingAvailability} busy={savingAvailability} onCancel={cancelAvailability} onConfirm={confirmAvailability} />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="display text-2xl">Estado de jugadores</h1>

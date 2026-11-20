@@ -6,20 +6,38 @@ import { useMutation } from "@/services/backend/react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+export type AvailabilityChange = {
+  squadPlayerId: Id<"squadPlayers">;
+  availability: PlayerAvailability;
+  playerName: string;
+};
+
 export function useSquadActions() {
   const setAvailabilityMutation = useMutation(api.squads.setAvailability);
   const [savingAvailability, setSavingAvailability] = useState(false);
+  const [pendingAvailability, setPendingAvailability] =
+    useState<AvailabilityChange | null>(null);
 
   const saveAvailability = async (
     squadPlayerId: Id<"squadPlayers">,
     availability: PlayerAvailability,
     playerName: string,
+    withdrawFromDraft = false,
   ) => {
     setSavingAvailability(true);
     try {
-      await setAvailabilityMutation({ squadPlayerId, availability });
+      const result = await setAvailabilityMutation({
+        squadPlayerId,
+        availability,
+        withdrawFromDraft,
+      });
+      if (result.requiresWithdrawal) {
+        setPendingAvailability({ squadPlayerId, availability, playerName });
+        return false;
+      }
+      setPendingAvailability(null);
       toast.success("Situación actualizada", {
-        description: `${playerName} ahora figura como ${availability}.`,
+        description: `${playerName} ahora figura como ${availability}.${result.withdrawn ? " Se retiró de las bajas previstas del draft." : ""}`,
       });
       return true;
     } catch (cause) {
@@ -32,5 +50,23 @@ export function useSquadActions() {
     }
   };
 
-  return { saveAvailability, savingAvailability };
+  const confirmAvailability = async () => {
+    if (!pendingAvailability || savingAvailability) return;
+    await saveAvailability(
+      pendingAvailability.squadPlayerId,
+      pendingAvailability.availability,
+      pendingAvailability.playerName,
+      true,
+    );
+  };
+  const cancelAvailability = () => {
+    if (!savingAvailability) setPendingAvailability(null);
+  };
+  return {
+    saveAvailability,
+    savingAvailability,
+    pendingAvailability,
+    confirmAvailability,
+    cancelAvailability,
+  };
 }
