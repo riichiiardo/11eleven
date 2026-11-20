@@ -1,5 +1,9 @@
 import {
-  FORMATION_GROUPS,
+  FUTBIN_FORMATIONS,
+  type FutbinFormationCode,
+} from "./futbin-formations";
+import {
+  LEGACY_FORMATION_GROUPS,
   type TacticalFormationCode,
 } from "./formation-catalog";
 /**
@@ -755,6 +759,7 @@ export type FormationSlot = {
 
 /** Códigos anteriores compatibles con las alineaciones ya guardadas. */
 export type FormationCode =
+  | FutbinFormationCode
   | TacticalFormationCode
   | "3-2-2-3"
   | "3-4-2-1"
@@ -1396,7 +1401,7 @@ export const FORMATION_CODES: FormationCode[] = [
 ];
 
 // Las variantes nuevas no cambian los slots de alineaciones anteriores.
-for (const group of FORMATION_GROUPS) {
+for (const group of LEGACY_FORMATION_GROUPS) {
   for (const family of group.families) {
     for (const option of family.variants) {
       const counters = new Map<string, number>();
@@ -1434,6 +1439,37 @@ for (const group of FORMATION_GROUPS) {
       FORMATION_CODES.push(option.code);
     }
   }
+}
+
+// Shared geometry for miniature and full pitch. Existing persisted slots stay readable.
+for (const option of FUTBIN_FORMATIONS) {
+  const counters = new Map<string, number>();
+  const minimum = Math.min(...option.slots.map((s) => s.y));
+  const maximum = option.slots.find((s) => s.role === "POR")!.y;
+  const slots = option.slots.map((point) => {
+    const role = point.role;
+    const position: Position = role === "MI" || role === "MD" ? "MC" : role;
+    const count = (counters.get(role) ?? 0) + 1;
+    counters.set(role, count);
+    const result = slot(
+      `${role.toLowerCase()}${count}`,
+      position,
+      point.x,
+      12 + ((point.y - minimum) / (maximum - minimum)) * 77,
+    );
+    result.role = role;
+    if (role === "MI") result.accepts = ["MC", "EI", "MCO"];
+    if (role === "MD") result.accepts = ["MC", "ED", "MCO"];
+    return result;
+  });
+  FORMATIONS[option.code] = {
+    code: option.code,
+    label: option.label,
+    shape: option.variant,
+    description: `${option.label} · ${option.variant}. Distribución contrastada con el constructor de FC27 de FUTBIN.`,
+    slots,
+  };
+  FORMATION_CODES.push(option.code);
 }
 
 /** Formation every new squad starts with. */

@@ -18,13 +18,13 @@ try {
   );
   assert.deepEqual(
     FORMATION_GROUPS.map((g) => g.families.flatMap((f) => f.variants).length),
-    [20, 6, 6],
+    [20, 5, 4],
   );
   const requested = FORMATION_GROUPS.flatMap((g) =>
     g.families.flatMap((f) => f.variants),
   );
-  assert.equal(new Set(requested.map((v) => v.code)).size, 32);
-  assert.equal(engine.FORMATION_CODES.length, 62);
+  assert.equal(new Set(requested.map((v) => v.code)).size, 29);
+  assert.equal(engine.FORMATION_CODES.length, 91);
   const roster = [
     "POR",
     "LI",
@@ -67,6 +67,37 @@ try {
       const remapped = engine.remapLineup(roster, option.code, initial);
       assert.equal(new Set(remapped.slots.map((s) => s.playerId)).size, 11);
     }
+  const { FormationMiniPitch } = await server.ssrLoadModule(
+    "/src/components/eleven/FormationMiniPitch.tsx",
+  );
+  for (const option of requested) {
+    const actual = engine.FORMATIONS[option.code].slots;
+    const original = option.slots;
+    const minimum = Math.min(...original.map((s) => s.y)),
+      maximum = original.find((s) => s.role === "POR").y;
+    assert.equal(actual.length, original.length);
+    actual.forEach((slot, index) => {
+      assert.equal(slot.role, original[index].role);
+      assert.equal(slot.x, original[index].x);
+      assert.ok(
+        Math.abs(
+          slot.y -
+            (12 + ((original[index].y - minimum) / (maximum - minimum)) * 77),
+        ) < 1e-9,
+      );
+      assert.ok(slot.x >= 5 && slot.x <= 95 && slot.y >= 12 && slot.y <= 89);
+    });
+    const mini = renderToString(
+      React.createElement(FormationMiniPitch, { formation: option.code }),
+    );
+    for (const slot of actual)
+      assert.ok(
+        mini.includes(
+          `data-slot="${slot.id}" data-x="${slot.x}" data-y="${slot.y}"`,
+        ),
+        option.code,
+      );
+  }
   const roles = (code) =>
     engine.FORMATIONS[code].slots.map((s) => s.role ?? s.label);
   assert.equal(
@@ -211,7 +242,7 @@ try {
     "Cancel only appears in editing mode",
   );
   console.log(
-    "Rules: 32 grouped tactical variants and 30 compatible saved formations; removed R08/R09; disabled ranges; per-competition XI; invalid bounds rejected; editor rendered.",
+    "Rules: 29 FUTBIN formations and 62 compatible previous formations; removed R08/R09; disabled ranges; per-competition XI; invalid bounds rejected; editor rendered.",
   );
 } finally {
   await server.close();

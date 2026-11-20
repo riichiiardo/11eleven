@@ -78,13 +78,9 @@ try {
       ),
     );
     if (name === "Formation") {
-      for (const count of [4, 3, 5])
-        assert.ok(
-          html
-            .replace(/<!--.*?-->/g, "")
-            .includes(`Líneas de ${count} defensas`),
-        );
-      assert.ok(html.includes("32 variantes organizadas"));
+      assert.ok(html.includes("Cambiar formación"));
+      assert.ok(html.includes('role="img"'));
+      assert.ok(!html.includes("Formaciones disponibles"));
     }
     assert.ok(html.length > 500, `${name} must render content`);
     assert.ok(

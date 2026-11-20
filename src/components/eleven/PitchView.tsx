@@ -116,6 +116,7 @@ export function PitchView({
           return (
             <button
               key={slot.id}
+              data-slot={slot.id}
               type="button"
               onClick={() => onSlotClick?.(slot.id)}
               aria-label={
