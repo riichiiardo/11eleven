@@ -15,6 +15,7 @@ const suites = [
   ["scripts/verify-chat-client.mjs"],
   ["scripts/verify-broadcast.mjs"],
   ["scripts/verify-competition-archive.mjs"],
+  ["scripts/verify-player-pool.mjs"],
 ];
 
 for (const args of suites) {

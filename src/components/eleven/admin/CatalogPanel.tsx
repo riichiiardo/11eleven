@@ -1,259 +1,296 @@
-import { useState } from "react";
-import { api } from "@/services/backend/api";
-import { errorMessage, relativeTime } from "@/lib/errors";
-import { useAction, useQuery } from "@/services/backend/react";
-import { toast } from "sonner";
-import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { rpc } from "@/infrastructure/supabase/client";
+import { parsePoolCsv, type PoolImportRow } from "@/domain/player-pool";
+import { SectionCard } from "@/components/eleven/SectionCard";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertTriangle,
-  Database,
-  Loader2,
-  RefreshCw,
-  Trophy,
-  Users,
-  Zap,
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Database } from "lucide-react";
 
-type CatalogSource = "ea" | "sofifa" | "supabase" | "snapshot";
-
-const SOURCE_META: Record<CatalogSource, { label: string; hint: string }> = {
-  ea: {
-    label: "EA SPORTS FC 27 · ratings oficiales (19.789)",
-    hint: "Fuente recomendada: los ratings oficiales de EA, 100 jugadores por página y sin proxy. Se importa en lotes para no agotar el tiempo de una sola operación.",
-  },
-  sofifa: {
-    label: "SoFIFA · API pública (requiere proxy)",
-    hint: "SoFIFA responde 403 (Cloudflare) a las IPs de datacenter. Solo funciona si defines SOFIFA_PROXY_URL (http://usuario:clave@host:puerto) en Convex → Settings → Environment Variables.",
-  },
-  supabase: {
-    label: "Supabase · staging SoFIFA (tu suscripción)",
-    hint: "Lee la tabla sofifa_players de tu proyecto Supabase, llenada por scripts/sync-players.py desde tu Mac. Requiere SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY (service_role, no anon) en Convex → Settings → Environment Variables.",
-  },
-  snapshot: {
-    label: "Snapshot local versionado (respaldo)",
-    hint: "Importa los agentes libres incluidos con la app. Es el respaldo automático cuando ninguna fuente externa responde.",
-  },
+type Player = {
+  id: string;
+  name: string;
+  nationality: string;
+  age: number;
+  position: string;
+  sofifa_id?: number;
 };
-
-/**
- * Catálogo de jugadores: fuentes, estado de la sincronización y progreso.
- * Administración define la base de datos con la que juega el torneo; las
- * plantillas y la propiedad de jugadores nunca se tocan aquí.
- */
+type Status = {
+  active: number;
+  identified: number;
+  pending: Player[];
+  candidates: Player[];
+};
+type ImportSummary = { total: number; inserted: number; updated: number };
 export function CatalogPanel() {
-  const catalog = useQuery(api.footballSync.catalogState);
-  const syncAction = useAction(api.footballApi.syncCatalog);
-  const [source, setSource] = useState<CatalogSource>("ea");
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{
-    page: number;
-    totalPages: number;
-    fetched: number;
-    inserted: number;
-    updated: number;
-  } | null>(null);
-
-  const handleSync = async () => {
-    setBusy(true);
-    setProgress(null);
-    try {
-      if (source === "snapshot") {
-        const result = await syncAction({ source });
-        toast.success("Snapshot local aplicado", {
-          description: `${result.inserted} agentes libres incorporados · ${result.unchanged} ya estaban en el catálogo`,
-        });
-        return;
-      }
-
-      // EA pages are 1-based; SoFIFA and Supabase cursors count from 0.
-      let page = source === "ea" ? 1 : 0;
-      let totalPages = 0;
-      let fetched = 0;
-      let inserted = 0;
-      let updated = 0;
-      let unchanged = 0;
-      let done = false;
-      let guard = 0;
-      let note: string | null = null;
-
-      while (!done && guard < 80) {
-        guard += 1;
-        const result = await syncAction({ source, page });
-        page = result.page;
-        totalPages = result.totalPages || totalPages;
-        fetched += result.fetched;
-        inserted += result.inserted;
-        updated += result.updated;
-        unchanged += result.unchanged;
-        done = result.done;
-        if (result.note) note = result.note;
-        setProgress({ page, totalPages, fetched, inserted, updated });
-        if (result.fallback) {
-          toast.warning("Fuente no accesible", {
-            description: result.note ?? undefined,
-          });
-          return;
-        }
-        if (result.fetched === 0) break;
-      }
-
-      const summary = `${fetched} jugadores descargados · ${inserted} nuevos · ${updated} actualizados · ${unchanged} sin cambios`;
-      if (note) {
-        toast.warning("Sincronización parcial", {
-          description: `${summary} · ${note}`,
-        });
-      } else {
-        toast.success("Catálogo sincronizado", { description: summary });
-      }
-    } catch (cause) {
-      toast.error("No se pudo sincronizar el catálogo", {
-        description: errorMessage(cause),
+  const [status, setStatus] = useState<Status | null>(null),
+    [error, setError] = useState(""),
+    [message, setMessage] = useState("");
+  const [rows, setRows] = useState<PoolImportRow[]>([]),
+    [filename, setFilename] = useState(""),
+    [busy, setBusy] = useState(false),
+    [progress, setProgress] = useState("");
+  const [preserve, setPreserve] = useState(""),
+    [source, setSource] = useState(""),
+    [search, setSearch] = useState("");
+  const [confirm, setConfirm] = useState(false),
+    [manualConfirm, setManualConfirm] = useState(false),
+    [candidates, setCandidates] = useState<Player[]>([]);
+  const reload = async () => {
+    const next = await rpc<Status>("pool_status");
+    setStatus(next);
+  };
+  useEffect(() => {
+    let active = true;
+    rpc<Status>("pool_status")
+      .then((next) => {
+        if (active) setStatus(next);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
       });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const fail = (e: unknown) =>
+    setError(e instanceof Error ? e.message : String(e));
+  const upload = async () => {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const job = await rpc<string>("pool_import_start", {
+        p_expected: rows.length,
+        p_label: filename,
+      });
+      for (let offset = 0; offset < rows.length; offset += 500) {
+        setProgress(
+          `Cargando ${Math.min(offset + 500, rows.length)} de ${rows.length}`,
+        );
+        const args = {
+          p_job: job,
+          p_offset: offset,
+          p_rows: rows.slice(offset, offset + 500),
+        };
+        try {
+          await rpc("pool_import_batch", args);
+        } catch {
+          await rpc("pool_import_batch", args);
+        }
+      }
+      setProgress("Aplicando actualización del pool…");
+      let summary: ImportSummary;
+      try {
+        summary = await rpc<ImportSummary>("pool_import_finish", {
+          p_job: job,
+        });
+      } catch {
+        summary = await rpc<ImportSummary>("pool_import_finish", {
+          p_job: job,
+        });
+      }
+      setMessage(
+        `${summary.total} jugadores activos · ${summary.updated} actualizados · ${summary.inserted} nuevos.`,
+      );
+      setRows([]);
+      setConfirm(false);
+      await reload();
+    } catch (e) {
+      fail(e);
     } finally {
       setBusy(false);
-      setProgress(null);
+      setProgress("");
     }
   };
-
+  const find = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      setCandidates(
+        (await rpc<Status>("pool_status", { p_search: search })).candidates,
+      );
+      setSource("");
+      setManualConfirm(false);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const reconcile = async () => {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await rpc("pool_reconcile", { p_preserve: preserve, p_source: source });
+      setMessage(
+        "Ficha vinculada. El jugador conserva su asignación y su ID interno.",
+      );
+      setPreserve("");
+      setSource("");
+      setManualConfirm(false);
+      setCandidates([]);
+      await reload();
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <SectionCard
-      title="Catálogo de jugadores"
-      icon={Database}
-      accent="gold"
-      bodyClassName="flex flex-col gap-5"
-    >
-      <p className="text-sm text-muted-foreground">
-        El catálogo es la base de jugadores de la que beben el draft y el mercado. Sincroniza los
-        ratings oficiales de EA SPORTS FC 27 (más de 19.000 jugadores) o los datos de SoFIFA
-        guardados en tu Supabase. La importación avanza por lotes y nunca toca las plantillas ni la
-        propiedad de los jugadores: solo se actualiza la tabla de jugadores.
-      </p>
-
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="catalog-source">Fuente de datos</Label>
-          <Select
-            value={source}
-            onValueChange={(value) => setSource(value as CatalogSource)}
-            disabled={busy}
+    <SectionCard title="Pool de jugadores" icon={Database}>
+      <div className="space-y-6">
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive p-3 text-sm text-destructive"
           >
-            <SelectTrigger id="catalog-source" className="min-h-11 w-full">
-              <SelectValue placeholder="Selecciona una fuente" />
-            </SelectTrigger>
-            <SelectContent>
-              { (Object.keys(SOURCE_META) as CatalogSource[]).map((key) => (
-                <SelectItem key={key} value={key}>
-                  {SOURCE_META[key].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">{SOURCE_META[source].hint}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          icon={Database}
-          label="Jugadores en catálogo"
-          value={catalog === undefined ? "…" : String(catalog?.total ?? 0)}
-        />
-        <StatTile
-          icon={Zap}
-          label="Agentes libres"
-          value={catalog === undefined ? "…" : String(catalog?.freeAgents ?? 0)}
-          tone="pitch"
-        />
-        <StatTile
-          icon={Users}
-          label="En plantillas"
-          value={catalog === undefined ? "…" : String(catalog?.owned ?? 0)}
-          tone="slate"
-        />
-        <StatTile
-          icon={Trophy}
-          label="Versión"
-          value={catalog?.version ?? "—"}
-          tone="gold"
-        />
-      </div>
-
-      {catalog?.lastSync && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-          <RefreshCw className="size-4 text-muted-foreground" aria-hidden="true" />
-          <span className="text-muted-foreground">Última sincronización:</span>
-          <span className="font-medium">{relativeTime(catalog.lastSync.at)}</span>
-          <Badge variant="outline">{catalog.lastSync.source}</Badge>
-          <span className="text-muted-foreground">
-            {catalog.lastSync.inserted} nuevos · {catalog.lastSync.updated} actualizados ·{" "}
-            {catalog.lastSync.unchanged} sin cambios
-          </span>
-        </div>
-      )}
-
-      {catalog?.lastError && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-          <div className="flex flex-col gap-0.5">
-            <span className="font-medium">Último intento de sincronización falló</span>
-            <span className="text-muted-foreground">
-              {catalog.lastError.message} · {relativeTime(catalog.lastError.at)}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        {busy && progress ? (
-          <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="font-semibold">
-                Descargando página {progress.page}
-                {progress.totalPages > 0 ? ` de ${progress.totalPages}` : "…"}
-              </span>
-              <span className="text-muted-foreground">
-                {progress.fetched} descargados · {progress.inserted} nuevos · {progress.updated}{" "}
-                actualizados
-              </span>
-            </div>
-            <Progress
-              className="mt-2 h-2"
-              value={
-                progress.totalPages > 0
-                  ? Math.min(100, Math.round(((progress.page - 1) / progress.totalPages) * 100))
-                  : 10
-              }
+            {error}
+          </p>
+        )}
+        {message && (
+          <p role="status" className="rounded-lg border p-3 text-sm">
+            {message}
+          </p>
+        )}
+        {!status && !error ? (
+          <p>Cargando pool…</p>
+        ) : (
+          status && (
+            <p>
+              {status.active} jugadores activos · {status.identified} con ID de
+              SoFIFA · {status.pending.length} asignados pendientes de
+              conciliación.
+            </p>
+          )
+        )}
+        <div className="space-y-3 rounded-xl border p-4">
+          <h3 className="font-semibold">Actualizar desde CSV</h3>
+          <p className="text-sm text-muted-foreground">
+            Carga el pool completo con la columna ID de SoFIFA. La actualización
+            conserva los identificadores internos y las asignaciones de los
+            jugadores identificados. Los ausentes quedan inactivos y los
+            asignados siguen disponibles en sus equipos.
+          </p>
+          <label className="block text-sm">
+            Archivo del pool
+            <Input
+              type="file"
+              accept=".csv,text/csv"
+              disabled={busy}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                setRows([]);
+                setError("");
+                setConfirm(false);
+                if (!file) return;
+                try {
+                  if (file.size > 15000000)
+                    throw Error("El archivo supera 15 MB.");
+                  setRows(parsePoolCsv(await file.text()));
+                  setFilename(file.name);
+                } catch (e) {
+                  fail(e);
+                }
+              }}
             />
-          </div>
-        ) : null}
-
-        <div>
-          <Button onClick={handleSync} disabled={busy} className="min-h-11">
-            {busy ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <RefreshCw className="size-4" aria-hidden="true" />
-            )}
-            {busy
-              ? "Sincronizando…"
-              : source === "snapshot"
-                ? "Aplicar snapshot local"
-                : "Sincronizar catálogo completo"}
+          </label>
+          {rows.length > 0 && (
+            <p>
+              {rows.length} jugadores validados en {filename}.
+            </p>
+          )}
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={confirm}
+              disabled={busy}
+              onChange={(e) => setConfirm(e.target.checked)}
+            />
+            Confirmo que este archivo contiene el pool completo a activar.
+          </label>
+          <Button disabled={busy || !rows.length || !confirm} onClick={upload}>
+            {busy ? progress || "Procesando…" : "Actualizar pool completo"}
           </Button>
-          <p className="mt-2 text-xs text-muted-foreground">
-            La descarga completa puede tardar unos minutos: se ejecuta por lotes y cada lote queda
-            registrado en la auditoría con tu nombre.
+        </div>
+        <div className="space-y-3 rounded-xl border p-4">
+          <h3 className="font-semibold">Conciliar un jugador de un equipo</h3>
+          <p className="text-sm text-muted-foreground">
+            Selecciona una ficha pendiente y busca su ficha actual en el pool.
+            La vinculación conserva el jugador del equipo y actualiza sus datos
+            desde la ficha seleccionada.
+          </p>
+          <label className="block text-sm">
+            Jugador pendiente
+            <select
+              aria-label="Jugador pendiente"
+              className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 pr-10"
+              disabled={busy}
+              value={preserve}
+              onChange={(e) => {
+                setPreserve(e.target.value);
+                setManualConfirm(false);
+              }}
+            >
+              <option value="">Seleccionar jugador</option>
+              {status?.pending.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} · {p.nationality} · {p.age} años · {p.position}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex gap-2">
+            <Input
+              aria-label="Buscar jugador del pool"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nombre del jugador"
+            />
+            <Button disabled={busy || search.trim().length < 2} onClick={find}>
+              Buscar
+            </Button>
+          </div>
+          <label className="block text-sm">
+            Ficha correcta del pool
+            <select
+              aria-label="Ficha correcta del pool"
+              className="mt-1 min-h-11 w-full rounded-md border bg-background px-3 pr-10"
+              disabled={busy}
+              value={source}
+              onChange={(e) => {
+                setSource(e.target.value);
+                setManualConfirm(false);
+              }}
+            >
+              <option value="">Seleccionar ficha</option>
+              {candidates.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} · {p.nationality} · {p.age} años · {p.position} ·
+                  SoFIFA {p.sofifa_id ?? "pendiente"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={manualConfirm}
+              disabled={busy}
+              onChange={(e) => setManualConfirm(e.target.checked)}
+            />
+            Confirmo que ambas fichas corresponden al mismo jugador.
+          </label>
+          <Button
+            disabled={busy || !preserve || !source || !manualConfirm}
+            onClick={reconcile}
+          >
+            Vincular ficha al jugador del equipo
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Las coincidencias ambiguas requieren revisión. Si el CSV presenta
+            homónimos, puedes añadir ID Pool para indicar expresamente el
+            identificador interno.
           </p>
         </div>
       </div>

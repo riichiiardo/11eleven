@@ -168,3 +168,26 @@ Publicación, SQL remoto y pruebas con sesiones reales son pasos separados.
 ## Archivo de competiciones y transmisiones
 
 Instalar `competitions-archive.sql` después de `rules-configuration.sql`. El módulo añade resultados privados por competición y temporada y una RPC de lectura para miembros. El plan de seis competiciones se genera con `node scripts/prepare-competition-seed.mjs --universe=<UUID>`; no se ejecuta automáticamente. Consultar [el flujo de importación y verificación](../docs/broadcast.md). No requiere nuevas claves públicas ni secrets.
+
+
+### Pool actualizable por ID de SoFIFA
+
+Aplicar `player-pool.sql` después de `csv-catalog.sql`. En Administración → Catálogo,
+un administrador carga el CSV completo con ID de SoFIFA. Se valida y carga en lotes
+de 500; solo se activa al completar todas las filas. Un ID de SoFIFA existente
+actualiza su misma ficha interna: no modifica asignaciones, alineaciones ni precios
+de adquisición. Los registros ausentes se inactivan; las fichas asignadas siguen
+visibles en su equipo. Cada importación conserva una instantánea privada previa.
+
+La primera carga vincula fichas sin ID únicamente por nombre y nacionalidad exactos
+y únicos. Los homónimos no se fusionan automáticamente. Las fichas asignadas sin
+coincidencia aparecen en «Conciliar un jugador de un equipo»: el administrador
+selecciona y confirma la identidad. La ficha del catálogo elegida no puede tener
+referencias; se conserva el ID interno de la ficha asignada y se registra la operación.
+También se admite una columna opcional `ID Pool` para una vinculación explícita.
+
+Campos requeridos: ID, Nombre y Apellido, Nacionalidad, Posiciones, Edad,
+Valoración General, Potencial, Equipo y Valor. Valor admite euros, K y M;
+se guarda como importe entero en euros. Todas las posiciones y los datos originales
+se conservan en `source_record`. La tabla de consulta es `public.players`;
+`catalog_active = true` identifica el pool vigente y `sofifa_id` su identidad externa.
