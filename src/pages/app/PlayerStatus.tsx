@@ -119,7 +119,7 @@ export default function PlayerStatus() {
                   disabled={savingAvailability}
                   onValueChange={(next) =>
                     saveAvailability(
-                      player.playerId,
+                      player.squadPlayerId,
                       next as PlayerAvailability,
                       player.name,
                     )

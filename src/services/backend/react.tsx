@@ -1,3 +1,4 @@
+import { availabilityArgs } from "@/services/backend/squad-availability";
 /**
  * Hooks de autenticación, consulta y acciones sobre el backend Supabase.
  * Las referencias públicas están en api.ts y sus vistas en contracts.ts.
@@ -402,10 +403,7 @@ function resolveMutation(
         return { name: String(data.name) };
       },
       "squads.setAvailability": (a) =>
-        rpc("set_availability", {
-          p_squad_player_id: a.squadPlayerId,
-          p_availability: a.availability,
-        }),
+        rpc("set_availability", availabilityArgs(a)),
       "squads.saveLineup": (a) =>
         rpc("save_lineup", { p_formation: a.formation, p_slots: a.slots }),
       "squads.autoFillLineup": async (a) => {

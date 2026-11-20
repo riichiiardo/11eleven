@@ -251,9 +251,9 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
         saving={savingAvailability}
-        onSaveAvailability={async (playerId, availability) => {
-          if (!selected) return;
-          await saveAvailability(playerId, availability, selected.name);
+        onSaveAvailability={async (squadPlayerId, availability) => {
+          if (!selected) return false;
+          return saveAvailability(squadPlayerId, availability, selected.name);
         }}
       />
     </div>

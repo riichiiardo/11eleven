@@ -105,9 +105,9 @@ export function PlayerDialog({
   onAssign?: (player: SquadPlayerView) => void;
   assignLabel?: string;
   onSaveAvailability: (
-    playerId: Id<"players">,
+    squadPlayerId: Id<"squadPlayers">,
     availability: PlayerAvailability,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   saving?: boolean;
 }) {
   const [draft, setDraft] = useState<PlayerAvailability | null>(null);
@@ -243,8 +243,8 @@ export function PlayerDialog({
                 className="min-h-11"
                 disabled={saving}
                 onClick={async () => {
-                  await onSaveAvailability(player.playerId, draft);
-                  setDraft(null);
+                  const saved = await onSaveAvailability(player.squadPlayerId, draft);
+                  if (saved) setDraft(null);
                 }}
               >
                 {saving ? (
