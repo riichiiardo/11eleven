@@ -18,6 +18,9 @@ Aplica los scripts en este orden, después de revisar el destino y sus permisos:
 9. `draft-outgoing.sql`
 10. `draft-bids.sql`
 11. `chat.sql`
+12. `market-availability.sql`
+13. `market-draft-availability.sql`
+14. `squad-tactics.sql`
 
 No hay un seed alternativo de equipos. El catálogo se carga desde la fuente
 configurada por sincronización explícita. `catalog.sql` configura staging
@@ -233,3 +236,7 @@ Instalar `squad-tactics.sql` después de `schema.sql` y `rpc.sql`. Guarda el có
 ### Situación de mercado de la plantilla
 
 Para instalaciones existentes, aplicar `market-availability.sql`; la definición canónica también está en `rpc.sql`. `set_availability` requiere el ID de `squad_players`, no el ID de `players`. Solo permite modificar una ficha propia con sesión válida, membresía vigente y universo activo coincidente. Mi Club, Plantilla y Estado de jugadores utilizan el mismo contrato; el cliente rechaza parámetros incompletos antes de enviar la consulta.
+
+### Bajas previstas y cambios de mercado
+
+Aplicar `market-draft-availability.sql` después de `draft-outgoing.sql` y `market-availability.sql`. La RPC `change_squad_availability` devuelve una solicitud de confirmación si el jugador es una baja seleccionada y se pretende quitar su situación de transferible. Con confirmación explícita retira esa baja, aumenta la revisión de la prelista y guarda la disponibilidad en una única transacción. Respeta el bloqueo de draft iniciado y de prelista enviada a revisión; conserva las otras selecciones, las revisiones de sus altas y las ofertas. El acceso sigue limitado al propietario y universo activo. Para verificar cancelación, confirmación y recarga en el navegador sin tocar producción: `node scripts/preview-market-draft.mjs`.

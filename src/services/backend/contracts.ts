@@ -37,6 +37,7 @@ type ReadResults = {
 };
 
 type MutationResults = {
+  "squads.setAvailability": { requiresWithdrawal: boolean; withdrawn: boolean; playerName?: string };
   "leagues.createLeague": { id: string; name: string };
   "leagues.joinLeague": { id: string; name: string };
   "leagues.activateLeague": { name: string };

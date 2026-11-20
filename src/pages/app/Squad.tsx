@@ -1,3 +1,4 @@
+import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
 import { useState } from "react";
 import type { AppStateView } from "@/domain/appTypes";
 import { FC_VERSION, formatMoney, type SquadPlayerView } from "@/domain/rulesEngine";
@@ -24,7 +25,7 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
   const contextState = useDashboardState();
   const state = directState ?? contextState;
   const navigate = useNavigate();
-  const { saveAvailability, savingAvailability } = useSquadActions();
+  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
 
   if (!state) return <DashboardUnavailable title="Plantilla" />;
@@ -50,6 +51,7 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      <AvailabilityWithdrawalDialog change={pendingAvailability} busy={savingAvailability} onCancel={cancelAvailability} onConfirm={confirmAvailability} />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="display text-2xl">Plantilla</h1>
@@ -214,7 +216,7 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
       </SectionCard>
 
       <PlayerDialog
-        player={selected}
+        player={state.squad.find((player) => player.squadPlayerId === selected?.squadPlayerId) ?? selected}
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
         saving={savingAvailability}

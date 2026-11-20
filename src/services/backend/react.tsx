@@ -403,7 +403,7 @@ function resolveMutation(
         return { name: String(data.name) };
       },
       "squads.setAvailability": (a) =>
-        rpc("set_availability", availabilityArgs(a)),
+        rpc("change_squad_availability", { ...availabilityArgs(a), p_withdraw: a.withdrawFromDraft === true }),
       "squads.saveLineup": (a) =>
         rpc("save_lineup", { p_formation: a.formation, p_slots: a.slots }),
       "squads.autoFillLineup": async (a) => {
