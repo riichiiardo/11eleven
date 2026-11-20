@@ -115,7 +115,7 @@ export function MarketPlayerCard({
         <div className="rounded border p-2 text-xs">
           <p>
             {bid.closed
-              ? "Puja cerrada · acuerdo reservado"
+              ? "Acuerdo reservado · admite propuestas alternativas"
               : `${bid.count} equipo(s) interesado(s)`}
           </p>
           {bid.highestCash != null && (
@@ -127,7 +127,7 @@ export function MarketPlayerCard({
       )}
 
       <div className="mt-auto flex items-center gap-2">
-        {player.offerable && !bid?.closed ? (
+        {player.offerable ? (
           <Button
             type="button"
             className="min-h-9 flex-1"

@@ -1,3 +1,5 @@
+import { TRANSFER_MODES, transferMode } from "@/domain/transfer-modes";
+import { CancelSaleDialog } from "./CancelSaleDialog";
 import { useState } from "react";
 import { Link } from "react-router";
 import { chatUrl } from "@/domain/chat";
@@ -40,6 +42,7 @@ import { cn } from "@/lib/utils";
 export function OfferCard({ offer }: { offer: OfferView }) {
   const now = useNow(30000);
   const { respondOffer, cancelOffer, busyKey } = useMarketActions();
+  const [cancelSaleOpen, setCancelSaleOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
   const meta = OFFER_STATUS_META[offer.status as OfferStatus];
 
@@ -63,7 +66,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
           <div className="flex flex-wrap items-center gap-2">
             <OfferStatusPill status={offer.status as OfferStatus} />
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {offer.type === "trade" ? "Intercambio" : "Operación en efectivo"}
+              {TRANSFER_MODES[transferMode(offer)]}
             </span>
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
@@ -100,6 +103,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
         />
       </div>
 
+      <p className="text-xs text-muted-foreground">Tus movimientos · Ingresos: {(offer.bidderIsMe ? offer.requested : offer.offered).map(p=>p.name).join(", ") || "Ninguno"} · Salidas: {(offer.bidderIsMe ? offer.offered : offer.requested).map(p=>p.name).join(", ") || "Ninguna"} · Motivo: {TRANSFER_MODES[transferMode(offer)]}</p>
       <div className="grid gap-2 sm:grid-cols-2">
         <PlayerColumn title="Ofrece" players={offer.offered} empty="Sin jugadores: solo dinero." />
         <PlayerColumn
@@ -170,6 +174,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
             </Button>
           </>
         ) : null}
+        {offer.canCancelSale ? <Button variant="outline" disabled={busyKey !== null} onClick={() => setCancelSaleOpen(true)}>Cancelar venta por otra oferta</Button> : null}
         {offer.canCancel ? (
           <Button
             type="button"
@@ -183,7 +188,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
             ) : (
               <Trash2 className="size-4" aria-hidden="true" />
             )}
-            Cancelar operación
+            Retirar oferta pendiente
           </Button>
         ) : null}
         <Button
@@ -204,6 +209,7 @@ export function OfferCard({ offer }: { offer: OfferView }) {
         </p>
       ) : null}
 
+      {cancelSaleOpen ? <CancelSaleDialog offer={offer} onClose={() => setCancelSaleOpen(false)} /> : null}
       <ValidationDialog
         offerId={offer.id}
         open={validationOpen}
@@ -235,18 +241,18 @@ function ValidationDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto scroll-thin sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="display text-base">
-            Validación final de la operación
+            Estado de aprobación de la operación
           </DialogTitle>
           <DialogDescription>
-            {OFFER_STATUS_META[status].description} Todo vuelve a comprobarse contra
-            el estado actual de ambas plantillas justo antes de aplicar los cambios.
+            {OFFER_STATUS_META[status].description} La ejecución comprueba de nuevo
+            la propiedad de los jugadores y el presupuesto antes de aplicar los cambios.
           </DialogDescription>
         </DialogHeader>
 
         {report === undefined ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Comprobando jugadores, presupuestos y reglas…
+            Consultando la aprobación de la operación…
           </p>
         ) : report === null ? (
           <p className="text-sm text-muted-foreground">
@@ -263,8 +269,8 @@ function ValidationDialog({
               )}
             >
               {report.passed
-                ? "La operación supera todas las comprobaciones: está lista para ejecutarse."
-                : "La operación no puede ejecutarse en este momento."}
+                ? "El acuerdo está aprobado o ejecutado. Si está reservado, Administración debe ejecutarlo."
+                : "La operación no cuenta con una aprobación activa para ejecutarse."}
             </p>
             <Separator />
             <RuleCheckList checks={report.checks} variant="full" />

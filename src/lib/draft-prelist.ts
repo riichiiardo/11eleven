@@ -17,7 +17,7 @@ export const DRAFT_POSITIONS = [
 const money = z
   .number()
   .finite()
-  .positive()
+  .nonnegative()
   .max(2000000000)
   .refine(
     (v) => Math.abs(v * 100 - Math.round(v * 100)) < 0.0001,
@@ -48,6 +48,8 @@ const url = z
 export const prelistEntrySchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("owned"),
+    transferMode: z.enum(["purchase", "exchange", "exchange_cash"]).optional(),
+    offeredPlayerId: z.string().uuid().optional(),
     playerId: z.string().uuid(),
     clubId: z.string().uuid(),
     price: money,
@@ -55,6 +57,7 @@ export const prelistEntrySchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("new"),
+    transferMode: z.literal("free").optional(),
     name: z
       .string()
       .trim()
@@ -71,7 +74,11 @@ export const prelistEntrySchema = z.discriminatedUnion("kind", [
     nationality: z.string().trim().min(2).max(80),
     sofifaUrl: url,
   }),
-]);
+]).superRefine((entry, ctx) => {
+  const mode = entry.transferMode ?? (entry.kind === "new" ? "free" : "purchase");
+  if ((mode === "exchange" && entry.price !== 0) || (mode !== "exchange" && entry.price <= 0)) ctx.addIssue({code:"custom",message:"Revisa el importe según el motivo del ingreso.",path:["price"]});
+  if (entry.kind === "owned" && (mode === "exchange" || mode === "exchange_cash") && !entry.offeredPlayerId) ctx.addIssue({code:"custom",message:"Selecciona tu jugador para el intercambio.",path:["offeredPlayerId"]});
+});
 export type PrelistEntry = z.infer<typeof prelistEntrySchema>;
 export type PrelistPlayer = {
   id: string;
@@ -106,7 +113,18 @@ export function validatePrelist(
     throw new Error(
       `El máximo es ${limit} altas y ${Math.min(6, limit)} bajas.`,
     );
-  entries.forEach((entry) => prelistEntrySchema.parse(entry));
+  const offered = new Set<string>();
+  entries.forEach((entry) => {
+    prelistEntrySchema.parse(entry);
+    const mode = entry.transferMode ?? (entry.kind === "new" ? "free" : "purchase");
+    if (mode === "exchange" && entry.price !== 0) throw new Error("El intercambio sin dinero debe indicar 0 €.");
+    if (mode !== "exchange" && entry.price <= 0) throw new Error("Indica un importe positivo en euros.");
+    if (entry.kind === "owned" && (mode === "exchange" || mode === "exchange_cash")) {
+      if (!entry.offeredPlayerId || offered.has(entry.offeredPlayerId)) throw new Error("Selecciona un jugador propio distinto para cada intercambio.");
+      offered.add(entry.offeredPlayerId);
+      if (!outgoing.includes(entry.offeredPlayerId)) throw new Error("El jugador ofrecido debe estar en tus bajas previstas.");
+    } else if (entry.kind === "owned" && entry.offeredPlayerId) throw new Error("Una compra no incluye jugadores ofrecidos.");
+  });
   const keys = entries.map((entry) =>
     entry.kind === "owned"
       ? entry.playerId
