@@ -1,4 +1,4 @@
-import { FORMATION_GROUPS } from "@/domain/formation-catalog";
+import { FormationPicker } from "@/components/eleven/FormationPicker";
 import { useMemo, useState } from "react";
 import type { AppStateView } from "@/domain/appTypes";
 import { api } from "@/services/backend/api";
@@ -44,12 +44,6 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionTrigger,
-  AccordionContent,
-} from "@/components/ui/accordion";
 
 const EMPTY_SQUAD: AppStateView["squad"] = [];
 
@@ -353,89 +347,13 @@ export default function Formation({
       </header>
 
       <SectionCard title="Esquema táctico" icon={Shirt} accent="pitch">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/40 p-3">
-          <p className="text-sm">
-            Esquema actual:{" "}
-            <strong>
-              {definition.label} · {definition.shape}
-            </strong>
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!isDirty || busy}
-            onClick={keepAutomaticFormation}
-          >
-            Restaurar formación guardada
-          </Button>
-        </div>
-        <Accordion
-          type="multiple"
-          defaultValue={[`defenders-${Number(lineup.formation[0])}`]}
-          className="space-y-3"
-        >
-          {FORMATION_GROUPS.map((group) => (
-            <AccordionItem
-              key={group.defenders}
-              value={`defenders-${group.defenders}`}
-              className="rounded-xl border px-4 last:border-b"
-            >
-              <AccordionTrigger className="min-h-14 font-semibold">
-                Líneas de {group.defenders} defensas
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="space-y-4">
-                  {group.families.map((family) => (
-                    <fieldset
-                      key={family.name}
-                      className="rounded-lg border p-3"
-                    >
-                      <legend className="px-2 font-semibold">
-                        {family.name}
-                      </legend>
-                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                        {family.variants.map((option) => (
-                          <label
-                            key={option.code}
-                            className={cn(
-                              "flex min-h-16 cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-                              option.code === lineup.formation
-                                ? "border-primary bg-primary/5 ring-1 ring-primary/40"
-                                : "hover:bg-accent",
-                            )}
-                          >
-                            <input
-                              type="radio"
-                              name="formation"
-                              value={option.code}
-                              checked={option.code === lineup.formation}
-                              disabled={busy}
-                              onChange={() => changeFormation(option.code)}
-                              aria-label={`${option.label} · ${option.variant}`}
-                              className="mt-1 accent-primary"
-                            />
-                            <span>
-                              <span className="block font-semibold">
-                                {option.label} · {option.variant}
-                              </span>
-                              <span className="mt-1 block text-xs text-muted-foreground">
-                                {option.rows
-                                  .slice(0, -1)
-                                  .map((row) => row.join(" / "))
-                                  .reverse()
-                                  .join(" → ")}
-                              </span>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  ))}
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+        <FormationPicker
+          formation={lineup.formation}
+          onChange={changeFormation}
+          disabled={busy}
+          onRestore={keepAutomaticFormation}
+          canRestore={isDirty}
+        />
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           {definition.description}
           {formationChanged
@@ -443,8 +361,7 @@ export default function Formation({
             : ""}
         </p>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          32 variantes organizadas por línea defensiva. Selecciona una, revisa
-          el once y pulsa Guardar para aplicarla.
+          Selecciona un dibujo, revisa el once y pulsa Guardar para confirmarlo.
         </p>
       </SectionCard>
 

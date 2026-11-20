@@ -1,5 +1,6 @@
+import { FUTBIN_FORMATIONS } from "./futbin-formations";
 /** Catálogo táctico solicitado; los códigos incluyen la variante para persistirla. */
-export const FORMATION_GROUPS = [
+export const LEGACY_FORMATION_GROUPS = [
   {
     defenders: 4,
     families: [
@@ -466,4 +467,19 @@ export const FORMATION_GROUPS = [
   },
 ] as const;
 export type TacticalFormationCode =
-  (typeof FORMATION_GROUPS)[number]["families"][number]["variants"][number]["code"];
+  (typeof LEGACY_FORMATION_GROUPS)[number]["families"][number]["variants"][number]["code"];
+
+/** Current selectable catalogue, verified against the FC27 builder. */
+export const FORMATION_GROUPS = ([4, 3, 5] as const).map((defenders) => {
+  const options = FUTBIN_FORMATIONS.filter(
+    (option) => option.defenders === defenders,
+  );
+  const names = [...new Set(options.map((option) => option.family))];
+  return {
+    defenders,
+    families: names.map((name) => ({
+      name,
+      variants: options.filter((option) => option.family === name),
+    })),
+  };
+});
