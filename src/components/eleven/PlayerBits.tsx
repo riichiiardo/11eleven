@@ -39,15 +39,17 @@ function PlayerFace({
   group: PositionGroup;
   sizes: string;
 }) {
-  const [broken, setBroken] = useState(false);
-  const showPhoto = Boolean(photo) && !broken;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showPhoto = Boolean(photo) && failedUrl !== photo;
   return showPhoto ? (
     <img
       src={photo ?? undefined}
       alt=""
       loading="lazy"
-      onError={() => setBroken(true)}
-      className={cn("rounded-full object-cover object-top", sizes)}
+      onError={() => setFailedUrl(photo ?? null)}
+      decoding="async"
+      style={{ borderRadius: "50%" }}
+      className={cn("rounded-full object-contain object-center", sizes)}
     />
   ) : (
     <span
@@ -68,7 +70,13 @@ function PlayerFace({
  * snapshot. Si el emoji no mapea a un país (🌍, 🏳️) o el CDN falla, se muestra
  * el emoji original como fallback. `className` ajusta el tamaño.
  */
-export function PlayerFlag({ flag, className }: { flag: string; className?: string }) {
+export function PlayerFlag({
+  flag,
+  className,
+}: {
+  flag: string;
+  className?: string;
+}) {
   const [broken, setBroken] = useState(false);
   const emoji = flag?.match(/\p{Extended_Pictographic}/u)?.[0] ?? "";
   let code: string | null = null;
@@ -98,7 +106,10 @@ export function PlayerFlag({ flag, className }: { flag: string; className?: stri
       alt=""
       loading="lazy"
       onError={() => setBroken(true)}
-      className={cn("h-[18px] rounded-md ring-1 ring-black/10 dark:ring-white/15", className)}
+      className={cn(
+        "h-[18px] rounded-md ring-1 ring-black/10 dark:ring-white/15",
+        className,
+      )}
     />
   );
 }
@@ -135,7 +146,12 @@ export function PlayerAvatar({
 }) {
   return (
     <span className={cn("relative inline-flex shrink-0", className)}>
-      <PlayerFace name={name} photo={photo} group={group} sizes={AVATAR_SIZES[size]} />
+      <PlayerFace
+        name={name}
+        photo={photo}
+        group={group}
+        sizes={AVATAR_SIZES[size]}
+      />
       {flag ? (
         <span
           className="absolute -bottom-1 -left-1.5 inline-flex overflow-hidden rounded-md shadow-sm ring-1 ring-white dark:ring-white/20"
@@ -171,7 +187,13 @@ export function PositionPill({
   );
 }
 
-export function OvrBadge({ ovr, className }: { ovr: number; className?: string }) {
+export function OvrBadge({
+  ovr,
+  className,
+}: {
+  ovr: number;
+  className?: string;
+}) {
   const tone =
     ovr >= 87
       ? "bg-gold/20 text-amber-800 dark:text-amber-200 ring-gold/40"
@@ -213,7 +235,11 @@ export function AvailabilityBadge({
       <span aria-hidden="true" className="text-xs leading-none">
         {meta.symbol}
       </span>
-      {showLabel ? <span>{meta.label}</span> : <span className="sr-only">{meta.label}</span>}
+      {showLabel ? (
+        <span>{meta.label}</span>
+      ) : (
+        <span className="sr-only">{meta.label}</span>
+      )}
     </span>
   );
 }
@@ -234,7 +260,11 @@ export function AvailabilityPicker({
   name?: string;
 }) {
   return (
-    <div role="radiogroup" aria-label="Situación del jugador" className="grid gap-2 sm:grid-cols-2">
+    <div
+      role="radiogroup"
+      aria-label="Situación del jugador"
+      className="grid gap-2 sm:grid-cols-2"
+    >
       {AVAILABILITIES.map((option) => {
         const meta = AVAILABILITY_META[option];
         const selected = option === value;

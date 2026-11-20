@@ -191,3 +191,35 @@ Valoración General, Potencial, Equipo y Valor. Valor admite euros, K y M;
 se guarda como importe entero en euros. Todas las posiciones y los datos originales
 se conservan en `source_record`. La tabla de consulta es `public.players`;
 `catalog_active = true` identifica el pool vigente y `sofifa_id` su identidad externa.
+
+
+### Rostros de jugadores
+
+Aplicar `player-images.sql` después de `player-pool.sql` y desplegar
+`supabase/functions/player-portraits/index.ts`, con verificación JWT activada y
+`src/domain/player-image.ts` incluido como dependencia relativa.
+
+El CSV admite la columna opcional `Imagen_URL`, con una URL directa de
+`cdn.sofifa.net/players/.../.../27_120.png`. El ID de la ruta debe coincidir
+con el ID de SoFIFA del registro. También se reconoce `data-src` antes de `src`
+si se proporciona HTML de la primera celda. Los archivos anteriores sin foto
+siguen siendo compatibles y no borran rostros almacenados.
+
+La importación añade tareas privadas por jugador. El descargador autenticado
+comprueba el permiso de administrador y procesa lotes acotados, intenta 240 px
+y vuelve a 120/original cuando el origen responde 404. Un 403 o 429 detiene el
+lote y conserva pendientes los trabajos restantes. No se eluden bloqueos.
+Solo se aceptan PNG con límites de tamaño y dimensiones, sin redirecciones.
+
+Las imágenes se guardan en el bucket público `player-faces`, creado por el
+servicio al guardar la primera foto válida. Las escrituras usan exclusivamente
+la credencial del servidor. La columna `public.players."Imagen_URL"` contiene
+la URL pública en Storage; `photo` refleja este valor para mantener el contrato
+del frontend. Cada archivo usa ID de SoFIFA y hash del contenido para evitar
+avatares cacheados tras una actualización. La cola usa leases y no sobrescribe
+con respuestas de una importación anterior.
+
+Administración → Catálogo muestra guardadas, pendientes, en proceso y errores;
+permite comprobar una foto antes de importar y reintentar descargas. Una foto
+fallida conserva la anterior o muestra iniciales. El rostro mantiene su borde
+circular y los overlays existentes de valoración y capitán.
