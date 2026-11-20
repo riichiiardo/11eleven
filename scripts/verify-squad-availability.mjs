@@ -59,14 +59,16 @@ try {
   const client = await server.ssrLoadModule(
     "/src/infrastructure/supabase/client.ts",
   );
+  let lastResult;
   client.setExecutor(async (name, args) => {
     assert.equal(name, "change_squad_availability");
-    return (
+    lastResult = (
       await db.query(
         "select public.change_squad_availability($1,$2,$3) value",
         [args.p_squad_player_id, args.p_availability, args.p_withdraw],
       )
     ).rows[0].value;
+    return lastResult;
   });
   const { useSquadActions } = await server.ssrLoadModule(
     "/src/hooks/use-squad-actions.ts",
@@ -165,6 +167,23 @@ try {
         [id(60), status, confirm],
       )
     ).rows[0].value;
+  const { queryStore } = await server.ssrLoadModule(
+    "/src/services/backend/query-store.ts",
+  );
+  const dashboardSnapshot = { club: "keeps the owning screen mounted" };
+  await queryStore.load(
+    "confirmation-regression",
+    async () => dashboardSnapshot,
+  );
+  assert.equal(
+    await actions.saveAvailability(id(60), "neutro", "Jugador anunciado"),
+    false,
+  );
+  assert.equal(
+    queryStore.get("confirmation-regression").data,
+    dashboardSnapshot,
+    "A confirmation response must not unmount the dashboard",
+  );
   assert.equal((await change("neutro")).requiresWithdrawal, true);
   await db.exec("reset role");
   const snapshot = async () => ({
@@ -211,7 +230,16 @@ try {
     "drop trigger zz_test_reject_market on public.squad_players;drop function public.test_reject_market();",
   );
   await login(1);
-  const withdrawn = await change("neutro", true);
+  assert.equal(
+    await actions.saveAvailability(id(60), "neutro", "Jugador anunciado", true),
+    true,
+  );
+  const withdrawn = lastResult;
+  assert.equal(
+    queryStore.get("confirmation-regression").data,
+    undefined,
+    "A confirmed change must refresh the dashboard",
+  );
   assert.equal(withdrawn.withdrawn, true);
   assert.equal(withdrawn.requiresWithdrawal, false);
   await db.exec("reset role");
@@ -328,7 +356,7 @@ try {
     ],
   );
   console.log(
-    "PASS availability: real hook/RPC/PostgreSQL for two presidents and four states, installed outgoing trigger, side-effect-free confirmation, atomic withdrawal/status, rollback, stale revisions, draft/review locks and foreign/anonymous denial.",
+    "PASS availability: real hook/RPC/PostgreSQL for two presidents and four states, installed outgoing trigger, side-effect-free confirmation with retained dashboard cache, atomic withdrawal/status, rollback, stale revisions, draft/review locks and foreign/anonymous denial.",
   );
 } finally {
   await db.close();
