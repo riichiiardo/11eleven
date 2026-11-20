@@ -229,3 +229,7 @@ Las importaciones completas guardan la cabecera del respaldo en `app.pool_import
 ### Código táctico por equipo
 
 Instalar `squad-tactics.sql` después de `schema.sql` y `rpc.sql`. Guarda el código de importación de FC 27 y las instrucciones en la plantilla del presidente; es independiente de `squads.formation`, del once y de las reglas generales. Las RPC comprueban propiedad y universo activo. El formulario tiene su propio botón Guardar, también disponible con un once incompleto y sin permisos de administrador. Los códigos antiguos de reglas no se copian porque representaban esquemas, no códigos de importación.
+
+### Situación de mercado de la plantilla
+
+Para instalaciones existentes, aplicar `market-availability.sql`; la definición canónica también está en `rpc.sql`. `set_availability` requiere el ID de `squad_players`, no el ID de `players`. Solo permite modificar una ficha propia con sesión válida, membresía vigente y universo activo coincidente. Mi Club, Plantilla y Estado de jugadores utilizan el mismo contrato; el cliente rechaza parámetros incompletos antes de enviar la consulta.

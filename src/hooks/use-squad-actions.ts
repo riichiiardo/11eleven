@@ -11,20 +11,22 @@ export function useSquadActions() {
   const [savingAvailability, setSavingAvailability] = useState(false);
 
   const saveAvailability = async (
-    playerId: Id<"players">,
+    squadPlayerId: Id<"squadPlayers">,
     availability: PlayerAvailability,
     playerName: string,
   ) => {
     setSavingAvailability(true);
     try {
-      await setAvailabilityMutation({ playerId, availability });
+      await setAvailabilityMutation({ squadPlayerId, availability });
       toast.success("Situación actualizada", {
         description: `${playerName} ahora figura como ${availability}.`,
       });
+      return true;
     } catch (cause) {
       toast.error("No se pudo actualizar la situación", {
         description: errorMessage(cause),
       });
+      return false;
     } finally {
       setSavingAvailability(false);
     }

@@ -220,9 +220,9 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
         saving={savingAvailability}
         assignLabel="Alinear en el XI"
         onAssign={goToFormation}
-        onSaveAvailability={async (playerId, availability) => {
-          if (!selected) return;
-          await saveAvailability(playerId, availability, selected.name);
+        onSaveAvailability={async (squadPlayerId, availability) => {
+          if (!selected) return false;
+          return saveAvailability(squadPlayerId, availability, selected.name);
         }}
       />
     </div>
