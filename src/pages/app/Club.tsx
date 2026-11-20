@@ -1,3 +1,4 @@
+import { SoldPlayerDialog } from "@/components/eleven/SoldPlayerDialog";
 import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
 import { useState } from "react";
 import { DraftPrelist } from "@/components/eleven/DraftPrelist";
@@ -34,7 +35,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
   const navigate = useNavigate();
-  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability } = useSquadActions();
+  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability, pendingSale, cancelSale } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
 
   if (!state) return <DashboardUnavailable title="Mi club" />;
@@ -54,6 +55,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      {pendingSale ? <SoldPlayerDialog key={pendingSale.squadPlayerId} selection={pendingSale} onClose={cancelSale} /> : null}
       <AvailabilityWithdrawalDialog change={pendingAvailability} busy={savingAvailability} onCancel={cancelAvailability} onConfirm={confirmAvailability} />
       <section className="card-soft flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
@@ -180,6 +182,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
                   "negociacion",
                   "neutro",
                   "intransferible",
+                  "vendido",
                 ] as const
               ).map((option) => (
                 <li
@@ -188,7 +191,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
                 >
                   <AvailabilityBadge availability={option} />
                   <span className="num text-sm font-bold">
-                    {state.availability[option]}
+                    {state.availability[option] ?? 0}
                   </span>
                 </li>
               ))}

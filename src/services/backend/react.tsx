@@ -1,3 +1,4 @@
+import { withSaleMarket, withSaleSquad } from "@/domain/sale-status";
 import { availabilityArgs } from "@/services/backend/squad-availability";
 /**
  * Hooks de autenticación, consulta y acciones sobre el backend Supabase.
@@ -213,7 +214,7 @@ function resolveRead(
         p_only_affordable: args?.onlyAffordable ?? false,
         p_limit: args?.limit ?? 24,
         p_offset: args?.offset ?? 0,
-      });
+      }).then(withSaleMarket);
     case "market.overview":
       return rpc<Record<string, unknown> | null>("market_overview").then(
         adaptMarketOverview,
@@ -233,7 +234,7 @@ function resolveRead(
     case "teams.squadOf":
       return rpc<Record<string, unknown> | null>("team_squad", {
         p_club_id: args?.clubId,
-      });
+      }).then(withSaleSquad);
     case "footballSync.catalogState":
       return rpc<Record<string, unknown>>("catalog_state");
     case "tournament.adminOverview":

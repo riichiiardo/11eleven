@@ -228,7 +228,7 @@ export type DbSquadPlayer = {
   squad_id: string;
   player_id: string;
   president_id: string;
-  availability: "transferible" | "negociacion" | "neutro" | "intransferible";
+  availability: "transferible" | "negociacion" | "neutro" | "intransferible" | "vendido";
   ovr_at_join: number;
   value_at_join: number;
   joined_at: string;

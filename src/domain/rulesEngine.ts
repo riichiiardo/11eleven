@@ -101,6 +101,7 @@ export const AVAILABILITIES = [
   "negociacion",
   "neutro",
   "intransferible",
+  "vendido",
 ] as const;
 
 export type PlayerAvailability = (typeof AVAILABILITIES)[number];
@@ -115,6 +116,11 @@ export type AvailabilityMeta = {
 
 /** Icon + text + colour: availability is never communicated by colour alone. */
 export const AVAILABILITY_META: Record<PlayerAvailability, AvailabilityMeta> = {
+  vendido: {
+    label: "Vendido", symbol: "✓✓", tone: "positive",
+    className: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    description: "Venta anunciada a un equipo de una negociación activa. El traspaso se gestiona en Negociaciones.",
+  },
   transferible: {
     label: "Transferible",
     symbol: "✓",
@@ -464,6 +470,8 @@ export type SquadPlayerView = {
   nationality: string;
   flag: string;
   availability: PlayerAvailability;
+  soldToClubId?: Id<"clubs"> | null;
+  soldToClubName?: string | null;
   realClub: string;
   realLeague: string;
   fcVersion: string;

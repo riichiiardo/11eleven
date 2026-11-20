@@ -230,6 +230,7 @@ export function PlayerDialog({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Situación en el mercado
             </p>
+            {player.availability === "vendido" ? <p className="text-sm text-sky-700">Vendido a {player.soldToClubName ?? "equipo por consultar"}. <button type="button" className="underline" onClick={() => void onSaveAvailability(player.squadPlayerId,"vendido")}>Editar venta</button></p> : null}
             {current ? (
               <AvailabilityPicker
                 value={current}

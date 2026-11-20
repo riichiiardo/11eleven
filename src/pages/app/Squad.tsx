@@ -1,3 +1,4 @@
+import { SoldPlayerDialog } from "@/components/eleven/SoldPlayerDialog";
 import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
 import { useState } from "react";
 import type { AppStateView } from "@/domain/appTypes";
@@ -25,7 +26,7 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
   const contextState = useDashboardState();
   const state = directState ?? contextState;
   const navigate = useNavigate();
-  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability } = useSquadActions();
+  const { saveAvailability, savingAvailability, pendingAvailability, confirmAvailability, cancelAvailability, pendingSale, cancelSale } = useSquadActions();
   const [selected, setSelected] = useState<SquadPlayerView | null>(null);
 
   if (!state) return <DashboardUnavailable title="Plantilla" />;
@@ -51,6 +52,7 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
+      {pendingSale ? <SoldPlayerDialog key={pendingSale.squadPlayerId} selection={pendingSale} onClose={cancelSale} /> : null}
       <AvailabilityWithdrawalDialog change={pendingAvailability} busy={savingAvailability} onCancel={cancelAvailability} onConfirm={confirmAvailability} />
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>

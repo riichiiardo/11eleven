@@ -1,3 +1,4 @@
+import { withSaleStatus } from "@/domain/sale-status";
 /**
  * 11Eleven — adaptadores de las RPCs de lectura.
  *
@@ -7,6 +8,7 @@
  */
 
 import {
+  AVAILABILITIES,
   autoLineup,
   evaluateLineup,
   evaluateSquadRules,
@@ -29,7 +31,7 @@ export function adaptTournamentState(raw: Json | null): Json | null {
   const state = raw as unknown as AppStateView;
   if (!state.rules || !state.club) return raw;
   const rules = effectiveRules(state.rules as ConfiguredRules);
-  const squad = state.squad ?? [];
+  const squad = (state.squad ?? []).map(withSaleStatus);
   const saved = state.lineup;
   const formation =
     saved && isFormationCode(saved.formation)
@@ -74,6 +76,7 @@ export function adaptTournamentState(raw: Json | null): Json | null {
     ...raw,
     rules,
     squad,
+    availability: Object.fromEntries(AVAILABILITIES.map(status => [status, squad.filter(player => player.availability === status).length])),
     lineup,
     evaluation,
     actions:
