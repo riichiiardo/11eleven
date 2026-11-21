@@ -256,18 +256,18 @@ export default function Market() {
               aria-hidden="true"
               className="h-4 w-1 rounded-full bg-brand"
             />
-            {players === undefined
+            {browseView === undefined
               ? "Cargando jugadores…"
-              : `${players.length} jugador(es) en ${SCOPE_LABEL[scope].toLowerCase()}`}
+              : `${players.length} de ${browseView?.total ?? 0} jugadores en ${SCOPE_LABEL[scope].toLowerCase()}`}
           </h2>
-          {players !== undefined && players.length > 0 ? (
+          {players.length > 0 ? (
             <p className="text-[11px] text-muted-foreground">
               Presupuesto reservado: {formatMoney(summary.committedCash)}
             </p>
           ) : null}
         </div>
 
-        {players === undefined ? (
+        {browseView === undefined ? (
           <div className="card-soft flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             Consultando el catálogo del torneo…
