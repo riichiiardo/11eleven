@@ -1,3 +1,4 @@
+import { ACCOUNT_PASSWORD_PATTERN as PASSWORD_PATTERN, ACCOUNT_PASSWORD_HINT as PASSWORD_HINT } from "@/domain/account-management";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,10 +25,6 @@ interface AuthProps {
   redirectAfterAuth?: string;
 }
 
-const PASSWORD_PATTERN =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{6,}$/;
-const PASSWORD_HINT =
-  "Mínimo 6 caracteres: incluye mayúsculas, minúsculas, números y un carácter especial.";
 
 function resolveRedirectAfterAuth(
   returnTo: string | null,
