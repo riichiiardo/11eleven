@@ -21,6 +21,7 @@ const suites = [
   ["scripts/verify-squad-availability.mjs"],
   ["scripts/verify-sold-players.mjs"],
   ["scripts/verify-transfer-modes.mjs"],
+  ["scripts/verify-president-accounts.mjs"],
 ];
 
 for (const args of suites) {

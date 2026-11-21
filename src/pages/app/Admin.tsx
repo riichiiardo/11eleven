@@ -1,3 +1,4 @@
+import { PresidentAccountDialog } from "@/components/eleven/admin/PresidentAccountDialog";
 import { useState } from "react";
 import type { AdminOverviewView, AppStateView } from "@/domain/appTypes";
 import { api } from "@/services/backend/api";
@@ -221,7 +222,7 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="presidentes" className="flex flex-col gap-5">
-          <PresidentsPanel overview={overview} />
+          <PresidentsPanel overview={overview} isPrincipal={state.adminRole === "principal"} />
         </TabsContent>
 
         <TabsContent value="mercado" className="flex flex-col gap-5">
@@ -1087,7 +1088,7 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
   );
 }
 
-function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
+function PresidentsPanel({ overview, isPrincipal }: { overview: AdminOverviewView; isPrincipal: boolean }) {
   const grantAdmin = useMutation(api.tournament.grantAdmin);
   const revokeAdmin = useMutation(api.tournament.revokeAdmin);
   const [email, setEmail] = useState("");
@@ -1123,6 +1124,7 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
         <InviteCard code={overview.tournament.code} />
       ) : null}
 
+      {isPrincipal && overview.tournament ? <div className="flex flex-wrap items-center gap-3"><PresidentAccountDialog tournamentId={overview.tournament.id} /><p className="text-xs text-muted-foreground">Solo el administrador principal puede crear cuentas o cambiar su acceso.</p></div> : null}
       <SectionCard
         title="Presidentes del torneo"
         icon={Users}
@@ -1138,7 +1140,7 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                 <TableHead className="text-right">Presupuesto</TableHead>
                 <TableHead>Rol administrativo</TableHead>
                 <TableHead>Acciones</TableHead>
-                <TableHead>Se unioprova</TableHead>
+                <TableHead>Se unió</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1153,7 +1155,7 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                     </p>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {president.clubName}
+                    {president.clubName ?? "Pendiente de elegir equipo"}
                   </TableCell>
                   <TableCell className="num text-center">
                     {president.squadSize}
@@ -1199,6 +1201,7 @@ function PresidentsPanel({ overview }: { overview: AdminOverviewView }) {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1.5">
+                      {isPrincipal && !president.adminRole && overview.tournament ? <PresidentAccountDialog tournamentId={overview.tournament.id} target={president} /> : null}
                       <ChangeClubDialog
                         president={president}
                         teams={overview.availableTeams}

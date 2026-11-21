@@ -23,6 +23,7 @@ Aplica los scripts en este orden, después de revisar el destino y sus permisos:
 14. `squad-tactics.sql`
 15. `market-sold.sql`
 16. `transfer-modes.sql`
+17. `president-accounts.sql`
 
 No hay un seed alternativo de equipos. El catálogo se carga desde la fuente
 configurada por sincronización explícita. `catalog.sql` configura staging
@@ -262,3 +263,15 @@ Aplicar `transfer-modes.sql` después de `market-sold.sql` antes de publicar el 
 El propietario puede cancelar una venta aprobada mediante `cancel_sale`, seleccionando una propuesta activa de otro manager por el mismo jugador y explicando por qué la considera mejor. Se verifica presupuesto y propiedad de la alternativa. Esto solo cancela la venta anterior: la nueva requiere aprobación separada. El comprador puede retirar una propuesta pendiente, pero no una compra ya aprobada. Una operación ejecutada no admite esta cancelación. No se reactivan ofertas invalidadas antes de esta mejora.
 
 Pruebas aisladas: `node scripts/verify-transfer-modes.mjs`; formulario con datos ficticios: `node scripts/preview-transfer-modes.mjs`. Ninguna de estas pruebas modifica producción.
+
+## Cuentas de presidentes gestionadas por el principal
+
+Aplicar `president-accounts.sql` y desplegar la Edge Function `president-accounts` antes del frontend. La función necesita `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`, disponibles únicamente en su entorno de servidor. Nunca añadir esta última a variables `VITE_`. La dependencia de supabase-js está fijada en el import del servidor.
+
+Al abrir el formulario, una comprobación sin escrituras valida la sesión y los permisos antes de habilitar los campos. La función verifica cada bearer token con `auth.getUser(token)` y consulta el rol principal y el universo activo en PostgreSQL. Su despliegue mantiene `verify_jwt: true` y añade una segunda verificación de sesión dentro del handler. Si se rotan las claves de Auth, verificar también la compatibilidad del control JWT gestionado antes de publicar cambios. Las RPCs de autorización y finalización solo son ejecutables por `service_role`.
+
+En Administración → Presidentes, el principal puede crear una cuenta con correo y contraseña, confirmada sin correo OTP. Se añade la membresía y una presidencia sin club ni presupuesto; al elegir equipo se aplica el presupuesto normal de ese club. Un correo existente no se reutiliza ni se sobrescribe al crear. En caso de fallo al registrar la presidencia se intenta retirar exclusivamente la cuenta recién creada.
+
+«Editar acceso» permite cambiar correo y/o contraseña de los presidentes del universo; contraseña vacía conserva la actual. La contraseña nunca se devuelve, muestra ni escribe en las tablas del juego o la auditoría. El correo se sincroniza desde Auth mediante trigger. Un cambio de credenciales afecta a la cuenta global y conserva equipos y presupuestos. Las cuentas con cualquier rol administrativo están protegidas de esta opción, incluida la propia cuenta del principal.
+
+Verificación aislada: `node scripts/verify-president-accounts.mjs` combina PostgreSQL real en PGlite con un proveedor Auth ficticio; `node scripts/preview-president-accounts.mjs` prueba el formulario sin usuarios reales. Para probar un cambio de credenciales de una cuenta real desde el navegador, la persona debe introducir y guardar las credenciales por sí misma.
