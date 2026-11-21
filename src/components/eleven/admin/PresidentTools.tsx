@@ -192,9 +192,7 @@ export function ChangeClubDialog({
               Cambiar equipo de {president.displayName}
             </DialogTitle>
             <DialogDescription>
-              Mueve la presidencia a cualquier equipo disponible del pool. La plantilla, el
-              presupuesto y el historial del Presidente se conservan; si el destino ya juega en el
-              calendario, el club anterior queda libre.
+              El presidente recibe la plantilla del equipo elegido y conserva su presupuesto. El equipo anterior queda libre con sus jugadores.
             </DialogDescription>
           </DialogHeader>
 
@@ -230,7 +228,7 @@ export function ChangeClubDialog({
               <p className="text-[11px] text-muted-foreground">
                 {teams.length > 0
                   ? `${teams.length} equipo(s) disponible(s) ahora mismo.`
-                  : "No hay equipos libres: elimina una presidencia o amplía el catálogo."}
+                  : "Todos los equipos de este universo tienen presidente."}
               </p>
             </div>
 
