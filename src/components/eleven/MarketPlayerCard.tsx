@@ -22,6 +22,7 @@ export function MarketPlayerCard({
   budgetAvailable,
   onOffer,
   showDetail = false,
+  row = false,
   bid,
   bidsReady = true,
 }: {
@@ -29,6 +30,7 @@ export function MarketPlayerCard({
   budgetAvailable: number;
   onOffer: (player: MarketPlayerView) => void;
   showDetail?: boolean;
+  row?: boolean;
   bid?: DepartureBid;
   bidsReady?: boolean;
 }) {
@@ -42,7 +44,7 @@ export function MarketPlayerCard({
   return (
     <article
       className={cn(
-        "card-soft flex h-full flex-col gap-3 p-3.5 transition-shadow hover:shadow-md",
+        row ? "grid items-center gap-2 px-4 py-2 sm:grid-cols-[minmax(12rem,2fr)_1fr_1.3fr_auto] hover:bg-muted/30" : "card-soft flex h-full flex-col gap-3 p-3.5 transition-shadow hover:shadow-md",
         !player.offerable && "opacity-90",
       )}
     >
@@ -126,7 +128,7 @@ export function MarketPlayerCard({
         </div>
       )}
 
-      <div className="mt-auto flex items-center gap-2">
+      <div className={cn("flex items-center gap-2", !row && "mt-auto")}>
         {player.offerable ? (
           <Button
             type="button"

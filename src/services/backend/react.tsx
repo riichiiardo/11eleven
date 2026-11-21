@@ -208,7 +208,9 @@ function resolveRead(
         adaptTournamentState,
       );
     case "market.browse":
-      return rpc<Record<string, unknown>>("market_browse", {
+      return rpc<Record<string, unknown>>("market_search", {
+        p_search: args?.search ?? "",
+        p_group: args?.group ?? "todos",
         p_scope: args?.scope ?? "todos",
         p_sort: args?.sort ?? "ovr",
         p_only_affordable: args?.onlyAffordable ?? false,

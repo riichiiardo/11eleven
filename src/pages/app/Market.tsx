@@ -64,6 +64,8 @@ export default function Market() {
   const [advancedOffer, setAdvancedOffer] = useState(false);
   const [selected, setSelected] = useState<MarketPlayerView | null>(null);
 
+  const [offset, setOffset] = useState(0);
+  const pageSize = 50;
   const marketOpen = state.tournament?.marketOpen ?? false;
 
   // browse returns { players, total, nationalities }; the list body consumes the
@@ -78,7 +80,8 @@ export default function Market() {
     group: group as "GK" | "DEF" | "MID" | "FWD" | "todos",
     sort: sort as "ovr" | "value" | "age" | "name",
     onlyAffordable,
-    limit: 60,
+    limit: pageSize,
+    offset,
   });
   const players: MarketPlayerView[] = browseView?.players ?? EMPTY_PLAYERS;
 
@@ -167,7 +170,7 @@ export default function Market() {
               type="button"
               role="tab"
               aria-selected={scope === option}
-              onClick={() => setScope(option)}
+              onClick={() => { setOffset(0); setScope(option); }}
               className={cn(
                 "min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors",
                 scope === option
@@ -192,7 +195,7 @@ export default function Market() {
                 id="market-search"
                 type="search"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => { setOffset(0); setSearch(event.target.value); }}
                 placeholder="Jugador, nacionalidad, posición o club…"
                 className="h-11 w-full rounded-lg border bg-card pl-9 pr-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
@@ -200,7 +203,7 @@ export default function Market() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="market-group">Posición</Label>
-            <Select value={group} onValueChange={setGroup}>
+            <Select value={group} onValueChange={(value) => { setOffset(0); setGroup(value); }}>
               <SelectTrigger id="market-group" className="min-h-11">
                 <SelectValue />
               </SelectTrigger>
@@ -215,7 +218,7 @@ export default function Market() {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="market-sort">Ordenar por</Label>
-            <Select value={sort} onValueChange={setSort}>
+            <Select value={sort} onValueChange={(value) => { setOffset(0); setSort(value); }}>
               <SelectTrigger id="market-sort" className="min-h-11">
                 <SelectValue />
               </SelectTrigger>
@@ -232,10 +235,10 @@ export default function Market() {
             <Switch
               id="market-affordable"
               checked={onlyAffordable}
-              onCheckedChange={setOnlyAffordable}
+              onCheckedChange={(value) => { setOffset(0); setOnlyAffordable(value); }}
             />
             <Label htmlFor="market-affordable" className="text-sm">
-              Solo lo que puedo fichar
+              Dentro de mi presupuesto
             </Label>
           </div>
         </div>
@@ -256,18 +259,18 @@ export default function Market() {
               aria-hidden="true"
               className="h-4 w-1 rounded-full bg-brand"
             />
-            {players === undefined
+            {browseView === undefined
               ? "Cargando jugadores…"
-              : `${players.length} jugador(es) en ${SCOPE_LABEL[scope].toLowerCase()}`}
+              : `${players.length ? offset + 1 : 0}–${offset + players.length} de ${browseView?.total ?? 0} jugadores en ${SCOPE_LABEL[scope].toLowerCase()}`}
           </h2>
-          {players !== undefined && players.length > 0 ? (
+          {players.length > 0 ? (
             <p className="text-[11px] text-muted-foreground">
               Presupuesto reservado: {formatMoney(summary.committedCash)}
             </p>
           ) : null}
         </div>
 
-        {players === undefined ? (
+        {browseView === undefined ? (
           <div className="card-soft flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             Consultando el catálogo del torneo…
@@ -275,6 +278,7 @@ export default function Market() {
         ) : players.length === 0 ? (
           <EmptyMarket
             onReset={() => {
+              setOffset(0);
               setSearch("");
               setGroup("todos");
               setOnlyAffordable(false);
@@ -282,7 +286,7 @@ export default function Market() {
             }}
           />
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="divide-y overflow-hidden rounded-lg border bg-card">
             {players.map((player) => (
               <li key={player.playerId}>
                 <MarketPlayerCard
@@ -291,11 +295,18 @@ export default function Market() {
                   bidsReady={!bidding.loading && !bidding.error}
                   budgetAvailable={state.budget.available}
                   onOffer={(target) => { setAdvancedOffer(false); setSelected(target); }}
-                  showDetail
+                  row
                 />
               </li>
             ))}
           </ul>
+        )}
+        {browseView && browseView.total > pageSize && (
+          <nav aria-label="Páginas de jugadores" className="flex items-center justify-end gap-3">
+            <Button variant="outline" disabled={offset === 0} onClick={() => setOffset(offset - pageSize)}>Anterior</Button>
+            <span>Página {1 + offset / pageSize} de {Math.ceil(browseView.total / pageSize)}</span>
+            <Button variant="outline" disabled={offset + pageSize >= browseView.total} onClick={() => setOffset(offset + pageSize)}>Siguiente</Button>
+          </nav>
         )}
       </section>
 
