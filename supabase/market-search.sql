@@ -29,14 +29,14 @@ begin
       'playerId', pool.id, 'name', pool.name, 'position', pool.position, 'group', pool."group",
       'ovr', pool.ovr, 'age', pool.age, 'value', pool.value, 'nationality', pool.nationality, 'flag', pool.flag,
       'realClub', pool.real_club, 'realLeague', pool.real_league, 'fcVersion', pool.fc_version, 'photo', pool.photo,
-      'kind', case when pool.owner_president_id is null then 'libre' else 'club' end,
+      'kind', case when pool.squad_player_id is null then 'libre' else 'club' end,
       'ownerClubId', pool.owner_club_id, 'ownerClubName', pool.owner_club_name, 'ownerShortName', pool.owner_short_name,
       'ownerColors', case when pool.owner_club_id is null then null else jsonb_build_array(pool.color_primary, pool.color_secondary) end,
       'ownerNickname', pool.owner_nickname, 'ownerPresidentId', pool.owner_president_id,
       'ownerIsMe', pool.owner_president_id = v_me.id,
       'availability', case when pool.availability='vendido' then 'intransferible' else coalesce(pool.availability,'libre') end, 'saleStatus',case when pool.availability='vendido' then 'vendido' else null end, 'soldToClubId',pool.sold_to_club_id,'soldToClubName',pool.sold_to_club_name,
-      'offerable', (pool.owner_president_id is null or (pool.availability in ('transferible','negociacion','neutro','vendido') and pool.owner_president_id <> v_me.id)),
-      'blockedReason', case when pool.owner_president_id = v_me.id then 'Es tu propio jugador'
+      'offerable', (pool.squad_player_id is null or (pool.availability in ('transferible','negociacion','neutro','vendido') and pool.owner_president_id <> v_me.id)),
+      'blockedReason', case when pool.squad_player_id is not null and pool.owner_president_id is null then 'Club sin presidente' when pool.owner_president_id = v_me.id then 'Es tu propio jugador'
                              when pool.availability = 'intransferible' then 'Intransferible'
                             else null end,
       'committedOfferId', null, 'withinBudget', pool.value <= v_me.budget,
@@ -44,23 +44,21 @@ begin
     ) as item
     from pool
     where ((p_scope = 'todos')
-        or (p_scope = 'libres' and pool.owner_president_id is null)
+        or (p_scope in ('libre','libres') and pool.squad_player_id is null)
         or (p_scope = 'clubes' and pool.owner_president_id is not null and pool.owner_president_id is distinct from v_me.id)
         or (p_scope = 'transferibles' and pool.availability = 'transferible' and pool.owner_president_id <> v_me.id) or (p_scope = 'mios' and pool.owner_president_id = v_me.id))
       and (p_group is null or p_group = 'todos' or pool."group" = p_group)
-      and strpos(translate(lower(pool.name), 'áéíóúüñ', 'aeiouun'),
+      and strpos(translate(lower(concat_ws(' ', pool.name, pool.nationality, pool.position, pool.real_club, pool.owner_club_name)), 'áéíóúüñ', 'aeiouun'),
                  translate(lower(trim(coalesce(p_search, ''))), 'áéíóúüñ', 'aeiouun')) > 0
       and (not p_only_affordable or pool.value <= v_me.budget)
   ),
   paged as (
     select row_number() over (
       order by
-        case
-          when p_sort in ('value','valor','precio') then (item->>'value')::numeric
-          when p_sort in ('age','edad') then (item->>'age')::numeric
-          else (item->>'ovr')::numeric
-        end desc,
-        (item->>'name') asc
+        case when p_sort = 'age' then (item->>'age')::integer end asc nulls last,
+        case when p_sort = 'value' then (item->>'value')::numeric end desc nulls last,
+        case when p_sort not in ('age','value','name') then (item->>'ovr')::integer end desc nulls last,
+        lower(item->>'name'), item->>'playerId'
     ) as ord,
     item
     from filtered
