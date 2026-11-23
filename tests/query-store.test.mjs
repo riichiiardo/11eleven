@@ -57,3 +57,21 @@ test("mutation invalidation notifies consumers; unsubscription removes listeners
   store.invalidateAll();
   assert.equal(notified, 1);
 });
+
+test("returning to a tab retains dashboard data until the authenticated user changes", async () => {
+  const store = new QueryStore();
+  store.setSessionUser("president-a");
+  await store.load("dashboard", async () => ({ club: "Parma" }));
+  const loaded = store.get("dashboard");
+  let notifications = 0;
+  store.subscribe("dashboard", () => notifications++);
+  store.setSessionUser("president-a");
+  store.setSessionUser("president-a");
+  assert.equal(store.get("dashboard"), loaded);
+  assert.equal(notifications, 0);
+  store.setSessionUser("president-b");
+  assert.equal(store.get("dashboard").data, undefined);
+  await store.load("dashboard", async () => ({ club: "Racing" }));
+  store.setSessionUser(null);
+  assert.equal(store.get("dashboard").data, undefined);
+});
