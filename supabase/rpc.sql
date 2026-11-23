@@ -170,7 +170,7 @@ begin
   insert into public.squad_players (tournament_id, club_id, squad_id, player_id, president_id, ovr_at_join, value_at_join)
   select v_tid, v_club.id, s.id, p.id, v_president, p.ovr, p.value
   from public.squads s
-  join public.players p on coalesce(p.source_record->>'game_team', p.real_club) = v_team.name
+  join public.players p on (p.source_record->>'game_team') = v_team.name
   where s.club_id = v_club.id
     and not exists (
       select 1 from public.squad_players existing

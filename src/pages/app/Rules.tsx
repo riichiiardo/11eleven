@@ -396,17 +396,6 @@ export function RulesEditor({
             />
           </SectionCard>
         ))}
-        <SectionCard title="R-07 · Jugadores por club de origen" icon={Scale}>
-          <RangeEditor
-            label="Club de origen"
-            value={draft.realClub}
-            onChange={(realClub) => set({ realClub })}
-          />
-          <p className="mt-2 text-sm">
-            Rango por cada club externo representado. Se excluyen el propio club
-            y los agentes libres.
-          </p>
-        </SectionCard>
         <SectionCard title="R-10 · Cierre de alineación" icon={Scale}>
           <Stepper
             label="Horas antes del partido"

@@ -262,7 +262,7 @@ export default function Draft() {
                   id="draft-search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Nombre, club real, país…"
+                  placeholder="Nombre del jugador…"
                   className="h-11 pl-9"
                   disabled={!myTurn}
                 />
@@ -382,7 +382,7 @@ export default function Draft() {
                     <p className="truncate text-sm font-semibold">
                       {pickRow.playerName}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
-                        {POSITION_LABEL[pickRow.position]} · {pickRow.realClub}
+                        {POSITION_LABEL[pickRow.position]}
                       </span>
                     </p>
                     <p className="truncate text-[11px] text-muted-foreground">
@@ -473,7 +473,7 @@ function PoolCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">{player.name}</p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {player.realClub} · {player.age} años
+            {player.age} años
           </p>
         </div>
         <span className="num rounded-lg bg-navy px-2 py-1 text-xs font-bold text-white">
@@ -528,7 +528,7 @@ function PickDialog({
                 Fichar a {player.name}
               </DialogTitle>
               <DialogDescription>
-                {player.realClub} · {POSITION_LABEL[player.position]} · OVR{" "}
+                {POSITION_LABEL[player.position]} · OVR{" "}
                 {player.ovr} · {player.age} años
               </DialogDescription>
             </DialogHeader>

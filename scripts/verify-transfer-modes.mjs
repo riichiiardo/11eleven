@@ -326,6 +326,19 @@ try {
   assert.ok(inbox.history.every(o=>o.side==="recibida" || o.side==="enviada"));
   await db.query("select public.prelist_offer_players(),public.next_prelist_pick(),public.prelist_pool_search('test')");
   console.log("PASS scoped negotiations and prelist RPCs");
+  await db.exec("reset role;create or replace view public.active_catalog_players as select * from public.players");
+  await db.exec(readFileSync("supabase/market-search.sql","utf8"));
+  await db.exec(readFileSync("supabase/signing-eligibility.sql","utf8"));
+  await db.query("insert into app.blocked_signings values ($1,$2)",[id(10),id(50)]);
+  const terms=(players,cash,owned=true)=>db.query("select app.check_signing_terms($1,$2::uuid[],'{}',$3,$4)",[id(10),players,cash,owned]);
+  await terms([],200000000);
+  await assert.rejects(terms([],200000001),/200.000.000/);
+  await terms([],200000001,false);
+  await assert.rejects(terms([id(50)],1),/bloqueado/);
+  await assert.rejects(db.query("select app.check_signing_terms($1,'{}',$2::uuid[],200000000,true)",[id(10),[id(51)]]),/200.000.000/);
+  await login(null,"anon");
+  await assert.rejects(db.query("select public.admin_set_signing_block($1,false)",[id(50)]),/permission denied/);
+  console.log("PASS market eligibility and cash/exchange boundaries");
 } finally {
   await db.close();
 }

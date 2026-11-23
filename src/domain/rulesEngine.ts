@@ -342,18 +342,6 @@ export const RULE_DESCRIPTORS: RuleDescriptor[] = (
       value: (r) => `${r.fwdMin} - ${r.fwdMax}`,
     },
     {
-      code: "R-07",
-      title: "Máximo de jugadores por club real",
-      description:
-        "Evita concentrar la plantilla en un solo club de origen y mantiene el mercado repartido entre Presidentes.",
-      scope: "Mercado",
-      value: (r) => `${r.maxPerRealClub} jugadores`,
-      field: "maxPerRealClub",
-      min: 1,
-      max: 10,
-      step: 1,
-    },
-    {
       code: "R-08",
       title: "OVR mínimo para fichar",
       description:
@@ -556,9 +544,9 @@ export function evaluateSquadRules(
   rules: TournamentRules,
   squad: SquadPlayerView[],
   availableBudget: number,
-  /** Your own club is the squad's home club: only external clubs count. */
   ownClubName?: string,
 ): SquadEvaluation {
+  void ownClubName;
   const stats = computeSquadStats(squad);
   const checks: RuleCheck[] = [];
 
@@ -599,31 +587,6 @@ export function evaluateSquadRules(
       action: { label: "Ver plantilla", to: "/dashboard/club" },
     });
   }
-
-  const perRealClub = new Map<string, number>();
-  for (const player of squad) {
-    if (ownClubName && player.realClub === ownClubName) continue;
-    if (player.realClub === FREE_AGENT_CLUB) continue; // free agents belong to no club
-    perRealClub.set(
-      player.realClub,
-      (perRealClub.get(player.realClub) ?? 0) + 1,
-    );
-  }
-  const biggestGroup = [...perRealClub.entries()].sort(
-    (a, b) => b[1] - a[1],
-  )[0];
-  const maxFromClub = biggestGroup?.[1] ?? 0;
-  checks.push({
-    id: "real-club",
-    ruleRef: "R-07 · Jugadores por club real",
-    label: "Jugadores por club real",
-    value: `${maxFromClub} / ${rules.maxPerRealClub}`,
-    passed: maxFromClub <= rules.maxPerRealClub,
-    detail:
-      maxFromClub <= rules.maxPerRealClub
-        ? `Ningún club externo aporta más de ${rules.maxPerRealClub} jugadores a tu plantilla. Ni tu propio club ni los agentes libres cuentan para este límite.`
-        : `${biggestGroup?.[0]} aporta ${maxFromClub} jugadores a tu plantilla y el máximo es ${rules.maxPerRealClub}.`,
-  });
 
   checks.push({
     id: "u21",
@@ -669,6 +632,7 @@ export function evaluateSigning(
   availableBudget: number,
   ownClubName?: string,
 ): SquadEvaluation {
+  void ownClubName;
   const stats = computeSquadStats(squad);
   const checks: RuleCheck[] = [];
   const limits = groupLimits(rules, groupOf(candidate.position));
@@ -725,23 +689,6 @@ export function evaluateSigning(
       ? `${candidate.name} supera el OVR mínimo exigido.`
       : `${candidate.name} tiene ${candidate.ovr} de OVR y el torneo exige al menos ${rules.minOvr}.`,
   );
-  const sameClub = squad.filter(
-    (p) =>
-      p.realClub === candidate.realClub &&
-      p.realClub !== ownClubName &&
-      p.realClub !== FREE_AGENT_CLUB,
-  ).length;
-  push(
-    "signing-club",
-    "R-07 · Jugadores por club real",
-    candidate.realClub,
-    `${sameClub} / ${rules.maxPerRealClub}`,
-    sameClub < rules.maxPerRealClub,
-    sameClub < rules.maxPerRealClub
-      ? `Puedes incorporar jugadores de ${candidate.realClub}.`
-      : `Tu plantilla ya tiene ${sameClub} jugadores pertenecientes a este club.`,
-  );
-
   const activeChecks = checks.filter((check) => check.id !== "signing-ovr");
   const violations = activeChecks.filter((c) => !c.passed);
   return { checks: activeChecks, passed: violations.length === 0, violations };

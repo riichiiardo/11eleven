@@ -67,6 +67,7 @@ import { MatchCard, StandingsTable } from "@/components/eleven/MatchBits";
 import { Award, RefreshCw, Swords, Trophy } from "lucide-react";
 import { FieldLabel, Tip } from "@/components/eleven/admin/AdminBits";
 import { PrizesPanel } from "@/components/eleven/admin/PrizesPanel";
+import { SigningEligibility } from "@/components/eleven/admin/SigningEligibility";
 import { CatalogPanel } from "@/components/eleven/admin/CatalogPanel";
 import {
   ChangeClubDialog,
@@ -249,6 +250,7 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="catalogo" className="flex flex-col gap-5">
+          <SigningEligibility />
           <CatalogPanel />
         </TabsContent>
       </Tabs>
@@ -449,8 +451,8 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
             Al ejecutar, cada acuerdo vuelve a comprobarse contra el estado
-            actual de ambas plantillas, los cupos por posición, el límite por
-            club real y los presupuestos. Si algo cambió desde el acuerdo, la
+            actual de ambas plantillas, los cupos por posición, el límite de 200 M€ entre presidentes
+            y los presupuestos. Si algo cambió desde el acuerdo, la
             operación queda invalidada con el motivo registrado y los jugadores
             vuelven a estar disponibles.
           </p>
@@ -840,7 +842,7 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
                     <p className="truncate text-sm font-semibold">
                       {pickRow.playerName}{" "}
                       <span className="text-xs font-normal text-muted-foreground">
-                        {pickRow.position} · {pickRow.realClub}
+                        {pickRow.position}
                       </span>
                     </p>
                     <p className="truncate text-[11px] text-muted-foreground">

@@ -201,7 +201,6 @@ export function PlayerDialog({
               { term: "Posición", value: POSITION_LABEL[player.position] },
               { term: "Edad", value: `${player.age} años` },
               { term: "OVR", value: String(player.ovr) },
-              { term: "Club de origen", value: player.realClub },
               { term: "Liga de origen", value: player.realLeague },
               { term: "Valoración", value: formatMoney(player.value) },
               { term: "Situación", value: player.availability },
