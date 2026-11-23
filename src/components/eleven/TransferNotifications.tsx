@@ -5,7 +5,7 @@ import { rpc } from "@/infrastructure/supabase/client";
 import { Button } from "@/components/ui/button";
 type Notice = {
   id: string;
-  offerId: string;
+  offerId: string | null;
   message: string;
   createdAt: string;
   readAt: string | null;
@@ -114,9 +114,9 @@ export function TransferNotifications() {
             </p>
             <Link
               className="underline"
-              to={`/dashboard/mercado/negociaciones?tab=${n.tab}#oferta-${n.offerId}`}
+              to={n.offerId ? `/dashboard/mercado/negociaciones?tab=${n.tab}#oferta-${n.offerId}` : "/dashboard/club"}
             >
-              Ver negociación
+              {n.offerId ? "Ver negociación" : "Ver mi club"}
             </Link>
           </li>
         ))}

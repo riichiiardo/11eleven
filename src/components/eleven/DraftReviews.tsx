@@ -13,6 +13,23 @@ type ReviewEntry = ReviewedEntry & {
   seller?: string;
   available?: boolean;
 };
+type Departure = {
+  playerId: string;
+  name: string;
+  presidentId: string;
+  revision: string;
+  destination: string | null;
+  cash: number | null;
+  pending: boolean;
+  approved: boolean;
+  offerType: string | null;
+};
+type ReviewTeam = {
+  id: string;
+  club: string;
+  manager: string | null;
+  players: Departure[];
+};
 type ReviewData = {
   isAdmin: boolean;
   reviewers: string[];
@@ -28,13 +45,19 @@ type ReviewData = {
 
 export function DraftReviews() {
   const [data, setData] = useState<ReviewData | null>(null);
+  const [teams, setTeams] = useState<ReviewTeam[] | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const load = async () => {
     try {
-      setData(await rpc<ReviewData>("draft_review_state"));
+      const [reviews, departures] = await Promise.all([
+        rpc<ReviewData>("draft_review_state"),
+        rpc<ReviewTeam[]>("review_departures"),
+      ]);
+      setData(reviews);
+      setTeams(departures);
       setError("");
     } catch (e) {
       setError(
@@ -46,9 +69,15 @@ export function DraftReviews() {
   };
   useEffect(() => {
     let active = true;
-    rpc<ReviewData>("draft_review_state")
+    Promise.all([
+      rpc<ReviewData>("draft_review_state"),
+      rpc<ReviewTeam[]>("review_departures"),
+    ])
       .then((result) => {
-        if (active) setData(result);
+        if (active) {
+          setData(result[0]);
+          setTeams(result[1]);
+        }
       })
       .catch((e) => {
         if (active)
@@ -124,6 +153,60 @@ export function DraftReviews() {
             ))}
           </fieldset>
         )}
+        <section aria-label="Bajas previstas por equipo" className="space-y-2">
+          <h4 className="font-semibold">Bajas previstas por equipo</h4>
+          {teams?.map((team) => (
+            <details key={team.id} className="rounded-lg border p-3">
+              <summary className="cursor-pointer font-semibold">
+                {team.club} · {team.players.length}{" "}
+                {team.players.length === 1 ? "baja" : "bajas"} ·{" "}
+                {team.manager ?? "Bot"}
+              </summary>
+              {team.players.length === 0 && (
+                <p className="pt-2 text-sm">Sin bajas previstas.</p>
+              )}
+              <ul className="divide-y">
+                {team.players.map((player) => (
+                  <li
+                    key={player.playerId}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3"
+                  >
+                    <div>
+                      <strong>{player.name}</strong>
+                      <p className="text-sm">
+                        {player.destination
+                          ? `${player.offerType === "trade" ? "Intercambio" : "Venta"} a ${player.destination} · ${formatMoney(player.cash ?? 0)} · Ambos managers conformes`
+                          : player.pending
+                            ? "Negociación abierta · pendiente de acuerdo"
+                            : "Rescisión prevista"}
+                      </p>
+                    </div>
+                    {player.approved &&
+                    (player.destination || !player.pending) ? (
+                      <span>Aprobada</span>
+                    ) : (
+                      <Button
+                        disabled={!player.destination && player.pending}
+                        onClick={() =>
+                          void act(() =>
+                            rpc("approve_departure", {
+                              p_president: player.presidentId,
+                              p_player: player.playerId,
+                              p_revision: player.revision,
+                            }),
+                          )
+                        }
+                      >
+                        Aprobar baja
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </section>
+        <h4 className="font-semibold">Altas enviadas a revisión</h4>
         {data?.lists.length === 0 && (
           <p>No hay prelistas pendientes de revisión.</p>
         )}
@@ -133,7 +216,7 @@ export function DraftReviews() {
             className="space-y-3 rounded border p-3"
           >
             <h4 className="font-semibold">
-              {list.president} · {list.outgoing.length} bajas previstas
+              {list.president} · {list.entries.length} altas
             </h4>
             {list.entries.map((entry) => {
               const noteKey = `${list.presidentId}:${entry.id}`;
