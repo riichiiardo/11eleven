@@ -63,9 +63,7 @@ export function MarketPlayerCard({
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-1">
             <PositionPill position={player.position} group={player.group} />
-            <span className="num rounded-md bg-muted px-1 py-0.5 text-[9px] font-bold text-muted-foreground">
-              {player.realClub}
-            </span>
+
           </div>
         </div>
         <OvrBadge ovr={player.ovr} className="!min-w-6 !p-0 !text-[10px]" />

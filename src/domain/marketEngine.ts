@@ -9,7 +9,6 @@
  */
 
 import {
-  FREE_AGENT_CLUB,
   GROUP_LABEL,
   GROUP_ORDER,
   formatMoney,
@@ -187,7 +186,6 @@ export function projectSquad(params: {
     before,
     incoming,
     outgoing,
-    ownClubName,
     cashDelta = 0,
     availableBudget,
   } = params;
@@ -245,29 +243,6 @@ export function projectSquad(params: {
           : `El grupo de ${GROUP_LABEL[group].toLowerCase()} quedaría en ${afterCount} y el máximo es ${limits.max}.`,
       });
     }
-  }
-
-  const perClub = new Map<string, number>();
-  for (const player of after) {
-    if (ownClubName && player.realClub === ownClubName) continue;
-    if (player.realClub === FREE_AGENT_CLUB) continue;
-    perClub.set(player.realClub, (perClub.get(player.realClub) ?? 0) + 1);
-  }
-  for (const player of incoming) {
-    if (player.realClub === FREE_AGENT_CLUB) continue;
-    if (ownClubName && player.realClub === ownClubName) continue;
-    const count = perClub.get(player.realClub) ?? 0;
-    checks.push({
-      id: `club-${player.realClub}`,
-      ruleRef: "R-07 · Jugadores por club real",
-      label: `${label}: origen ${player.realClub}`,
-      value: `${count} / ${rules.maxPerRealClub}`,
-      passed: count <= rules.maxPerRealClub,
-      detail:
-        count <= rules.maxPerRealClub
-          ? `${player.name} mantiene ${player.realClub} dentro del límite de ${rules.maxPerRealClub} jugadores.`
-          : `Tu plantilla ya tiene ${count} jugadores pertenecientes a ${player.realClub} y el máximo es ${rules.maxPerRealClub}.`,
-    });
   }
 
   const u21After = after.filter((player) => player.age <= 21).length;

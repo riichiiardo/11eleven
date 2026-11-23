@@ -148,7 +148,7 @@ function TeamSquadDialog({
             <DialogDescription>
               {club.presidentNickname
                 ? `Presidente ${club.presidentNickname} · ${club.league}`
-                : `Club libre · ${club.league}`}
+                : `Bot · pendiente de presidente · ${club.league}`}
             </DialogDescription>
           </DialogHeader>
         ) : null}
@@ -427,7 +427,7 @@ export default function Teams() {
                     ) : null}
                     {!club.presidentNickname ? (
                       <span className="rounded bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                        Libre
+                        Bot
                       </span>
                     ) : null}
                   </p>

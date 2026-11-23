@@ -105,6 +105,7 @@ export function OfferDialog({
             {isFree ? `Fichar a ${player.name}` : `Oferta por ${player.name}`}
           </DialogTitle>
           <DialogDescription>
+            {!isFree && "Límite entre presidentes: 200 M€ entre dinero y jugadores entregados. "}
             {player.ownerClubName
               ? `Presidente destinatario: ${player.ownerNickname ?? "sin asignar"} · ${player.ownerClubName}`
               : "Agente libre: no requiere acuerdo entre Presidentes."}

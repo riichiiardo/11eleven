@@ -113,6 +113,7 @@ export function useDraftActions() {
     wrap(`pick-${playerId}`, () => pickMutation({ playerId }), {
       failure: "No se pudo completar el fichaje",
       success: (result) => {
+        if (!result) { toast.success("Fichaje registrado"); return; }
         const { playerName, price, draftClosed, nextNickname } = result as {
           playerName: string;
           price: number;

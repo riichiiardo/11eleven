@@ -187,21 +187,8 @@ export function additionalChecks(
       detail: `${title}: ${value}. Rango permitido: ${min}–${max}.`,
       action: { label: "Ver reglas", to: "/dashboard/reglas" },
     });
-  if (scope === "squad" && c.realClub.enabled) {
-    const groups = new Map<string, number>();
-    for (const p of squad)
-      if (p.realClub !== ownClubName && p.realClub !== "Agente libre")
-        groups.set(p.realClub, (groups.get(p.realClub) ?? 0) + 1);
-    for (const [name, total] of groups)
-      check(
-        `origin-${name}`,
-        `Jugadores de ${name}`,
-        total,
-        c.realClub.min,
-        c.realClub.max,
-        "R-07 · Club de origen",
-      );
-  }
+  void ownClubName;
+  void squad;
   if (scope === "xi" && active) {
     if (active.u20.enabled)
       check(

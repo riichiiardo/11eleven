@@ -30,8 +30,8 @@ do $$declare f record; definition text;begin
  for f in select p.oid from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in('public','app') and p.prokind='f' and (pg_get_functiondef(p.oid) like '%p.real_club = v_team.name%' or pg_get_functiondef(p.oid) like '%p.real_club = t.name%')
  loop
   definition:=pg_get_functiondef(f.oid);
-  definition:=replace(definition,'p.real_club = v_team.name','coalesce(p.source_record->>''game_team'', p.real_club) = v_team.name');
-  definition:=replace(definition,'p.real_club = t.name','coalesce(p.source_record->>''game_team'', p.real_club) = t.name');
+  definition:=replace(definition,'p.real_club = v_team.name','(p.source_record->>''game_team'') = v_team.name');
+  definition:=replace(definition,'p.real_club = t.name','(p.source_record->>''game_team'') = t.name');
   execute definition;
  end loop;
 end$$;

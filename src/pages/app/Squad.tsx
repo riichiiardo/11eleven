@@ -11,10 +11,8 @@ import { PitchView } from "@/components/eleven/PitchView";
 import { SquadTable } from "@/components/eleven/SquadTable";
 import { GroupMeter } from "@/components/eleven/RuleCheckList";
 import {
-  AvailabilityBadge,
   OvrBadge,
   PlayerAvatar,
-  PositionPill,
 } from "@/components/eleven/PlayerBits";
 import { PlayerDialog } from "@/components/eleven/PlayerDialog";
 import { useSquadActions } from "@/hooks/use-squad-actions";
@@ -193,28 +191,7 @@ export default function Squad({ state: directState }: { state?: AppStateView }) 
       </Tabs>
 
       <SectionCard title="Todos los jugadores por situación" icon={ClipboardList}>
-        <ul className="flex flex-wrap gap-2">
-          {state.squad.map((player) => (
-            <li key={player.squadPlayerId}>
-              <button
-                type="button"
-                onClick={() => setSelected(player)}
-                className="flex min-h-11 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors hover:bg-accent"
-              >
-                <PlayerAvatar
-                  name={player.name}
-                  flag={player.flag}
-                  group={player.group}
-                  size="xs"
-                  photo={player.photo}
-                />
-                <span className="text-sm font-semibold">{player.name.split(" ").slice(-1)}</span>
-                <PositionPill position={player.position} group={player.group} />
-                <AvailabilityBadge availability={player.availability} showLabel={false} />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <SquadTable squad={state.squad} stats={stats} onSelect={setSelected} />
       </SectionCard>
 
       <PlayerDialog

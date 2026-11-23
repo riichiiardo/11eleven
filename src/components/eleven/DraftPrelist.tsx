@@ -16,6 +16,7 @@ import { formatMoney } from "@/domain/rulesEngine";
 import { DraftReviews } from "./DraftReviews";
 import { DraftOutgoing } from "./DraftOutgoing";
 
+type PoolMatch = { name: string; sofifa_id: number; value: number; nationality: string; ovr: number; position: string; source: string };
 const selectClass = "w-full min-h-11 rounded-md border bg-background p-2";
 
 export function DraftPrelist() {
@@ -36,6 +37,28 @@ export function DraftPrelist() {
   const [ovr, setOvr] = useState("");
   const [nationality, setNationality] = useState("");
   const [positions, setPositions] = useState<string[]>([]);
+  const [offerTargets,setOfferTargets] = useState<{playerId:string;clubId:string;name:string;price:number;offeredPlayerId:string|null;sofifaId:number|null;status:string}[]>([]);
+  useEffect(() => {
+    let active=true;
+    const refresh=()=>rpc<typeof offerTargets>("prelist_offer_players").then(rows=>{if(active)setOfferTargets(rows);}).catch(e=>{if(active)setError(e instanceof Error ? e.message : "No se pudieron consultar las ofertas.");});
+    void refresh();
+    const timer=window.setInterval(refresh,15000);
+    return ()=>{active=false;window.clearInterval(timer);};
+  },[]);
+  const unlistedOffers=offerTargets.filter(o=>!data?.entries.some(e=>e.kind==="owned" && e.playerId===o.playerId));
+  const [term,setTerm] = useState("");
+  const [matches,setMatches] = useState<PoolMatch[]>([]);
+  const [lookupMessage,setLookupMessage] = useState("");
+  useEffect(() => {
+    let current = true;
+    if (kind !== "new" || term.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      rpc<PoolMatch[]>("prelist_pool_search", {term: term.trim()}).then(rows => {
+        if (current) { setMatches(rows); setLookupMessage(rows.length ? "" : "Sin coincidencias. Completa la ficha con el enlace de SoFIFA."); }
+      }).catch(() => { if (current) setLookupMessage("No se pudo consultar el catálogo."); });
+    },250);
+    return () => { current = false; window.clearTimeout(timer); };
+  },[term,kind]);
   const [editingId, setEditingId] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -64,6 +87,7 @@ export function DraftPrelist() {
     JSON.stringify([data?.entries, data?.outgoing]) !==
     JSON.stringify([saved?.entries, saved?.outgoing]);
   const resetForm = () => {
+    setTerm(""); setMatches([]); setLookupMessage("");
     setTransferMode("purchase");
     setOfferedPlayerId("");
     setEditingId(null);
@@ -146,6 +170,7 @@ export function DraftPrelist() {
     setError("");
     setNotice("");
     try {
+      if (submit && data.entries.length + unlistedOffers.length !== data.outgoing.length) throw new Error("Selecciona una baja por cada alta antes de enviar.");
       validatePrelist(data.entries, data.outgoing, data.limit);
       await rpc<number>("save_draft_prelist", {
         p_entries: data.entries,
@@ -196,9 +221,14 @@ export function DraftPrelist() {
         ) : (
           <>
             <p>
-              Altas: {data.entries.length}/{data.limit} · Bajas:{" "}
+              Altas: {data.entries.length + unlistedOffers.length}/{Math.min(6,data.limit)} · Bajas:{" "}
               {data.outgoing.length}/{Math.min(6, data.limit)}
             </p>
+            {unlistedOffers.length>0 && <section aria-label="Altas por ofertas"><h3 className="font-semibold">Ofertas que ocupan un cupo</h3>{unlistedOffers.map(o=><div className="flex items-center justify-between border-b py-2" key={o.playerId}><span>{o.name} · {o.status}</span><Button type="button" variant="outline" disabled={busy || data.status==="submitted"} onClick={()=>{
+              resetForm();setKind("owned");setClubId(o.clubId);setPlayerId(o.playerId);setPrice(String(o.price));
+              setTransferMode(o.offeredPlayerId ? o.price>0 ? "exchange_cash":"exchange":"purchase");setOfferedPlayerId(o.offeredPlayerId ?? "");
+              if(o.sofifaId)setSofifaUrl("https://sofifa.com/player/"+o.sofifaId);
+            }}>Completar selección</Button></div>)}</section>}
             <p role="status">
               {data.status === "submitted"
                 ? "En revisión: espera la respuesta del administrador o designado."
@@ -288,6 +318,18 @@ export function DraftPrelist() {
                 ) : (
                   <>
                     <label className="space-y-1">
+                      Buscar por nombre o ID de SoFIFA
+                      <Input type="search" value={term} onChange={e=>{setTerm(e.target.value);setMatches([]);setLookupMessage("");}} />
+                    </label>
+                    {lookupMessage && <p role="status">{lookupMessage}</p>}
+                    {matches.length > 0 && <label>Resultados<select className={selectClass} value="" onChange={e=>{
+                      const match = matches.find(m=>String(m.sofifa_id)===e.target.value);
+                      if (!match) return;
+                      setName(match.name); setOvr(String(match.ovr ?? "")); setNationality(match.nationality ?? "");
+                      setPrice(String(match.value ?? "")); setPositions((match.position ?? "").split(/[, /]+/).filter(pos=>DRAFT_POSITIONS.some(p=>p===pos)));
+                      setSofifaUrl("https://sofifa.com/player/"+match.sofifa_id);
+                    }}><option value="">Elegir jugador</option>{matches.map(m=><option key={m.sofifa_id} value={m.sofifa_id}>{m.name} · {m.nationality} · {m.source}</option>)}</select></label>}
+                    <label className="space-y-1">
                       Nombre y apellido
                       <Input
                         value={name}
@@ -367,7 +409,7 @@ export function DraftPrelist() {
               </div>
               <Button
                 type="button"
-                disabled={!editingId && data.entries.length >= data.limit}
+                disabled={!editingId && data.entries.length + unlistedOffers.filter(o=>o.playerId!==playerId).length >= Math.min(6,data.limit)}
                 onClick={add}
               >
                 {editingId ? "Actualizar selección" : "Añadir a la prelista"}
@@ -422,6 +464,11 @@ export function DraftPrelist() {
                           {entry.reviewNote ? `: ${entry.reviewNote}` : ""}
                         </p>
                       </div>
+                      <div className="flex gap-2">{[-1,1].map(delta=><Button type="button" variant="outline" key={delta} disabled={!data.entries[index+delta]} onClick={()=>{
+                        const entries=[...data.entries];
+                        [entries[index],entries[index+delta]]=[entries[index+delta],entries[index]];
+                        setData({...data,entries});
+                      }}>{delta<0?"Subir":"Bajar"} prioridad</Button>)}</div>
                       {(entry.reviewStatus !== "approved" ||
                         !validSofifaUrl(entry.sofifaUrl)) && (
                         <Button

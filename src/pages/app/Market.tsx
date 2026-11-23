@@ -5,7 +5,7 @@ import type { MarketScope } from "@/domain/marketEngine";
 import { MARKET_SCOPE_LABEL } from "@/domain/marketEngine";
 import { formatMoney } from "@/domain/rulesEngine";
 import { useQuery } from "@/services/backend/react";
-import { useOutletContext } from "react-router";
+import { Link, useOutletContext } from "react-router";
 import { SectionCard, StatTile } from "@/components/eleven/SectionCard";
 import { OfferDialog } from "@/components/eleven/OfferDialog";
 import { MarketPlayerCard } from "@/components/eleven/MarketPlayerCard";
@@ -151,6 +151,10 @@ export default function Market() {
         />
       </section>
 
+      <nav aria-label="Negociaciones abiertas" className="flex flex-wrap gap-2">
+        <Button asChild variant="outline"><Link to="/dashboard/mercado/negociaciones?tab=recibidas"><Handshake />Ofertas recibidas</Link></Button>
+        <Button asChild variant="outline"><Link to="/dashboard/mercado/negociaciones?tab=enviadas"><ShoppingBag />Ofertas enviadas</Link></Button>
+      </nav>
       <SectionCard
         title="Explorar jugadores"
         icon={Search}

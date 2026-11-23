@@ -159,14 +159,6 @@ const DEMO_CHECKS: RuleCheck[] = [
     detail: "Cumples el rango de delanteros (6-8).",
   },
   {
-    id: "demo-club",
-    ruleRef: "R-07 · Jugadores por club real",
-    label: "Jugadores por club real",
-    value: "3 / 3",
-    passed: true,
-    detail: "Ningún club de origen aporta más de 3 jugadores a tu plantilla.",
-  },
-  {
     id: "demo-lineup",
     ruleRef: "Alineación · Posición natural",
     label: "Posiciones compatibles",
