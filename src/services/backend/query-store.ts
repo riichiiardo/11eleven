@@ -15,6 +15,13 @@ export class QueryStore {
   private listeners = new Map<string, Set<() => void>>();
   private pending = new Map<string, Promise<void>>();
   private generation = 0;
+  private sessionUser: string | null | undefined;
+
+  setSessionUser(userId: string | null): void {
+    if (this.sessionUser === userId) return;
+    this.sessionUser = userId;
+    this.invalidateAll();
+  }
 
   get(key: string): QuerySnapshot { return this.snapshots.get(key) ?? empty; }
 

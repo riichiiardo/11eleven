@@ -73,20 +73,25 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    let receivedAuthEvent = false;
+    const applySession = (next: typeof session) => {
       if (!active) return;
-      setSession(
-        data.session as unknown as {
-          user?: { id: string; email?: string };
-        } | null,
+      queryStore.setSessionUser(next?.user?.id ?? null);
+      // Auth refreshes tokens independently. React only needs the visible identity.
+      setSession(previous =>
+        previous?.user?.id === next?.user?.id && previous?.user?.email === next?.user?.email
+          ? previous : next,
       );
       setIsLoading(false);
+    };
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      receivedAuthEvent = true;
+      applySession(next ? { user: { id: next.user.id, email: next.user.email } } : null);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      queryStore.invalidateAll();
-      setSession(
-        s as unknown as { user?: { id: string; email?: string } } | null,
-      );
+    void supabase.auth.getSession().then(({ data }) => {
+      if (receivedAuthEvent) return;
+      const user = data.session?.user;
+      applySession(user ? { user: { id: user.id, email: user.email } } : null);
     });
     return () => {
       active = false;
