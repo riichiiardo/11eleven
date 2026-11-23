@@ -16,6 +16,7 @@ type Row = {
   profile: Profile;
   club: string | null;
   blocked: boolean;
+  sofifaUrl?: string;
 };
 const positions = [
   "POR",
@@ -51,6 +52,7 @@ export function PlayerProfiles({
   const [rows, setRows] = useState<Row[]>(),
     [selected, select] = useState<Row>(),
     [draft, setDraft] = useState<Profile>();
+  const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -77,19 +79,34 @@ export function PlayerProfiles({
       clearTimeout(timer);
     };
   }, [club, scope, search, page, rev]);
-  async function submit(row: Row, add: boolean) {
+  async function submit(row: Row | undefined, add: boolean) {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      if (add)
+      if (!row && draft) {
+        const target = scope === "pool" ? null : club || null;
+        await rpc("admin_create_player", {
+          p_profile: draft,
+          p_sofifa_url: link.trim() || null,
+          p_club: target,
+        });
+        setScope(target ? "club" : "pool");
+        setPage(0);
+        setSearch(draft.name.trim());
+        setNotice(
+          target
+            ? "Jugador creado y añadido a " + name + "."
+            : "Jugador creado como agente libre.",
+        );
+      } else if (row && add)
         await rpc("admin_roster_change", {
           p_action: "add",
           p_player: row.id,
           p_source: null,
           p_destination: club,
         });
-      else
+      else if (row)
         await rpc("admin_edit_player_profile", {
           p_id: row.id,
           p_before: row.profile,
@@ -97,11 +114,12 @@ export function PlayerProfiles({
         });
       select(undefined);
       setDraft(undefined);
-      setNotice(
-        add
-          ? row.profile.name + " se añadió a " + name + "."
-          : "Ficha guardada.",
-      );
+      if (row)
+        setNotice(
+          add
+            ? row.profile.name + " se añadió a " + name + "."
+            : "Ficha guardada.",
+        );
 
       onChanged();
     } catch (e) {
@@ -131,6 +149,7 @@ export function PlayerProfiles({
               setPage(0);
               setSearch("");
               select(undefined);
+              setDraft(undefined);
               setNotice("");
             }}
           >
@@ -147,12 +166,33 @@ export function PlayerProfiles({
             setSearch(e.target.value);
             setPage(0);
             select(undefined);
+            setDraft(undefined);
           }}
         />
       </label>
+      <Button
+        variant="outline"
+        onClick={() => {
+          select(undefined);
+          setLink("");
+          setError("");
+          setNotice("");
+          setDraft({
+            name: search.trim(),
+            nationality: "",
+            positions: [],
+            age: NaN,
+            ovr: NaN,
+            value: NaN,
+            potential: null,
+          });
+        }}
+      >
+        Crear jugador
+      </Button>
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
-      {selected && draft && (
+      {draft && (
         <form
           className="grid gap-3 rounded border p-4 sm:grid-cols-2"
           onSubmit={(e) => {
@@ -161,8 +201,24 @@ export function PlayerProfiles({
           }}
         >
           <p className="sm:col-span-2">
-            Ficha compartida por el pool y los clubes · {selected.profile.name}
+            {selected
+              ? "Ficha compartida por el pool y los clubes · " +
+                selected.profile.name
+              : scope === "pool"
+                ? "Nuevo agente libre"
+                : "Nuevo jugador para " + name}
           </p>
+          {!selected && (
+            <label>
+              Enlace de SoFIFA (opcional)
+              <Input
+                type="url"
+                value={link}
+                placeholder="https://sofifa.com/player/…"
+                onChange={(e) => setLink(e.target.value)}
+              />
+            </label>
+          )}
           {(["name", "nationality"] as const).map((k, i) => (
             <label key={k}>
               {["Nombre", "Nacionalidad"][i]}
@@ -181,7 +237,7 @@ export function PlayerProfiles({
                 type="number"
                 min={k === "age" ? 1 : 0}
                 max={k === "value" ? undefined : 100}
-                value={draft[k] ?? ""}
+                value={Number.isFinite(draft[k]) ? (draft[k] ?? "") : ""}
                 onChange={(e) =>
                   setDraft({
                     ...draft,
@@ -194,7 +250,8 @@ export function PlayerProfiles({
           <label>
             Posición principal{" "}
             <select
-              value={draft.positions[0]}
+              required
+              value={draft.positions[0] ?? ""}
               onChange={(e) =>
                 setDraft({
                   ...draft,
@@ -205,6 +262,9 @@ export function PlayerProfiles({
                 })
               }
             >
+              <option value="" disabled>
+                Selecciona una posición
+              </option>
               {positions.map((p) => (
                 <option key={p}>{p}</option>
               ))}
@@ -234,11 +294,16 @@ export function PlayerProfiles({
                 ))}
             </div>
           </fieldset>
-          <Button type="submit">Guardar ficha</Button>
+          <Button type="submit">
+            {selected ? "Guardar ficha" : "Crear jugador"}
+          </Button>
           <Button
             type="button"
             variant="outline"
-            onClick={() => select(undefined)}
+            onClick={() => {
+              select(undefined);
+              setDraft(undefined);
+            }}
           >
             Cancelar
           </Button>
@@ -253,6 +318,11 @@ export function PlayerProfiles({
               {r.profile.name} · {r.profile.positions.join(", ")} ·{" "}
               {r.profile.ovr} · {r.club ?? "Agente libre"}
             </span>
+            {r.sofifaUrl && (
+              <a href={r.sofifaUrl} target="_blank" rel="noreferrer">
+                SoFIFA
+              </a>
+            )}
             <Button
               variant="outline"
               onClick={() => {
@@ -278,6 +348,7 @@ export function PlayerProfiles({
           onClick={() => {
             setPage(page - 1);
             select(undefined);
+            setDraft(undefined);
           }}
         >
           Anterior
@@ -289,6 +360,7 @@ export function PlayerProfiles({
           onClick={() => {
             setPage(page + 1);
             select(undefined);
+            setDraft(undefined);
           }}
         >
           Siguiente

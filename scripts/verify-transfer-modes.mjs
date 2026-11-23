@@ -358,6 +358,30 @@ try {
   await login(null,"anon");
   await assert.rejects(db.query("select public.admin_set_signing_block($1,false)",[id(50)]),/permission denied/);
   console.log("PASS market eligibility and cash/exchange boundaries");
+  await db.exec("reset role");
+  const poolSql = readFileSync("supabase/player-pool.sql","utf8");
+  await db.exec(poolSql.slice(poolSql.indexOf("create or replace function app.require_pool_admin"),poolSql.indexOf("create or replace function public.pool_status")));
+  for (const file of ["admin-club-rosters","admin-player-profiles","manual-player-registration"]) {
+    await db.exec(readFileSync("supabase/"+file+".sql","utf8"));
+  }
+  const profile = {name:"Alta manual",nationality:"España",age:22,ovr:75,value:1000000,potential:null,positions:["MD","ED"]};
+  const createPlayer = (name,url,clubId) => db.query("select public.admin_create_player($1,$2,$3) id",[JSON.stringify({...profile,name}),url,clubId]);
+  await login(2);
+  await assert.rejects(createPlayer("Sin permiso",null,null),/Administración/);
+  await login(1);
+  await createPlayer("Libre manual",null,null);
+  await assert.rejects(createPlayer("Libre manual","",null),/coincidente/);
+  await assert.rejects(createPlayer("URL inválida","https://example.org/player/123",null),/enlace/);
+  const link="https://sofifa.com/player/123456/jugador";
+  const registered=(await createPlayer("Alta manual",link,id(20))).rows[0].id;
+  await assert.rejects(createPlayer("Otro nombre",link,null),/coincidente/);
+  await assert.rejects(createPlayer("Alta revertida",null,id(799)),/destino/);
+  const result=(await db.query("select public.admin_player_profiles('Alta manual',0,$1,false) data",[id(20)])).rows[0].data;
+  assert.equal(result[0].id,registered);
+  assert.equal(result[0].sofifaUrl,"https://sofifa.com/player/123456");
+  assert.deepEqual(result[0].profile.positions,profile.positions);
+  assert.deepEqual((await db.query("select public.admin_player_profiles('Alta revertida',0,null,false) data")).rows[0].data,[]);
+  console.log("PASS manual registration: free and assigned players, optional link, duplicate prevention, authorization and atomic rollback");
 } finally {
   await db.close();
 }
