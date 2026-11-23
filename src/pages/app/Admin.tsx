@@ -67,6 +67,7 @@ import { MatchCard, StandingsTable } from "@/components/eleven/MatchBits";
 import { Award, RefreshCw, Swords, Trophy } from "lucide-react";
 import { FieldLabel, Tip } from "@/components/eleven/admin/AdminBits";
 import { PrizesPanel } from "@/components/eleven/admin/PrizesPanel";
+import { ClubRosters } from "@/components/eleven/admin/ClubRosters";
 import { SigningEligibility } from "@/components/eleven/admin/SigningEligibility";
 import { CatalogPanel } from "@/components/eleven/admin/CatalogPanel";
 import {
@@ -180,6 +181,10 @@ export default function Admin() {
             <Users className="size-4" aria-hidden="true" />
             Presidentes
           </TabsTrigger>
+          <TabsTrigger value="plantillas" className="min-h-10">
+            <Users className="size-4" />
+            Plantillas
+          </TabsTrigger>
           <TabsTrigger value="mercado" className="min-h-10">
             <Handshake className="size-4" aria-hidden="true" />
             Mercado
@@ -223,9 +228,15 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="presidentes" className="flex flex-col gap-5">
-          <PresidentsPanel overview={overview} isPrincipal={state.adminRole === "principal"} />
+          <PresidentsPanel
+            overview={overview}
+            isPrincipal={state.adminRole === "principal"}
+          />
         </TabsContent>
 
+        <TabsContent value="plantillas">
+          <ClubRosters />
+        </TabsContent>
         <TabsContent value="mercado" className="flex flex-col gap-5">
           <MarketPanel overview={overview} />
         </TabsContent>
@@ -451,10 +462,10 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
             Al ejecutar, cada acuerdo vuelve a comprobarse contra el estado
-            actual de ambas plantillas, los cupos por posición, el límite de 200 M€ entre presidentes
-            y los presupuestos. Si algo cambió desde el acuerdo, la
-            operación queda invalidada con el motivo registrado y los jugadores
-            vuelven a estar disponibles.
+            actual de ambas plantillas, los cupos por posición, el límite de 200
+            M€ entre presidentes y los presupuestos. Si algo cambió desde el
+            acuerdo, la operación queda invalidada con el motivo registrado y
+            los jugadores vuelven a estar disponibles.
           </p>
           <Button
             type="button"
@@ -1090,7 +1101,13 @@ function CompetitionPanel({ overview }: { overview: AdminOverviewView }) {
   );
 }
 
-function PresidentsPanel({ overview, isPrincipal }: { overview: AdminOverviewView; isPrincipal: boolean }) {
+function PresidentsPanel({
+  overview,
+  isPrincipal,
+}: {
+  overview: AdminOverviewView;
+  isPrincipal: boolean;
+}) {
   const grantAdmin = useMutation(api.tournament.grantAdmin);
   const revokeAdmin = useMutation(api.tournament.revokeAdmin);
   const [email, setEmail] = useState("");
@@ -1126,7 +1143,15 @@ function PresidentsPanel({ overview, isPrincipal }: { overview: AdminOverviewVie
         <InviteCard code={overview.tournament.code} />
       ) : null}
 
-      {isPrincipal && overview.tournament ? <div className="flex flex-wrap items-center gap-3"><PresidentAccountDialog tournamentId={overview.tournament.id} /><p className="text-xs text-muted-foreground">Solo el administrador principal puede crear cuentas o cambiar su acceso.</p></div> : null}
+      {isPrincipal && overview.tournament ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <PresidentAccountDialog tournamentId={overview.tournament.id} />
+          <p className="text-xs text-muted-foreground">
+            Solo el administrador principal puede crear cuentas o cambiar su
+            acceso.
+          </p>
+        </div>
+      ) : null}
       <SectionCard
         title="Presidentes del torneo"
         icon={Users}
@@ -1203,7 +1228,14 @@ function PresidentsPanel({ overview, isPrincipal }: { overview: AdminOverviewVie
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1.5">
-                      {isPrincipal && !president.adminRole && overview.tournament ? <PresidentAccountDialog tournamentId={overview.tournament.id} target={president} /> : null}
+                      {isPrincipal &&
+                      !president.adminRole &&
+                      overview.tournament ? (
+                        <PresidentAccountDialog
+                          tournamentId={overview.tournament.id}
+                          target={president}
+                        />
+                      ) : null}
                       <ChangeClubDialog
                         president={president}
                         teams={overview.availableTeams}
