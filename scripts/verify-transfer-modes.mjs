@@ -361,7 +361,7 @@ try {
   await db.exec("reset role");
   const poolSql = readFileSync("supabase/player-pool.sql","utf8");
   await db.exec(poolSql.slice(poolSql.indexOf("create or replace function app.require_pool_admin"),poolSql.indexOf("create or replace function public.pool_status")));
-  for (const file of ["admin-club-rosters","admin-player-profiles","manual-player-registration"]) {
+  for (const file of ["admin-club-rosters","admin-player-profiles","manual-player-registration","admin-roster-resolution"]) {
     await db.exec(readFileSync("supabase/"+file+".sql","utf8"));
   }
   const profile = {name:"Alta manual",nationality:"España",age:22,ovr:75,value:1000000,potential:null,positions:["MD","ED"]};
@@ -382,6 +382,32 @@ try {
   assert.deepEqual(result[0].profile.positions,profile.positions);
   assert.deepEqual((await db.query("select public.admin_player_profiles('Alta revertida',0,null,false) data")).rows[0].data,[]);
   console.log("PASS manual registration: free and assigned players, optional link, duplicate prevention, authorization and atomic rollback");
+  const matches = (await db.query("select public.admin_player_matches($1,$2,$3,$4) data", ["Alta manual","España",22,link])).rows[0].data;
+  assert.equal(matches[0].club_id,id(20));
+  const freeMatches = (await db.query("select public.admin_player_matches($1,$2,$3,null) data",["Libre manual","España",22])).rows[0].data;
+  assert.equal(freeMatches.length,1);
+  assert.equal(freeMatches[0].club_id,null);
+  await db.query("select public.admin_roster_change($1,null,$2,'add')",[freeMatches[0].id,id(20)]);
+  const reused = (await db.query("select public.admin_player_matches($1,$2,$3,null) data",["Libre manual","España",22])).rows[0].data;
+  assert.equal(reused.length,1);
+  assert.equal(reused[0].id,freeMatches[0].id);
+  assert.equal(reused[0].club_id,id(20));
+  const releaseRosterPlayer = () => db.query("select public.admin_release_roster_player($1,$2)",[registered,id(20)]);
+  await db.exec("reset role");
+  await db.query("insert into app.draft_prelists(president_id,outgoing) values ($1,$2) on conflict(president_id) do update set outgoing=excluded.outgoing",[id(30),JSON.stringify([registered])]);
+  const insertOffer = "insert into public.offers(tournament_id,type,bidder_president_id,bidder_club_id,seller_president_id,seller_club_id,requested_player_ids,cash,status)values($1,'cash',$2,$3,$4,$5,$6,100,$7) returning id";
+  const releaseOffer=(await db.query(insertOffer,[id(10),id(31),id(21),id(30),id(20),[registered],"reservada"])).rows[0].id;
+  await login(1);
+  await assert.rejects(releaseRosterPlayer(),/acuerdo aceptado/);
+  await db.exec("reset role");
+  await db.query("update public.offers set status='enviada' where id=$1",[releaseOffer]);
+  await login(1);
+  await releaseRosterPlayer();
+  await db.exec("reset role");
+  assert.equal((await db.query("select status from public.offers where id=$1",[releaseOffer])).rows[0].status,"invalidada");
+  assert.deepEqual((await db.query("select outgoing from app.draft_prelists where president_id=$1",[id(30)])).rows[0].outgoing,[]);
+  assert.equal((await db.query("select id from public.squad_players where player_id=$1",[registered])).rows.length,0);
+  console.log("PASS existing profile lookup and confirmed release with outgoing selection, open bid and protected agreement");
 } finally {
   await db.close();
 }
