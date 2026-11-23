@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { rpc } from "@/infrastructure/supabase/client";
@@ -17,6 +18,16 @@ type Row = {
   club: string | null;
   blocked: boolean;
   sofifaUrl?: string;
+};
+type Match = {
+  id: string;
+  name: string;
+  nationality: string;
+  age: number;
+  active: boolean;
+  blocked: boolean;
+  club: string | null;
+  club_id: string | null;
 };
 const positions = [
   "POR",
@@ -52,6 +63,8 @@ export function PlayerProfiles({
   const [rows, setRows] = useState<Row[]>(),
     [selected, select] = useState<Row>(),
     [draft, setDraft] = useState<Profile>();
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [createInClub, setCreateInClub] = useState(Boolean(club));
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -85,7 +98,18 @@ export function PlayerProfiles({
     setNotice("");
     try {
       if (!row && draft) {
-        const target = scope === "pool" ? null : club || null;
+        const target = createInClub ? club || null : null;
+        const existing = await rpc<Match[]>("admin_player_matches", {
+          p_name: draft.name,
+          p_nation: draft.nationality,
+          p_age: draft.age,
+          p_link: link.trim() || null,
+        });
+        if (existing.length) {
+          setMatches(existing);
+          setNotice("Encontramos una ficha existente. Revisa la coincidencia.");
+          return;
+        }
         await rpc("admin_create_player", {
           p_profile: draft,
           p_sofifa_url: link.trim() || null,
@@ -94,11 +118,11 @@ export function PlayerProfiles({
         setScope(target ? "club" : "pool");
         setPage(0);
         setSearch(draft.name.trim());
-        setNotice(
-          target
-            ? "Jugador creado y añadido a " + name + "."
-            : "Jugador creado como agente libre.",
-        );
+        const confirmation = target
+          ? draft.name.trim() + " se creó y se añadió a " + name + "."
+          : draft.name.trim() + " se creó como agente libre.";
+        setNotice(confirmation);
+        toast.success(confirmation);
       } else if (row && add)
         await rpc("admin_roster_change", {
           p_action: "add",
@@ -114,16 +138,24 @@ export function PlayerProfiles({
         });
       select(undefined);
       setDraft(undefined);
-      if (row)
-        setNotice(
-          add
-            ? row.profile.name + " se añadió a " + name + "."
-            : "Ficha guardada.",
-        );
+      if (row) {
+        const confirmation = add
+          ? row.profile.name + " se añadió a " + name + "."
+          : "Ficha guardada.";
+        setNotice(confirmation);
+        toast.success(confirmation);
+      }
 
+      if (add) {
+        setSearch("");
+        setPage(0);
+        setScope("club");
+      }
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al guardar.");
+      const detail = e instanceof Error ? e.message : "Error al guardar.";
+      setError(detail);
+      toast.error(detail);
     } finally {
       setBusy(false);
     }
@@ -175,6 +207,8 @@ export function PlayerProfiles({
         onClick={() => {
           select(undefined);
           setLink("");
+          setMatches([]);
+          setCreateInClub(Boolean(club));
           setError("");
           setNotice("");
           setDraft({
@@ -195,6 +229,7 @@ export function PlayerProfiles({
       {draft && (
         <form
           className="grid gap-3 rounded border p-4 sm:grid-cols-2"
+          onChange={() => setMatches([])}
           onSubmit={(e) => {
             e.preventDefault();
             void submit(selected, false);
@@ -204,10 +239,22 @@ export function PlayerProfiles({
             {selected
               ? "Ficha compartida por el pool y los clubes · " +
                 selected.profile.name
-              : scope === "pool"
+              : !createInClub
                 ? "Nuevo agente libre"
                 : "Nuevo jugador para " + name}
           </p>
+          {!selected && club && (
+            <label>
+              Destino{" "}
+              <select
+                value={createInClub ? "club" : "pool"}
+                onChange={(e) => setCreateInClub(e.target.value === "club")}
+              >
+                <option value="club">{name}</option>
+                <option value="pool">Pool · agente libre</option>
+              </select>
+            </label>
+          )}
           {!selected && (
             <label>
               Enlace de SoFIFA (opcional)
@@ -294,6 +341,48 @@ export function PlayerProfiles({
                 ))}
             </div>
           </fieldset>
+          {!selected && matches.length > 0 && (
+            <ul className="sm:col-span-2">
+              {matches.map((match) => (
+                <li
+                  key={match.id}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span>
+                    {match.name} · {match.nationality} · {match.age} años ·{" "}
+                    {match.club ?? "Libre"}
+                    {!match.active ? " · Ficha inactiva" : ""}
+                    {match.blocked ? " · Bloqueado" : ""}
+                  </span>
+                  {club &&
+                    createInClub &&
+                    !match.club_id &&
+                    match.active &&
+                    !match.blocked && (
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          void submit(
+                            {
+                              id: match.id,
+                              profile: { ...draft, name: match.name },
+                              club: null,
+                              blocked: false,
+                            },
+                            true,
+                          )
+                        }
+                      >
+                        Añadir ficha existente a {name}
+                      </Button>
+                    )}
+                  {match.club_id === club && (
+                    <span>Ya pertenece a este equipo</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
           <Button type="submit">
             {selected ? "Guardar ficha" : "Crear jugador"}
           </Button>

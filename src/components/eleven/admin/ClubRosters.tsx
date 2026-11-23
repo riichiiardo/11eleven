@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PlayerProfiles } from "./PlayerProfiles";
+import { toast } from "sonner";
 import { Users } from "lucide-react";
 import { rpc } from "@/infrastructure/supabase/client";
 import { SectionCard } from "@/components/eleven/SectionCard";
@@ -20,6 +21,7 @@ export function ClubRosters() {
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState(""),
     [error, setError] = useState("");
+  const [confirmRelease, setConfirmRelease] = useState(false);
   const [editing, edit] = useState<Member>(),
     [destination, setDestination] = useState("");
   useEffect(() => {
@@ -48,11 +50,6 @@ export function ClubRosters() {
     const dest =
       action === "release" ? null : action === "move" ? destination : club;
     if (
-      action === "release" &&
-      !window.confirm("¿Dejar libre a " + player.name + "?")
-    )
-      return;
-    if (
       action === "move" &&
       !window.confirm(
         "¿Mover a " +
@@ -67,21 +64,38 @@ export function ClubRosters() {
     setError("");
     setMessage("");
     try {
-      await rpc("admin_roster_change", {
-        p_action: action,
-        p_player: player.id,
-        p_source: action === "add" ? null : club,
-        p_destination: dest,
-        p_value: action === "edit" ? editing?.value : null,
-        p_rating: action === "edit" ? editing?.rating : null,
-      });
+      if (action === "release")
+        await rpc("admin_release_roster_player", {
+          p_player: player.id,
+          p_club: club,
+        });
+      else
+        await rpc("admin_roster_change", {
+          p_action: action,
+          p_player: player.id,
+          p_source: action === "add" ? null : club,
+          p_destination: dest,
+          p_value: action === "edit" ? editing?.value : null,
+          p_rating: action === "edit" ? editing?.rating : null,
+        });
       edit(undefined);
       setDestination("");
       setState((old) => old && { ...old, players: [], free: [] });
       refresh((n) => n + 1);
-      setMessage("Cambio guardado para " + player.name + ".");
+      const confirmation =
+        action === "release"
+          ? player.name +
+            " salió de " +
+            state?.clubs.find((c) => c.id === club)?.name +
+            " y quedó libre."
+          : "Cambio guardado para " + player.name + ".";
+      setMessage(confirmation);
+      toast.success(confirmation);
+      setConfirmRelease(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al guardar.");
+      const detail = e instanceof Error ? e.message : "Error al guardar.";
+      setError(detail);
+      toast.error(detail);
     } finally {
       setBusy(false);
     }
@@ -143,6 +157,7 @@ export function ClubRosters() {
                           variant="outline"
                           onClick={() => {
                             edit(p);
+                            setConfirmRelease(false);
                             setDestination("");
                           }}
                         >
@@ -215,7 +230,7 @@ export function ClubRosters() {
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => save("release", editing)}
+                    onClick={() => setConfirmRelease(true)}
                   >
                     Dejar libre
                   </Button>
@@ -223,6 +238,28 @@ export function ClubRosters() {
                     Cerrar
                   </Button>
                 </div>
+                {confirmRelease && (
+                  <div className="space-y-2 rounded border p-3">
+                    <p>
+                      ¿Dejar libre a {editing.name}? Se retirará su baja
+                      prevista y se invalidarán sus ofertas abiertas. Los
+                      acuerdos aceptados o reservados deben resolverse en
+                      Negociaciones.
+                    </p>
+                    <Button
+                      variant="destructive"
+                      onClick={() => void save("release", editing)}
+                    >
+                      Confirmar baja
+                    </Button>{" "}
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmRelease(false)}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                )}
               </section>
             )}
           </>
