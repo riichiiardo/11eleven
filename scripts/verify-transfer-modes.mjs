@@ -299,6 +299,33 @@ try {
   console.log(
     "PASS transfer modes: exact free-agent cost, owner approval, cash purchase, 1:1 exchange, exchange+cash, both ownership directions, budget/idempotence, competing offers preserved, seller-only cancellation by documented choice, separate reapproval, prelist persistence, wrong universe and anonymous denial.",
   );
+  await db.exec("reset role; alter table public.players add column if not exists sofifa_id bigint; alter table public.squads alter column president_id drop not null; alter table public.squad_players alter column president_id drop not null");
+  for (const migration of ["bot-club-rosters","president-offer-lists","prelist-offer-slots","prelist-pick-priority","racing-roster-repair"]) {
+    await db.exec(readFileSync("supabase/"+migration+".sql","utf8"));
+  }
+  const repair=readFileSync("supabase/racing-roster-repair.sql","utf8");
+  const list=(label)=>repair.match(new RegExp(label+" uuid\\[\\]:=array\\[([^\\]]+)"))[1].match(/[0-9a-f-]{36}/g);
+  const keep=list("keep"), release=list("release");
+  assert.equal(keep.length,28);assert.equal(release.length,30);
+  const club=repair.match(/club uuid:='([^']+)'/)[1];
+  const tid=repair.match(/tid uuid:='([^']+)'/)[1];
+  await db.query("insert into tournaments(id,code,name,season) values($1,'RACE','Ensayo','2026')",[tid]);
+  await db.query("insert into clubs(id,tournament_id,name,short_name,league,country) values($1,$2,'Racing Club','RAC','L','Argentina')",[club,tid]);
+  const squad=(await db.query("insert into squads(tournament_id,club_id)values($1,$2)returning id",[tid,club])).rows[0].id;
+  for(const [index,rowId] of [...keep,...release].entries()){
+    const player=(await db.query(`insert into players(name,real_club,position,"group",ovr,age,value,nationality,source_record)values($1,'Racing Club','MC','MID',70,20,10,'Argentina',$2::jsonb) returning id`,["Ensayo "+index,JSON.stringify(index<28?{game_team:"Racing Club"}:{})])).rows[0].id;
+    await db.query("insert into squad_players(id,tournament_id,club_id,squad_id,player_id)values($1,$2,$3,$4,$5)",[rowId,tid,club,squad,player]);
+  }
+  await db.exec(repair);
+  await db.exec(repair);
+  assert.deepEqual((await db.query("select id from squad_players where club_id=$1",[club])).rows.map(r=>r.id).sort(),keep.sort());
+  assert.equal((await db.query("select count(*)::int n from app.racing_roster_correction_backup")).rows[0].n,30);
+  await login(1);
+  const inbox=(await db.query("select public.market_overview() data")).rows[0].data;
+  assert.ok(inbox.history.length>0);
+  assert.ok(inbox.history.every(o=>o.side==="recibida" || o.side==="enviada"));
+  await db.query("select public.prelist_offer_players(),public.next_prelist_pick(),public.prelist_pool_search('test')");
+  console.log("PASS scoped negotiations and prelist RPCs");
 } finally {
   await db.close();
 }
