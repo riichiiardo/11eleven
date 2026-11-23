@@ -200,6 +200,25 @@ try {
   const budgetBefore = (
     await asOwner("select id,budget from public.presidents order by id")
   ).rows;
+  await db.exec("reset role; begin");
+  await db.exec(readFileSync("supabase/departure-approvals.sql","utf8"));
+  await login(2);
+  await assert.rejects(db.query("select public.review_departures()"),/permiso/).catch(()=>{throw Error("review permissions")});
+  await db.exec("rollback");
+  await db.exec("reset role; begin");
+  await db.exec(readFileSync("supabase/departure-approvals.sql","utf8"));
+  await login(1);
+  const teams=(await db.query("select public.review_departures() data")).rows[0].data;
+  const legs=teams.flatMap(team=>team.players);
+  assert.equal(legs.length,2);
+  for(const leg of legs){
+    assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,0);
+    for(let retry=0;retry<2;retry++)await db.query("select public.approve_departure($1,$2,$3)",[leg.presidentId,leg.playerId,leg.revision]);
+  }
+  assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,1);
+  await db.exec("reset role");
+  assert.equal((await db.query("select count(*)::int n from app.transfer_notifications where message like 'Baja aprobada:%'")).rows[0].n,4);
+  await db.exec("rollback");
   await login(1);
   assert.equal(
     (await db.query("select public.respond_offer_execute_reserved() data"))
