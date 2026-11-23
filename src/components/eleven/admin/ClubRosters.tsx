@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PlayerProfiles } from "./PlayerProfiles";
 import { Users } from "lucide-react";
 import { rpc } from "@/infrastructure/supabase/client";
 import { SectionCard } from "@/components/eleven/SectionCard";
@@ -14,7 +15,6 @@ type State = {
 };
 export function ClubRosters() {
   const [club, setClub] = useState(""),
-    [term, setTerm] = useState(""),
     [state, setState] = useState<State>(),
     [revision, refresh] = useState(0);
   const [busy, setBusy] = useState(false),
@@ -25,7 +25,7 @@ export function ClubRosters() {
   useEffect(() => {
     let active = true;
     const timer = setTimeout(() => {
-      rpc<State>("admin_roster_state", { p_club: club || null, p_search: term })
+      rpc<State>("admin_roster_state", { p_club: club || null, p_search: "" })
         .then((result) => {
           if (active) {
             setState(result);
@@ -40,7 +40,7 @@ export function ClubRosters() {
       active = false;
       clearTimeout(timer);
     };
-  }, [club, term, revision]);
+  }, [club, revision]);
   async function save(
     action: "add" | "move" | "edit" | "release",
     player: Item,
@@ -98,7 +98,6 @@ export function ClubRosters() {
               setClub(e.target.value);
               edit(undefined);
               setDestination("");
-              setTerm("");
               setMessage("");
               setState((old) => old && { ...old, players: [], free: [] });
             }}
@@ -113,30 +112,16 @@ export function ClubRosters() {
         </label>
         {error && <p role="alert">{error}</p>}
         {message && <p role="status">{message}</p>}
+        <PlayerProfiles
+          key={club}
+          rev={revision}
+          club={club}
+          name={state?.clubs.find((c) => c.id === club)?.name ?? ""}
+          onChanged={() => refresh((n) => n + 1)}
+        />
         {club && (
           <>
-            <label className="block">
-              Añadir agente libre
-              <Input
-                type="search"
-                placeholder="Busca por nombre o ID de SoFIFA"
-                value={term}
-                onChange={(e) => {
-                  setTerm(e.target.value);
-                  setState((old) => old && { ...old, free: [] });
-                }}
-              />
-            </label>
-            {state?.free.map((p) => (
-              <div className="flex items-center justify-between" key={p.id}>
-                <span>
-                  {p.name} · {p.nationality} · {p.ovr}
-                </span>
-                <Button variant="outline" onClick={() => save("add", p)}>
-                  Añadir
-                </Button>
-              </div>
-            ))}
+            <h3 className="font-semibold">Incorporaciones y cambios de club</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
