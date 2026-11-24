@@ -503,7 +503,7 @@ function resolveMutation(
       "adminOps.changePresidentClub": (a) =>
         rpc("change_president_club", {
           p_president_id: a.presidentId,
-          p_team_catalog_id: a.teamCatalogId,
+          p_team_catalog_id: a.catalogTeamId,
           p_league_club_id: a.leagueClubId,
         }),
       "adminOps.removePresident": (a) =>
