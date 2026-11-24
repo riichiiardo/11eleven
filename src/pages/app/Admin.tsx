@@ -67,6 +67,7 @@ import { MatchCard, StandingsTable } from "@/components/eleven/MatchBits";
 import { Award, RefreshCw, Swords, Trophy } from "lucide-react";
 import { FieldLabel, Tip } from "@/components/eleven/admin/AdminBits";
 import { PrizesPanel } from "@/components/eleven/admin/PrizesPanel";
+import { CompetitionEnrollment } from "@/components/eleven/admin/CompetitionEnrollment";
 import { ClubRosters } from "@/components/eleven/admin/ClubRosters";
 import { SigningEligibility } from "@/components/eleven/admin/SigningEligibility";
 import { CatalogPanel } from "@/components/eleven/admin/CatalogPanel";
@@ -235,6 +236,7 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="plantillas">
+          <CompetitionEnrollment />
           <ClubRosters />
         </TabsContent>
         <TabsContent value="mercado" className="flex flex-col gap-5">
