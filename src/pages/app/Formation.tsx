@@ -1,6 +1,7 @@
 import { SquadTactics } from "@/components/eleven/SquadTactics";
 import { FormationPicker } from "@/components/eleven/FormationPicker";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { rpc } from "@/infrastructure/supabase/client";
 import type { AppStateView } from "@/domain/appTypes";
 import { api } from "@/services/backend/api";
 import {
@@ -48,30 +49,170 @@ import { cn } from "@/lib/utils";
 
 const EMPTY_SQUAD: AppStateView["squad"] = [];
 
+type CompetitionFormation = {
+  id: string;
+  name: string;
+  ruleId: string | null;
+  lineup: Lineup | null;
+};
+
 export default function Formation({
   state: directState,
+  competitions,
 }: {
   state?: AppStateView;
+  competitions?: CompetitionFormation[];
 }) {
   const contextState = useDashboardState();
   const state = directState ?? contextState;
+  if (!state?.club) return <DashboardUnavailable title="Formación" />;
+  return (
+    <CompetitionNavigator
+      key={state.club.id}
+      state={state}
+      initialOptions={competitions}
+    />
+  );
+}
+
+function CompetitionNavigator({
+  state,
+  initialOptions,
+}: {
+  state: AppStateView;
+  initialOptions?: CompetitionFormation[];
+}) {
+  const [options, setOptions] =
+    useState<CompetitionFormation[]>(initialOptions);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState("");
+  const [attempt, retry] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, Lineup | null>>({});
+  useEffect(() => {
+    if (initialOptions) return;
+    let active = true;
+    rpc<CompetitionFormation[]>("formation_competitions")
+      .then((rows) => {
+        if (active) {
+          setOptions(rows);
+          setError("");
+        }
+      })
+      .catch((cause) => {
+        if (active) setError(errorMessage(cause));
+      });
+    return () => {
+      active = false;
+    };
+  }, [attempt, initialOptions]);
+  if (error)
+    return (
+      <SectionCard title="Formación">
+        <p role="alert">{error}</p>
+        <Button
+          onClick={() => {
+            setError("");
+            retry((n) => n + 1);
+          }}
+        >
+          Reintentar
+        </Button>
+      </SectionCard>
+    );
+  if (!options) return <p role="status">Cargando competiciones…</p>;
+  const competition =
+    options.find((item) => item.id === selected) ?? options[0];
+  const key = competition?.id ?? "";
+  return (
+    <>
+      {competition && (
+        <SectionCard title="Competición">
+          <label className="flex flex-wrap items-center gap-3">
+            Formación para
+            <select
+              className="rounded-md border bg-background p-2"
+              value={key}
+              disabled={busy}
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {options.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </SectionCard>
+      )}
+      <FormationEditor
+        key={key}
+        state={state}
+        competition={competition}
+        draft={drafts[key] ?? null}
+        setDraft={(lineup) =>
+          setDrafts((previous) => ({ ...previous, [key]: lineup }))
+        }
+        busy={busy}
+        setBusy={setBusy}
+        onSaved={(lineup) =>
+          setOptions((previous) =>
+            previous?.map((item) =>
+              item.id === key ? { ...item, lineup } : item,
+            ),
+          )
+        }
+      />
+    </>
+  );
+}
+
+function FormationEditor({
+  state,
+  competition,
+  draft,
+  setDraft,
+  busy,
+  setBusy,
+  onSaved,
+}: {
+  state: AppStateView;
+  competition?: CompetitionFormation;
+  draft: Lineup | null;
+  setDraft: (lineup: Lineup | null) => void;
+  busy: boolean;
+  setBusy: (value: boolean) => void;
+  onSaved: (lineup: Lineup) => void;
+}) {
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
   const autoFill = useMutation(api.squads.autoFillLineup);
 
-  const serverLineup = state?.lineup ?? null;
+  const saved = competition?.lineup;
+  const serverLineup =
+    saved && Object.prototype.hasOwnProperty.call(FORMATIONS, saved.formation)
+      ? saved
+      : state.lineup;
   // "Alinear en el XI" from the squad page arrives with the player pre-selected.
   const incomingPlayerId =
     (location.state as { playerId?: string } | null)?.playerId ?? null;
-  const [draft, setDraft] = useState<Lineup | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(
     incomingPlayerId,
   );
   const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const lineup = draft ?? serverLineup;
-  const rules = state?.rules ?? null;
+  const rules = useMemo(() => {
+    const base = state.rules as ConfiguredRules | null;
+    if (!competition || !base?.configuration) return base;
+    return {
+      ...base,
+      configuration: {
+        ...base.configuration,
+        activeCompetitionId: competition.ruleId ?? "",
+      },
+    };
+  }, [state.rules, competition]);
   const squad = state?.squad ?? EMPTY_SQUAD;
 
   const evaluationInput = state?.evaluation;
@@ -215,13 +356,20 @@ export default function Formation({
     });
   };
 
+  const save = async (next: Lineup) => {
+    if (competition) {
+      await rpc("save_competition_lineup", {
+        p_competition: competition.id,
+        p_formation: next.formation,
+        p_slots: next.slots,
+      });
+      onSaved(next);
+    } else await saveLineup(next);
+  };
   const persist = async () => {
     setBusy(true);
     try {
-      await saveLineup({
-        formation: lineup.formation,
-        slots: lineup.slots,
-      });
+      await save(lineup);
       setDraft(null);
       toast.success("Alineación guardada", {
         description: `${definition.label} · ${evaluation.starters.length} titulares verificados por el motor de reglas.`,
@@ -238,7 +386,8 @@ export default function Formation({
   const persistAuto = async () => {
     setBusy(true);
     try {
-      await autoFill({ formation: lineup.formation });
+      if (competition) await save(autoLineup(squad, lineup.formation));
+      else await autoFill({ formation: lineup.formation });
       setDraft(null);
       toast.success("Alineación automática aplicada", {
         description:

@@ -74,11 +74,15 @@ try {
       React.createElement(
         MemoryRouter,
         null,
-        React.createElement(Page, { state: ready }),
+        React.createElement(Page, { state: ready, competitions: [
+          {id:"liga",name:"Liga de prueba",ruleId:null,lineup:null},
+          {id:"copa",name:"Copa de prueba",ruleId:null,lineup:null},
+        ] }),
       ),
     );
     if (name === "Formation") {
       assert.ok(html.includes("Cambiar formación"));
+      assert.ok(html.includes("Liga de prueba") && html.includes("Copa de prueba"));
       assert.ok(html.includes('role="img"'));
       assert.ok(!html.includes("Formaciones disponibles"));
     }

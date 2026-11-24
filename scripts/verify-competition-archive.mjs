@@ -49,6 +49,39 @@ try {
   await db.query(
     "insert into app.broadcast_sources(video_id,channel_id,title,competition_slug,round_number)values('Ax3pHQdXZm8','UCdi3BBPwD7Y0XTp86qGCofA','J9','primera',9),('EWOxcfACXhQ','UCdi3BBPwD7Y0XTp86qGCofA','Cup','fa-cup',null)",
   );
+  for (const migration of ["draft-prelists", "draft-outgoing", "competition-lineups"]) {
+    await db.exec(readFileSync(`supabase/${migration}.sql`, "utf8"));
+  }
+  await db.exec(`
+    insert into public.clubs(id,tournament_id,name,short_name,league,country)
+    values ('${id(91)}','${id(10)}','Test club','TST','L','España'),
+           ('${id(92)}','${id(10)}','Other club','OTH','L','España');
+    update app.competition_teams set club_id='${id(92)}' where id='${id(23)}';
+    insert into public.presidents(id,tournament_id,user_id,club_id,nickname,display_name)
+    values ('${id(93)}','${id(10)}','${id(1)}','${id(91)}','Test','Test');
+    update public.profiles set active_tournament_id='${id(10)}' where id='${id(1)}';
+    select set_config('request.jwt.claims','{"sub":"${id(1)}"}',false);
+  `);
+  const formationOptions = async () => (await db.query("select public.formation_competitions() data")).rows[0].data;
+  assert.deepEqual((await formationOptions()).map(row=>row.id),[league]);
+  await denied(db.query("select public.save_competition_lineup($1,'4-4-2','[]')",[cup]));
+  await db.query("update app.competition_teams set club_id=$1 where id=$2",[id(91), id(23)]);
+  assert.deepEqual((await formationOptions()).map(row=>row.id),[cup,league]);
+  await db.exec(`
+    insert into public.squads(id,tournament_id,club_id,president_id)
+    values ('${id(94)}','${id(10)}','${id(91)}','${id(93)}');
+    insert into public.players(id,name,position,"group",ovr,age,value)
+    select md5(n::text)::uuid,'Lineup '||n,'MC','MID',75,25,1000 from generate_series(1,11) n;
+    insert into public.squad_players(tournament_id,club_id,squad_id,player_id,president_id)
+    select '${id(10)}','${id(91)}','${id(94)}',id,'${id(93)}' from public.players where name like 'Lineup %';
+  `);
+  const slots = (await db.query("select jsonb_agg(jsonb_build_object('slotId',name,'playerId',id)) slots from public.players where name like 'Lineup %'")).rows[0].slots;
+  await db.query("select public.save_competition_lineup($1,'4-4-2',$2)",[league,JSON.stringify(slots)]);
+  assert.equal((await formationOptions()).find(row=>row.id===cup).lineup,null);
+  config[1].u20 = {enabled:true,min:1,max:11};
+  await db.query("update public.tournament_rules set configuration=$1 where tournament_id=$2",[{competitions:config},id(10)]);
+  await assert.rejects(db.query("select public.save_competition_lineup($1,'4-4-2',$2)",[cup,JSON.stringify(slots)]),/R-11/);
+  await db.exec("select set_config('request.jwt.claims','{}',false)");
   const doc = {
     round: 9,
     stage: "Regular",
