@@ -141,6 +141,7 @@ function TeamSquadDialog({
                 name={club.name}
                 shortName={club.shortName}
                 colors={[club.colorPrimary, club.colorSecondary]}
+                crestUrl={club.crestUrl}
                 size="sm"
               />
               <span className="display">{club.name}</span>
@@ -415,6 +416,7 @@ export default function Teams() {
                   name={club.name}
                   shortName={club.shortName}
                   colors={[club.colorPrimary, club.colorSecondary]}
+                  crestUrl={club.crestUrl}
                   size="md"
                 />
                 <div className="min-w-0 flex-1">

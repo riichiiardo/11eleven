@@ -383,6 +383,7 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
                         name={club.name}
                         shortName={club.shortName}
                         colors={[club.colorPrimary, club.colorSecondary]}
+                        crestUrl={club.crestUrl}
                         size="sm"
                       />
                       <span className="text-sm font-semibold">{club.name}</span>
