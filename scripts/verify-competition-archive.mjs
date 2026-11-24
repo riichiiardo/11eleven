@@ -82,6 +82,24 @@ try {
   await db.query("update public.tournament_rules set configuration=$1 where tournament_id=$2",[{competitions:config},id(10)]);
   await assert.rejects(db.query("select public.save_competition_lineup($1,'4-4-2',$2)",[cup,JSON.stringify(slots)]),/R-11/);
   await db.exec("select set_config('request.jwt.claims','{}',false)");
+  await db.exec("begin");
+  const poolMigration = readFileSync("supabase/player-pool.sql", "utf8");
+  await db.exec(poolMigration.slice(poolMigration.indexOf("create or replace function app.require_pool_admin"),poolMigration.indexOf("create or replace function public.pool_status")));
+  await db.exec(readFileSync("supabase/club-competition-enrollment.sql", "utf8"));
+  await db.query("select set_config('request.jwt.claims',$1,false)", [JSON.stringify({sub:id(1)})]);
+  await db.exec("savepoint non_admin");
+  await denied(db.query("select public.admin_save_competition_enrollment($1,$2)",[id(91),[league]]));
+  await db.exec("rollback to non_admin");
+  await db.query("insert into public.tournament_admins(tournament_id,user_id,role) values($1,$2,'principal')",[id(10),id(1)]);
+  assert.deepEqual((await formationOptions()).map(row=>row.id),[cup]);
+  await db.query("select public.admin_save_competition_enrollment($1,$2)",[id(91),[league]]);
+  const currentOptions=await formationOptions();
+  assert.deepEqual(currentOptions.map(row=>row.id),[league]);
+  assert.deepEqual(currentOptions[0].lineup.slots,slots);
+  assert.equal((await db.query("select current_participant from app.competition_teams where id=$1",[id(23)])).rows[0].current_participant,false);
+  await db.query("select public.admin_save_competition_enrollment($1,$2)",[id(91),[]]);
+  assert.deepEqual(await formationOptions(),[]);
+  await db.exec("rollback");
   const doc = {
     round: 9,
     stage: "Regular",

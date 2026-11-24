@@ -122,6 +122,15 @@ function CompetitionNavigator({
       </SectionCard>
     );
   if (!options) return <p role="status">Cargando competiciones…</p>;
+  if (!options.length)
+    return (
+      <SectionCard title="Formación">
+        <p>
+          Tu club aún no está inscrito en ninguna competición. La administración
+          puede asignarlas desde Plantillas.
+        </p>
+      </SectionCard>
+    );
   const competition =
     options.find((item) => item.id === selected) ?? options[0];
   const key = competition?.id ?? "";
