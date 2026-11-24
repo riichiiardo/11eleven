@@ -243,6 +243,11 @@ export function RulesEditor({
   universe: string;
 }) {
   const [draft, setDraft] = useState(() => configurationFor(rules));
+  const [section, setSection] = useState("competitions");
+  const [competitionId, setCompetitionId] = useState("");
+  const currentCompetition =
+    draft.competitions.find((c) => c.id === competitionId) ??
+    draft.competitions[0];
   const [formation, setFormation] = useState(rules.fc27FormationCode);
   const [savedDraft, setSavedDraft] = useState(() => configurationFor(rules));
   const [savedFormation, setSavedFormation] = useState(rules.fc27FormationCode);
@@ -301,7 +306,7 @@ export function RulesEditor({
   };
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
-      <header>
+      <header className="rounded-xl border bg-primary/5 p-5">
         <h1 className="display text-2xl">Reglas del Universo</h1>
         <p>{universe}. Las reglas del XI se configuran por competición.</p>
         {!isAdmin && <p>Solo el administrador puede modificar estas reglas.</p>}
@@ -340,316 +345,409 @@ export function RulesEditor({
           </Button>
         )}
       </div>
-      <fieldset
-        disabled={!isAdmin || !editing || busy}
-        className="space-y-5 disabled:opacity-80"
+      <nav
+        aria-label="Secciones de reglas"
+        className="flex flex-wrap gap-2 rounded-xl border bg-muted/30 p-2"
       >
-        <SectionCard title="R-01 · Presupuesto inicial" icon={Scale}>
-          <label className="flex items-center gap-2">
-            €{" "}
-            <Input
-              aria-label="Presupuesto inicial en euros"
-              type="number"
-              min={0}
-              max={2000000000}
-              step="0.01"
-              value={draft.budget}
-              onChange={(e) => set({ budget: Number(e.target.value) })}
-            />
-          </label>
-          <p className="mt-2 text-sm text-muted-foreground">
-            El presupuesto general se aplica a los equipos que lo heredan. Los
-            importes individuales se conservan cuando cambia el general.
-          </p>
-          <ClubBudgets
-            generalBudget={savedDraft.budget}
-            drafts={clubDrafts}
-            revision={budgetRevision}
-            onChange={(id, value) =>
-              setClubDrafts((previous) => ({ ...previous, [id]: value }))
-            }
-          />
-        </SectionCard>
-        <SectionCard title="R-02 · Tamaño de plantilla" icon={Scale}>
-          <Stepper
-            label="Jugadores en plantilla"
-            min={11}
-            value={draft.squadSize}
-            onChange={(squadSize) => set({ squadSize })}
-          />
-        </SectionCard>
-        {(
-          [
-            ["GK", "R-03 · Porteros"],
-            ["DEF", "R-04 · Defensas"],
-            ["MID", "R-05 · Medios"],
-            ["FWD", "R-06 · Delanteros"],
-          ] as const
-        ).map(([group, label]) => (
-          <SectionCard key={group} title={label} icon={Scale}>
-            <RangeEditor
-              label={label}
-              value={draft.groups[group]}
-              onChange={(range) =>
-                set({ groups: { ...draft.groups, [group]: range } })
-              }
-            />
-          </SectionCard>
+        {[
+          ["competitions", "Competiciones"],
+          ["squad", "Plantilla y presupuesto"],
+          ["general", "Formación, draft y reglas generales"],
+        ].map(([id, label]) => (
+          <Button
+            key={id}
+            type="button"
+            variant={section === id ? "default" : "ghost"}
+            aria-pressed={section === id}
+            onClick={() => setSection(id)}
+          >
+            {label}
+          </Button>
         ))}
-        <SectionCard title="R-10 · Cierre de alineación" icon={Scale}>
-          <Stepper
-            label="Horas antes del partido"
-            max={72}
-            value={draft.lineupLockHours}
-            onChange={(lineupLockHours) => set({ lineupLockHours })}
-          />
-        </SectionCard>
-        <SectionCard
-          title="Competiciones del Universo · R-11 y R-12"
-          icon={Scale}
-        >
-          <div className="space-y-5">
-            {draft.competitions.map((c) => {
-              const update = (patch: Partial<typeof c>) =>
-                set({
-                  competitions: draft.competitions.map((x) =>
-                    x.id === c.id ? { ...x, ...patch } : x,
-                  ),
-                });
-              return (
-                <div key={c.id} className="rounded-xl border p-4 space-y-4">
-                  <div className="flex flex-wrap gap-3">
-                    <Input
-                      aria-label="Nombre de competición"
-                      value={c.name}
-                      onChange={(e) => update({ name: e.target.value })}
-                    />
-                    <label>
-                      Formato{" "}
-                      <select
-                        className="bg-background border rounded p-2"
-                        value={c.kind}
-                        onChange={(e) =>
-                          update({ kind: e.target.value as typeof c.kind })
-                        }
-                      >
-                        <option value="league">Liga (Premier League)</option>
-                        <option value="cup">Copa (FA Cup)</option>
-                        <option value="league_playoffs">
-                          Liga con liguilla (Liga MX)
-                        </option>
-                      </select>
-                    </label>
-                  </div>
-                  <label className="flex gap-2">
-                    <input
-                      type="radio"
-                      name="activeCompetition"
-                      checked={draft.activeCompetitionId === c.id}
-                      onChange={() => set({ activeCompetitionId: c.id })}
-                    />
-                    Aplicar reglas de esta competición al XI actual
-                  </label>
-                  <div className="flex flex-wrap gap-4">
-                    <Stepper
-                      label={
-                        c.kind === "cup"
-                          ? "Partidos por eliminatoria"
-                          : "Vueltas de la liga"
-                      }
-                      min={1}
-                      max={10}
-                      value={c.rounds}
-                      onChange={(rounds) => update({ rounds })}
-                    />
-                    {c.kind === "league_playoffs" && (
-                      <Stepper
-                        label="Equipos en liguilla"
-                        value={c.playoffTeams}
-                        onChange={(playoffTeams) => update({ playoffTeams })}
-                      />
-                    )}
-                  </div>
-                  {c.kind !== "cup" && (
-                    <div className="flex flex-wrap gap-4">
-                      <Stepper
-                        label="Ascensos"
-                        value={c.promotions}
-                        onChange={(promotions) => update({ promotions })}
-                      />
-                      <Stepper
-                        label="Descensos"
-                        value={c.relegations}
-                        onChange={(relegations) => update({ relegations })}
-                      />
-                      {(
-                        [
-                          ["promotionTarget", "Destino de ascenso"],
-                          ["relegationTarget", "Destino de descenso"],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <label key={key}>
-                          {label}{" "}
-                          <select
-                            className="bg-background border rounded p-2"
-                            value={c[key]}
-                            onChange={(e) => update({ [key]: e.target.value })}
-                          >
-                            <option value="">Sin destino</option>
-                            {draft.competitions
-                              .filter((x) => x.id !== c.id && x.kind !== "cup")
-                              .map((x) => (
-                                <option key={x.id} value={x.id}>
-                                  {x.name}
-                                </option>
-                              ))}
-                          </select>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  <RangeEditor
-                    label="R-11 · Sub-20 en el XI (menores de 20 años)"
-                    value={c.u20}
-                    max={11}
-                    onChange={(u20) => update({ u20 })}
-                  />
-                  <RangeEditor
-                    label="R-12 · Nacionales en el XI"
-                    value={c.nationals}
-                    max={11}
-                    onChange={(nationals) => update({ nationals })}
-                  />
-                  <label>
-                    Nacionalidad de la competición{" "}
-                    <Input
-                      aria-label="Nacionalidad de la competición"
-                      value={c.nationality}
-                      onChange={(e) => update({ nationality: e.target.value })}
-                      placeholder="Ej.: México, Inglaterra"
-                    />
-                  </label>
-                  <CustomRules
-                    rules={c.customRules}
-                    onChange={(customRules) => update({ customRules })}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      set({
-                        competitions: draft.competitions
-                          .filter((x) => x.id !== c.id)
-                          .map((x) => ({
-                            ...x,
-                            promotionTarget:
-                              x.promotionTarget === c.id
-                                ? ""
-                                : x.promotionTarget,
-                            relegationTarget:
-                              x.relegationTarget === c.id
-                                ? ""
-                                : x.relegationTarget,
-                          })),
-                        activeCompetitionId:
-                          draft.activeCompetitionId === c.id
-                            ? ""
-                            : draft.activeCompetitionId,
-                      })
-                    }
-                  >
-                    Eliminar competición
-                  </Button>
-                </div>
-              );
-            })}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                const id = crypto.randomUUID();
-                set({
-                  competitions: [
-                    ...draft.competitions,
-                    {
-                      id,
-                      name: "Nueva competición",
-                      kind: "league",
-                      rounds: 2,
-                      playoffTeams: 8,
-                      promotions: 0,
-                      relegations: 0,
-                      promotionTarget: "",
-                      relegationTarget: "",
-                      u20: { enabled: false, min: 0, max: 11 },
-                      nationals: { enabled: false, min: 0, max: 11 },
-                      nationality: "",
-                      customRules: [],
-                    },
-                  ],
-                  activeCompetitionId: draft.activeCompetitionId || id,
-                });
-              }}
-            >
-              Crear competición
-            </Button>
-          </div>
-        </SectionCard>
-        <SectionCard title="R-13 · Formación" icon={Scale}>
-          <label>
-            Esquema predeterminado{" "}
-            <select
-              className="bg-background border rounded p-2"
-              value={formation}
-              onChange={(e) => setFormation(e.target.value)}
-            >
-              {FORMATION_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </label>
-        </SectionCard>
-        <SectionCard title="Draft · Altas y bajas" icon={Scale}>
-          <div className="space-y-4">
-            <Stepper
-              label="Máximo de altas y bajas por presidente"
-              value={draft.draft.maxTransfers}
-              max={100}
-              onChange={(maxTransfers) =>
-                set({ draft: { ...draft.draft, maxTransfers } })
-              }
-            />
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={draft.draft.extraPlayer}
-                onChange={(e) =>
-                  set({
-                    draft: { ...draft.draft, extraPlayer: e.target.checked },
-                  })
+      </nav>
+      <fieldset className="space-y-5 disabled:opacity-80">
+        {section === "squad" && (
+          <fieldset
+            disabled={!isAdmin || !editing || busy}
+            className="grid gap-3 lg:grid-cols-2"
+          >
+            <SectionCard title="R-01 · Presupuesto inicial" icon={Scale}>
+              <label className="flex items-center gap-2">
+                €{" "}
+                <Input
+                  aria-label="Presupuesto inicial en euros"
+                  type="number"
+                  min={0}
+                  max={2000000000}
+                  step="0.01"
+                  value={draft.budget}
+                  onChange={(e) => set({ budget: Number(e.target.value) })}
+                />
+              </label>
+              <p className="mt-2 text-sm text-muted-foreground">
+                El presupuesto general se aplica a los equipos que lo heredan.
+                Los importes individuales se conservan cuando cambia el general.
+              </p>
+              <ClubBudgets
+                generalBudget={savedDraft.budget}
+                drafts={clubDrafts}
+                revision={budgetRevision}
+                onChange={(id, value) =>
+                  setClubDrafts((previous) => ({ ...previous, [id]: value }))
                 }
               />
-              Autorizar una plaza adicional de alta y baja
-            </label>
-            <p className="text-sm text-muted-foreground">
-              Máximo vigente:{" "}
-              {draft.draft.maxTransfers + Number(draft.draft.extraPlayer)} altas
-              y otras tantas bajas. La prelista es privada y no ejecuta
-              fichajes.
-            </p>
-          </div>
-        </SectionCard>
-        <SectionCard
-          title="R-14 en adelante · Reglas del administrador"
-          icon={Scale}
-        >
-          <CustomRules
-            rules={draft.customRules}
-            onChange={(customRules) => set({ customRules })}
-          />
-        </SectionCard>
+            </SectionCard>
+            <SectionCard title="R-02 · Tamaño de plantilla" icon={Scale}>
+              <Stepper
+                label="Jugadores en plantilla"
+                min={11}
+                value={draft.squadSize}
+                onChange={(squadSize) => set({ squadSize })}
+              />
+            </SectionCard>
+            {(
+              [
+                ["GK", "R-03 · Porteros"],
+                ["DEF", "R-04 · Defensas"],
+                ["MID", "R-05 · Medios"],
+                ["FWD", "R-06 · Delanteros"],
+              ] as const
+            ).map(([group, label]) => (
+              <SectionCard key={group} title={label} icon={Scale}>
+                <RangeEditor
+                  label={label}
+                  value={draft.groups[group]}
+                  onChange={(range) =>
+                    set({ groups: { ...draft.groups, [group]: range } })
+                  }
+                />
+              </SectionCard>
+            ))}
+            <SectionCard title="R-10 · Cierre de alineación" icon={Scale}>
+              <Stepper
+                label="Horas antes del partido"
+                max={72}
+                value={draft.lineupLockHours}
+                onChange={(lineupLockHours) => set({ lineupLockHours })}
+              />
+            </SectionCard>
+          </fieldset>
+        )}
+        {section === "competitions" && (
+          <SectionCard
+            title="Competiciones del Universo · R-11 y R-12"
+            icon={Scale}
+          >
+            <div className="space-y-5">
+              <label className="flex flex-wrap items-center gap-3">
+                Competición
+                <select
+                  className="rounded-md border bg-background p-2"
+                  value={currentCompetition?.id ?? ""}
+                  onChange={(e) => setCompetitionId(e.target.value)}
+                >
+                  {!currentCompetition && (
+                    <option value="">Sin competiciones</option>
+                  )}
+                  {draft.competitions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {draft.competitions
+                .filter((c) => c.id === currentCompetition?.id)
+                .map((c) => {
+                  const update = (patch: Partial<typeof c>) =>
+                    set({
+                      competitions: draft.competitions.map((x) =>
+                        x.id === c.id ? { ...x, ...patch } : x,
+                      ),
+                    });
+                  return (
+                    <fieldset
+                      disabled={!isAdmin || !editing || busy}
+                      key={c.id}
+                      className="rounded-xl border p-4 space-y-4"
+                    >
+                      <div className="flex flex-wrap gap-3">
+                        <Input
+                          aria-label="Nombre de competición"
+                          value={c.name}
+                          onChange={(e) => update({ name: e.target.value })}
+                        />
+                        <label>
+                          Formato{" "}
+                          <select
+                            className="bg-background border rounded p-2"
+                            value={c.kind}
+                            onChange={(e) =>
+                              update({ kind: e.target.value as typeof c.kind })
+                            }
+                          >
+                            <option value="league">
+                              Liga (Premier League)
+                            </option>
+                            <option value="cup">Copa (FA Cup)</option>
+                            <option value="league_playoffs">
+                              Liga con liguilla (Liga MX)
+                            </option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="flex gap-2">
+                        <input
+                          type="radio"
+                          name="activeCompetition"
+                          checked={draft.activeCompetitionId === c.id}
+                          onChange={() => set({ activeCompetitionId: c.id })}
+                        />
+                        Aplicar reglas de esta competición al XI actual
+                      </label>
+                      <div className="flex flex-wrap gap-4">
+                        <Stepper
+                          label={
+                            c.kind === "cup"
+                              ? "Partidos por eliminatoria"
+                              : "Vueltas de la liga"
+                          }
+                          min={1}
+                          max={10}
+                          value={c.rounds}
+                          onChange={(rounds) => update({ rounds })}
+                        />
+                        {c.kind === "league_playoffs" && (
+                          <Stepper
+                            label="Equipos en liguilla"
+                            value={c.playoffTeams}
+                            onChange={(playoffTeams) =>
+                              update({ playoffTeams })
+                            }
+                          />
+                        )}
+                      </div>
+                      {c.kind !== "cup" && (
+                        <div className="flex flex-wrap gap-4">
+                          <Stepper
+                            label="Ascensos"
+                            value={c.promotions}
+                            onChange={(promotions) => update({ promotions })}
+                          />
+                          <Stepper
+                            label="Descensos"
+                            value={c.relegations}
+                            onChange={(relegations) => update({ relegations })}
+                          />
+                          {(
+                            [
+                              ["promotionTarget", "Destino de ascenso"],
+                              ["relegationTarget", "Destino de descenso"],
+                            ] as const
+                          ).map(([key, label]) => (
+                            <label key={key}>
+                              {label}{" "}
+                              <select
+                                className="bg-background border rounded p-2"
+                                value={c[key]}
+                                onChange={(e) =>
+                                  update({ [key]: e.target.value })
+                                }
+                              >
+                                <option value="">Sin destino</option>
+                                {draft.competitions
+                                  .filter(
+                                    (x) => x.id !== c.id && x.kind !== "cup",
+                                  )
+                                  .map((x) => (
+                                    <option key={x.id} value={x.id}>
+                                      {x.name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <RangeEditor
+                        label="R-11 · Sub-20 en el XI (menores de 20 años)"
+                        value={c.u20}
+                        max={11}
+                        onChange={(u20) => update({ u20 })}
+                      />
+                      <RangeEditor
+                        label="R-12 · Jugadores del país del club en el XI"
+                        value={c.nationals}
+                        max={11}
+                        onChange={(nationals) =>
+                          update({
+                            nationals,
+                            extraNationals:
+                              c.extraNationals ??
+                              (c.nationality
+                                ? c.nationals
+                                : { enabled: false, min: 0, max: 11 }),
+                          })
+                        }
+                      />
+                      <RangeEditor
+                        label="Cuota opcional de nacionalidades de la competición"
+                        max={11}
+                        value={
+                          c.extraNationals ??
+                          (c.nationality
+                            ? c.nationals
+                            : { enabled: false, min: 0, max: 11 })
+                        }
+                        onChange={(extraNationals) =>
+                          update({ extraNationals })
+                        }
+                      />
+                      <label>
+                        Nacionalidades de la competición (opcional){" "}
+                        <Input
+                          aria-label="Nacionalidad de la competición"
+                          value={c.nationality}
+                          onChange={(e) =>
+                            update({ nationality: e.target.value })
+                          }
+                          placeholder="Ej.: México, Inglaterra"
+                        />
+                      </label>
+                      <CustomRules
+                        rules={c.customRules}
+                        onChange={(customRules) => update({ customRules })}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          set({
+                            competitions: draft.competitions
+                              .filter((x) => x.id !== c.id)
+                              .map((x) => ({
+                                ...x,
+                                promotionTarget:
+                                  x.promotionTarget === c.id
+                                    ? ""
+                                    : x.promotionTarget,
+                                relegationTarget:
+                                  x.relegationTarget === c.id
+                                    ? ""
+                                    : x.relegationTarget,
+                              })),
+                            activeCompetitionId:
+                              draft.activeCompetitionId === c.id
+                                ? ""
+                                : draft.activeCompetitionId,
+                          })
+                        }
+                      >
+                        Eliminar competición
+                      </Button>
+                    </fieldset>
+                  );
+                })}
+              <Button
+                type="button"
+                disabled={!isAdmin || !editing || busy}
+                variant="outline"
+                onClick={() => {
+                  const id = crypto.randomUUID();
+                  setCompetitionId(id);
+                  set({
+                    competitions: [
+                      ...draft.competitions,
+                      {
+                        id,
+                        name: "Nueva competición",
+                        kind: "league",
+                        rounds: 2,
+                        playoffTeams: 8,
+                        promotions: 0,
+                        relegations: 0,
+                        promotionTarget: "",
+                        relegationTarget: "",
+                        u20: { enabled: false, min: 0, max: 11 },
+                        nationals: { enabled: false, min: 0, max: 11 },
+                        nationality: "",
+                        customRules: [],
+                      },
+                    ],
+                    activeCompetitionId: draft.activeCompetitionId || id,
+                  });
+                }}
+              >
+                Crear competición
+              </Button>
+            </div>
+          </SectionCard>
+        )}
+        {section === "general" && (
+          <fieldset
+            disabled={!isAdmin || !editing || busy}
+            className="grid gap-3 lg:grid-cols-2"
+          >
+            <SectionCard title="R-13 · Formación" icon={Scale}>
+              <label>
+                Esquema predeterminado{" "}
+                <select
+                  className="bg-background border rounded p-2"
+                  value={formation}
+                  onChange={(e) => setFormation(e.target.value)}
+                >
+                  {FORMATION_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </SectionCard>
+            <SectionCard title="Draft · Altas y bajas" icon={Scale}>
+              <div className="space-y-4">
+                <Stepper
+                  label="Máximo de altas y bajas por presidente"
+                  value={draft.draft.maxTransfers}
+                  max={100}
+                  onChange={(maxTransfers) =>
+                    set({ draft: { ...draft.draft, maxTransfers } })
+                  }
+                />
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={draft.draft.extraPlayer}
+                    onChange={(e) =>
+                      set({
+                        draft: {
+                          ...draft.draft,
+                          extraPlayer: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  Autorizar una plaza adicional de alta y baja
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  Máximo vigente:{" "}
+                  {draft.draft.maxTransfers + Number(draft.draft.extraPlayer)}{" "}
+                  altas y otras tantas bajas. La prelista es privada y no
+                  ejecuta fichajes.
+                </p>
+              </div>
+            </SectionCard>
+            <SectionCard
+              title="R-14 en adelante · Reglas del administrador"
+              icon={Scale}
+            >
+              <CustomRules
+                rules={draft.customRules}
+                onChange={(customRules) => set({ customRules })}
+              />
+            </SectionCard>
+          </fieldset>
+        )}
       </fieldset>
       {message && (
         <p role="status" className="rounded border p-3">

@@ -208,7 +208,7 @@ try {
   };
   assert.ok(
     config
-      .additionalChecks(rules, [player], [player], "xi")
+      .additionalChecks(rules, [player], [player], "xi", undefined, "México")
       .every((x) => x.passed),
   );
   assert.ok(
@@ -260,8 +260,8 @@ try {
     ),
   );
   for (const label of [
-    "Presupuesto inicial en euros",
-    "Aumentar Jugadores en plantilla",
+    "Plantilla y presupuesto",
+    "Formación, draft y reglas generales",
     "Crear competición",
     "Crear regla parametrizable",
     "Editar reglas",

@@ -242,11 +242,18 @@ function FormationEditor({
           check.id !== "lineup-u20" && check.id !== "lineup-club-nation",
       );
     result.checks.push(
-      ...additionalChecks(configured, squad, result.starters, "xi"),
+      ...additionalChecks(
+        configured,
+        squad,
+        result.starters,
+        "xi",
+        state.club?.name,
+        state.club?.country,
+      ),
     );
     result.valid = result.checks.every((check) => check.passed);
     return result;
-  }, [rules, squad, lineup, evaluationInput]);
+  }, [rules, squad, lineup, evaluationInput, state.club]);
 
   const assignedIds = new Set(
     (lineup?.slots ?? [])

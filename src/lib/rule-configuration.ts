@@ -40,7 +40,8 @@ export const competitionSchema = z.object({
   relegationTarget: z.string(),
   u20: range,
   nationals: range,
-  nationality: z.string().trim().max(80),
+  nationality: z.string().trim().max(240),
+  extraNationals: range.optional(),
   customRules: z.array(customRuleSchema),
 });
 export const ruleConfigurationSchema = z
@@ -77,7 +78,11 @@ export const ruleConfigurationSchema = z
           code: "custom",
           message: "Los límites del XI no pueden superar 11.",
         });
-      if (c.nationals.enabled && !c.nationality)
+      if (
+        c.extraNationals?.enabled &&
+        (!c.nationality.split(",").some((x) => x.trim()) ||
+          c.extraNationals.max > 11)
+      )
         ctx.addIssue({
           code: "custom",
           message: `Indica la nacionalidad para ${c.name}.`,
@@ -165,6 +170,7 @@ export function additionalChecks(
   xi: SquadPlayerView[],
   scope: "squad" | "xi",
   ownClubName?: string,
+  clubCountry?: string,
 ): RuleCheck[] {
   const c = rules.configuration;
   if (!c) return [];
@@ -199,25 +205,40 @@ export function additionalChecks(
         active.u20.max,
         "R-11 · Sub-20 por competición",
       );
-    if (active.nationals.enabled)
+    const normalize = (country: string) =>
+      country
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    if (active.nationals.enabled) {
+      const country = normalize(clubCountry ?? "");
+      check(
+        "competition-club-nationals",
+        `País del club (${clubCountry || "sin configurar"})`,
+        xi.filter((p) => country && normalize(p.nationality) === country)
+          .length,
+        country ? active.nationals.min : 12,
+        active.nationals.max,
+        "R-12 · País del club",
+      );
+    }
+    const extra =
+      active.extraNationals ??
+      (active.nationality ? active.nationals : undefined);
+    if (extra?.enabled) {
+      const countries = new Set(
+        active.nationality.split(",").map(normalize).filter(Boolean),
+      );
       check(
         "competition-nationals",
-        `Nacionales (${active.nationality})`,
-        xi.filter(
-          (p) =>
-            p.nationality
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase() ===
-            active.nationality
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .toLowerCase(),
-        ).length,
-        active.nationals.min,
-        active.nationals.max,
-        "R-12 · Nacionales por competición",
+        `Nacionalidades de la competición (${active.nationality})`,
+        xi.filter((p) => countries.has(normalize(p.nationality))).length,
+        extra.min,
+        extra.max,
+        "Cuota adicional de nacionalidad",
       );
+    }
   }
   for (const r of [...c.customRules, ...(active?.customRules ?? [])].filter(
     (r) => r.enabled && r.scope === scope,
