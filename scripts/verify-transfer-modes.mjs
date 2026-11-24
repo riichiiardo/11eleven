@@ -408,6 +408,17 @@ try {
   assert.deepEqual((await db.query("select outgoing from app.draft_prelists where president_id=$1",[id(30)])).rows[0].outgoing,[]);
   assert.equal((await db.query("select id from public.squad_players where player_id=$1",[registered])).rows.length,0);
   console.log("PASS existing profile lookup and confirmed release with outgoing selection, open bid and protected agreement");
+  await db.exec(readFileSync("supabase/preserve-roster-on-club-change.sql", "utf8"));
+  const nextClub=id(895);
+  await db.query("insert into public.clubs(id,tournament_id,name,short_name,league,country) values($1,$2,'FC Andorra','AND','L','España')",[nextClub,id(10)]);
+  await db.query("update public.offers set status='invalidada' where tournament_id=$1 and status in ('enviada','negociacion','aceptada','reservada')",[id(10)]);
+  const rosterBefore=(await db.query("select id,player_id,value_at_join from public.squad_players where club_id=$1 order by id",[id(20)])).rows;
+  assert.ok(rosterBefore.length);
+  await db.query("select app.assign_club_roster($1,$2,$3)",[id(10),id(30),nextClub]);
+  assert.deepEqual((await db.query("select id,player_id,value_at_join from public.squad_players where club_id=$1 order by id",[nextClub])).rows,rosterBefore);
+  assert.equal((await db.query("select count(*)::int n from public.squad_players where club_id=$1",[id(20)])).rows[0].n,0);
+  assert.equal((await db.query("select c.country from public.presidents p join public.clubs c on c.id=p.club_id where p.id=$1",[id(30)])).rows[0].country,"España");
+  console.log("PASS club reassignment preserves player IDs and acquisition values and frees the former club");
 } finally {
   await db.close();
 }
