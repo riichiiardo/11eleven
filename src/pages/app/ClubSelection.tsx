@@ -101,7 +101,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
     try {
       await chooseTeam({ catalogTeamId: candidate.catalogTeamId });
       toast.success(`¡Bienvenido a ${candidate.name}!`, {
-        description: "Tu plantilla preseleccionada estará disponible desde el primer ingreso.",
+        description: candidate.rosterSize ? "Tu plantilla preseleccionada está disponible." : "Puedes consultar tu plantilla en Mi Club.",
       });
       setCandidate(null);
     } catch (cause) {
@@ -143,7 +143,7 @@ export default function ClubSelection({ state }: { state: AppStateView }) {
                 {state.tournament?.name}
               </strong>{" "}
               ({state.tournament?.season}). Explora el catálogo global de equipos
-              por país y liga. Recibirás la plantilla preseleccionada del equipo
+              por país y liga. Recibirás la plantilla preseleccionada del equipo, si está disponible
               y podrás gestionarla desde el primer ingreso.
             </p>
           </div>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { rpc } from "@/infrastructure/supabase/client";
 import { api } from "@/services/backend/api";
 import type { AvailableTeamView, PresidentView } from "@/domain/appTypes";
 import { formatMoney } from "@/domain/rulesEngine";
@@ -150,6 +151,27 @@ export function ChangeClubDialog({
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const [pool, setPool] = useState<(AvailableTeamView & {kind?: "club" | "national"; occupied?: boolean})[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState("club");
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    rpc<NonNullable<typeof pool>>("admin_team_pool_choices")
+      .then((items) => { if (active) setPool(items); })
+      .catch((cause) => { if (active) setLoadError(errorMessage(cause)); });
+    return () => { active = false; };
+  }, [open]);
+  const options = pool ? [...pool, ...teams.filter(team => !pool.some(item =>
+    (team.leagueClubId && item.leagueClubId === team.leagueClubId) ||
+    (team.catalogTeamId && item.catalogTeamId === team.catalogTeamId)
+  )).map(team => ({...team,kind:"club" as const,occupied:false}))] : [];
+  const term = query.trim().toLowerCase();
+  const filtered = options.filter(team =>
+    (team.kind ?? "club") === kindFilter && `${team.name} ${team.country}`.toLowerCase().includes(term)
+  );
+
   const submit = async () => {
     if (!target) return;
     setBusy(true);
@@ -178,7 +200,7 @@ export function ChangeClubDialog({
         variant="outline"
         size="sm"
         className="min-h-9"
-        onClick={() => setOpen(true)}
+        onClick={() => {setPool(null);setLoadError("");setQuery("");setTarget("");setOpen(true);}}
       >
         <RefreshCw className="size-3.5" aria-hidden="true" />
         Cambiar equipo
@@ -192,13 +214,19 @@ export function ChangeClubDialog({
               Cambiar equipo de {president.displayName}
             </DialogTitle>
             <DialogDescription>
-              Mueve la presidencia a cualquier equipo disponible del pool. La plantilla, el
-              presupuesto y el historial del Presidente se conservan; si el destino ya juega en el
-              calendario, el club anterior queda libre.
+              Asigna un club o una selección nacional. El presidente recibe la plantilla del equipo de destino.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <Button type="button" variant={kindFilter==="club"?"default":"outline"} onClick={()=>{setKindFilter("club");setTarget("");}}>Clubes</Button>
+              <Button type="button" variant={kindFilter==="national"?"default":"outline"} onClick={()=>{setKindFilter("national");setTarget("");}}>Selecciones</Button>
+            </div>
+            <Input type="search" aria-label="Buscar equipo por nombre o país" placeholder="Buscar por nombre o país" value={query} onChange={e=>{setQuery(e.target.value);setTarget("");}} />
+            {loadError && <p role="alert">{loadError}</p>}
+            {!pool && !loadError && <p role="status">Cargando equipos…</p>}
+
             <div className="flex flex-col gap-1.5">
               <FieldLabel
                 htmlFor="changeClubTarget"
@@ -206,31 +234,32 @@ export function ChangeClubDialog({
               >
                 Equipo disponible
               </FieldLabel>
-              <Select value={target} onValueChange={setTarget} disabled={teams.length === 0}>
+              <Select value={target} onValueChange={setTarget} disabled={filtered.length === 0}>
                 <SelectTrigger id="changeClubTarget" className="min-h-11">
                   <SelectValue placeholder="Elige un equipo libre" />
                 </SelectTrigger>
                 <SelectContent className="max-h-80">
-                  {teams.map((team) => (
+                  {filtered.map((team) => (
                     <SelectItem
                       key={team.leagueClubId ? `lc:${team.leagueClubId}` : `ct:${team.catalogTeamId}`}
                       value={team.leagueClubId ? `lc:${team.leagueClubId}` : `ct:${team.catalogTeamId}`}
+                      disabled={team.occupied}
                       className="min-h-10"
                     >
                       {team.name}
                       <span className="text-muted-foreground">
                         {" "}
                         · {team.league}
-                        {team.leagueClubId ? " · libre en la liga" : ""}
+                        {team.occupied ? " · ocupado" : team.leagueClubId ? " · libre en la liga" : ""}
                       </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                {teams.length > 0
-                  ? `${teams.length} equipo(s) disponible(s) ahora mismo.`
-                  : "No hay equipos libres: elimina una presidencia o amplía el catálogo."}
+                {filtered.length > 0
+                  ? `${filtered.filter(team => !team.occupied).length} equipo(s) disponible(s) en esta búsqueda.`
+                  : "No hay equipos que coincidan con la búsqueda."}
               </p>
             </div>
 
