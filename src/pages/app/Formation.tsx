@@ -82,8 +82,9 @@ function CompetitionNavigator({
   state: AppStateView;
   initialOptions?: CompetitionFormation[];
 }) {
-  const [options, setOptions] =
-    useState<CompetitionFormation[]>(initialOptions);
+  const [options, setOptions] = useState<CompetitionFormation[] | undefined>(
+    initialOptions,
+  );
   const [error, setError] = useState("");
   const [selected, setSelected] = useState("");
   const [attempt, retry] = useState(0);
