@@ -215,7 +215,7 @@ export function ChangeClubDialog({
               Cambiar equipo de {president.displayName}
             </DialogTitle>
             <DialogDescription>
-              Asigna un club o una selección nacional. El presidente recibe la plantilla del equipo de destino.
+              El presidente conserva a sus jugadores al cambiar a un equipo sin plantilla. Las reglas se aplican según el nuevo club.
             </DialogDescription>
           </DialogHeader>
 
