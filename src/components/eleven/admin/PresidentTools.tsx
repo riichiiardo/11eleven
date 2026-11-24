@@ -1,3 +1,4 @@
+import { Crest } from "@/components/eleven/Crest";
 import { useEffect, useState } from "react";
 import { rpc } from "@/infrastructure/supabase/client";
 import { api } from "@/services/backend/api";
@@ -151,7 +152,7 @@ export function ChangeClubDialog({
   const [target, setTarget] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [pool, setPool] = useState<(AvailableTeamView & {kind?: "club" | "national"; occupied?: boolean})[] | null>(null);
+  const [pool, setPool] = useState<(AvailableTeamView & {kind?: "club" | "national"; occupied?: boolean; crestUrl?: string | null})[] | null>(null);
   const [query, setQuery] = useState("");
   const [kindFilter, setKindFilter] = useState("club");
   const [loadError, setLoadError] = useState("");
@@ -166,7 +167,7 @@ export function ChangeClubDialog({
   const options = pool ? [...pool, ...teams.filter(team => !pool.some(item =>
     (team.leagueClubId && item.leagueClubId === team.leagueClubId) ||
     (team.catalogTeamId && item.catalogTeamId === team.catalogTeamId)
-  )).map(team => ({...team,kind:"club" as const,occupied:false}))] : [];
+  )).map(team => ({...team,kind:"club" as const,occupied:false,crestUrl:null}))] : [];
   const term = query.trim().toLowerCase();
   const filtered = options.filter(team =>
     (team.kind ?? "club") === kindFilter && `${team.name} ${team.country}`.toLowerCase().includes(term)
@@ -246,7 +247,10 @@ export function ChangeClubDialog({
                       disabled={team.occupied}
                       className="min-h-10"
                     >
-                      {team.name}
+                      <span className="inline-flex items-center gap-2">
+                        <Crest name={team.name} shortName={team.name.slice(0,3)} colors={team.colors} crestUrl={team.crestUrl} size="sm" />
+                        <span>{team.name}</span>
+                      </span>
                       <span className="text-muted-foreground">
                         {" "}
                         · {team.league}
