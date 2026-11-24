@@ -83,6 +83,18 @@ try {
   await assert.rejects(db.query("select public.save_competition_lineup($1,'4-4-2',$2)",[cup,JSON.stringify(slots)]),/R-11/);
   await db.exec("select set_config('request.jwt.claims','{}',false)");
   await db.exec("begin");
+  await db.exec(readFileSync("supabase/competition-nationality-rules.sql", "utf8"));
+  const nationalityConfig = {competitions:[
+    {...config[0],nationals:{enabled:true,min:1,max:11},nationality:"Francia, Argentina",extraNationals:{enabled:true,min:1,max:11}},
+    config[1],
+  ]};
+  await db.query("update public.tournament_rules set configuration=$1 where tournament_id=$2",[nationalityConfig,id(10)]);
+  const verifyXI=()=>db.query("select app.assert_competition_lineup($1,$2,$3,'primera')",[id(10),id(93),JSON.stringify(slots)]);
+  await db.exec("savepoint nationality");
+  await assert.rejects(verifyXI(),/país del club/);
+  await db.exec("rollback to nationality");
+  await db.query("update public.players set nationality=case when id=$1 then 'España' else 'Argentina' end where name like 'Lineup %'",[slots[0].playerId]);
+  await verifyXI();
   const poolMigration = readFileSync("supabase/player-pool.sql", "utf8");
   await db.exec(poolMigration.slice(poolMigration.indexOf("create or replace function app.require_pool_admin"),poolMigration.indexOf("create or replace function public.pool_status")));
   await db.exec(readFileSync("supabase/club-competition-enrollment.sql", "utf8"));

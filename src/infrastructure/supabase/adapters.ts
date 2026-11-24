@@ -67,7 +67,14 @@ export function adaptTournamentState(raw: Json | null): Json | null {
       (check) => check.id !== "lineup-u20" && check.id !== "lineup-club-nation",
     );
   lineupEvaluation.checks.push(
-    ...additionalChecks(rules, squad, lineupEvaluation.starters, "xi"),
+    ...additionalChecks(
+      rules,
+      squad,
+      lineupEvaluation.starters,
+      "xi",
+      state.club.name,
+      state.club.country,
+    ),
   );
   lineupEvaluation.valid = lineupEvaluation.checks.every(
     (check) => check.passed,
@@ -76,7 +83,12 @@ export function adaptTournamentState(raw: Json | null): Json | null {
     ...raw,
     rules,
     squad,
-    availability: Object.fromEntries(AVAILABILITIES.map(status => [status, squad.filter(player => player.availability === status).length])),
+    availability: Object.fromEntries(
+      AVAILABILITIES.map((status) => [
+        status,
+        squad.filter((player) => player.availability === status).length,
+      ]),
+    ),
     lineup,
     evaluation,
     actions:
