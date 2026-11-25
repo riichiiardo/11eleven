@@ -207,6 +207,7 @@ try {
   await db.exec("rollback");
   await db.exec("reset role; begin");
   await db.exec(readFileSync("supabase/departure-approvals.sql","utf8"));
+  await db.exec(readFileSync("supabase/partial-draft-approval.sql","utf8"));
   await login(1);
   const teams=(await db.query("select public.review_departures() data")).rows[0].data;
   const legs=teams.flatMap(team=>team.players);
@@ -215,9 +216,15 @@ try {
     assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,0);
     for(let retry=0;retry<2;retry++)await db.query("select public.approve_departure($1,$2,$3)",[leg.presidentId,leg.playerId,leg.revision]);
   }
+  const approval = [legs[0].presidentId,legs[0].playerId,legs[0].revision];
+  await db.query("select public.draft_prepare(1,60,false)");
+  await db.query("select public.revoke_departure_approval($1,$2,$3)",approval);
+  assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,0);
+  await db.query("select public.draft_set_status('en_curso')");
+  await db.query("select public.approve_departure($1,$2,$3)",approval);
   assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,1);
   await db.exec("reset role");
-  assert.equal((await db.query("select count(*)::int n from app.transfer_notifications where message like 'Baja aprobada:%'")).rows[0].n,4);
+  assert.equal((await db.query("select count(*)::int n from app.transfer_notifications where message like 'Baja aprobada:%'")).rows[0].n,6);
   await db.exec("rollback");
   await login(1);
   assert.equal(

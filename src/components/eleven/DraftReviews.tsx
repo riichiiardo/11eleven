@@ -185,9 +185,17 @@ export function DraftReviews() {
                             : "Rescisión prevista"}
                       </p>
                     </div>
-                    {player.approved &&
-                    (player.destination || !player.pending) ? (
-                      <span>Aprobada</span>
+                    {player.approved ? (
+                      <div className="flex items-center gap-2">
+                        <span>Aprobada</span>
+                        <Button type="button" variant="outline" onClick={() => void act(() =>
+                          rpc("revoke_departure_approval", {
+                            p_president: player.presidentId,
+                            p_player: player.playerId,
+                            p_revision: player.revision,
+                          })
+                        )}>Revocar aprobación</Button>
+                      </div>
                     ) : (
                       <Button
                         disabled={!player.destination && player.pending}
