@@ -89,6 +89,7 @@ export type PrelistPlayer = {
   ovr: number;
 };
 export type PrelistData = {
+  locked?: boolean;
   status: "draft" | "submitted" | "reviewed";
   canReview: boolean;
   revision: number;

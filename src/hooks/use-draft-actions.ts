@@ -9,7 +9,8 @@ export type DraftConfig = {
   totalRounds: number;
   pickSeconds: number;
   snake: boolean;
-  orderMode: "inscripcion" | "sorteo";
+  orderMode: "inscripcion" | "sorteo" | "manual";
+  presidentOrder?: string[];
 };
 
 /**

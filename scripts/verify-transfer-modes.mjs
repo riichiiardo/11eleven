@@ -419,6 +419,16 @@ try {
   assert.equal((await db.query("select count(*)::int n from public.squad_players where club_id=$1",[id(20)])).rows[0].n,0);
   assert.equal((await db.query("select c.country from public.presidents p join public.clubs c on c.id=p.club_id where p.id=$1",[id(30)])).rows[0].country,"España");
   console.log("PASS club reassignment preserves player IDs and acquisition values and frees the former club");
+  await db.exec(readFileSync("supabase/draft-prelist-turns.sql","utf8"));
+  const orderedDraft=id(896);
+  await db.query(`insert into public.drafts(id,tournament_id,status,"order",round,total_rounds,pick_seconds,started_at) values($1,$2,'pausado',$3,1,1,30,now()) on conflict(tournament_id) do update set id=excluded.id,status=excluded.status,"order"=excluded."order",round=1,total_rounds=1,pick_seconds=30,started_at=now(),current_index=0`,[orderedDraft,id(11),[id(30),id(31)]]);
+  await db.query("select app.advance_draft_turn(d,true) from public.drafts d where d.id=$1",[orderedDraft]);
+  await db.query("select app.advance_draft_turn(d,true) from public.drafts d where d.id=$1",[orderedDraft]);
+  const extraRound=(await db.query('select round,current_index,"order" from public.drafts where id=$1',[orderedDraft])).rows[0];
+  assert.equal(extraRound.round,2);
+  assert.deepEqual(extraRound.order,[id(30),id(31)]);
+  assert.equal(extraRound.current_index,0);
+  console.log("PASS recovery round preserves the original order of deferred slots");
 } finally {
   await db.close();
 }
