@@ -114,10 +114,19 @@ export function DraftReviews() {
       className="space-y-4 rounded-lg border p-4"
       aria-label="Revisión de prelistas"
     >
-      <Button type="button" variant="outline" disabled={busy} onClick={() => void act(async () => {
-        const count = await rpc<number>("draft_return_conflicts");
-        return count;
-      })}>Retornar altas ya elegidas por otro presidente</Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy}
+        onClick={() =>
+          void act(async () => {
+            const count = await rpc<number>("draft_return_conflicts");
+            return count;
+          })
+        }
+      >
+        Retornar altas ya elegidas por otro presidente
+      </Button>
       <h3 className="font-semibold">Revisión de prelistas del draft</h3>
       <p className="text-sm">
         Aprobar una preselección no ejecuta un fichaje. El rechazo requiere un
@@ -159,6 +168,10 @@ export function DraftReviews() {
         )}
         <section aria-label="Bajas previstas por equipo" className="space-y-2">
           <h4 className="font-semibold">Bajas previstas por equipo</h4>
+          <p className="text-sm text-muted-foreground">
+            Si hay bajas o ventas registradas, puedes abrir el draft cuando al
+            menos un presidente tenga todas las suyas aprobadas.
+          </p>
           {teams?.map((team) => (
             <details key={team.id} className="rounded-lg border p-3">
               <summary className="cursor-pointer font-semibold">
@@ -188,13 +201,22 @@ export function DraftReviews() {
                     {player.approved ? (
                       <div className="flex items-center gap-2">
                         <span>Aprobada</span>
-                        <Button type="button" variant="outline" onClick={() => void act(() =>
-                          rpc("revoke_departure_approval", {
-                            p_president: player.presidentId,
-                            p_player: player.playerId,
-                            p_revision: player.revision,
-                          })
-                        )}>Revocar aprobación</Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          aria-label={`Cancelar aprobación de ${player.name}`}
+                          onClick={() =>
+                            void act(() =>
+                              rpc("revoke_departure_approval", {
+                                p_president: player.presidentId,
+                                p_player: player.playerId,
+                                p_revision: player.revision,
+                              }),
+                            )
+                          }
+                        >
+                          Cancelar
+                        </Button>
                       </div>
                     ) : (
                       <Button
