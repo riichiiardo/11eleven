@@ -562,6 +562,14 @@ function MarketPanel({ overview }: { overview: AdminOverviewView }) {
  * order, open the window (which executes reserved agreements), pause/resume
  * the clock, skip a stuck turn and close the draft.
  */
+function shuffleDraftOrder<T>(order: T[]) {
+  for (let index = order.length - 1; index > 0; index--) {
+    const drawn = Math.floor(Math.random() * (index + 1));
+    [order[index], order[drawn]] = [order[drawn], order[index]];
+  }
+  return order;
+}
+
 export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
   const { prepare, open, pause, resume, skipTurn, close, busyKey } =
     useDraftActions();
@@ -576,7 +584,10 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
 
   const [positions, setPositions] = useState<Record<string, number>>({});
   const [orderError, setOrderError] = useState("");
-  const eligible = overview.presidents.filter(p => p.clubId);
+  const eligible = overview.clubs.map(club => {
+    const president = overview.presidents.find(member => member.clubId === club.id);
+    return { id: president?.id ?? club.id, clubName: club.name, nickname: president?.nickname ?? "Bot", joinedAt: president?.joinedAt ?? Number.MAX_SAFE_INTEGER };
+  });
   const positionOf = (id: string, index: number) => positions[id] ?? index + 1;
   const status = draft.status;
   const canPrepare = status === null || status === "borrador";
@@ -729,10 +740,15 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={(event) => {
               event.preventDefault();
-              if (form.orderMode !== "manual") { void prepare(form); return; }
+              if (form.orderMode !== "manual") {
+                const ordered = [...eligible].sort((a,b)=>a.joinedAt-b.joinedAt);
+                const draftOrder = form.orderMode === "sorteo" ? shuffleDraftOrder(ordered) : ordered;
+                void prepare({ ...form, presidentOrder: draftOrder.map(p => p.id) });
+                return;
+              }
               const ranked = eligible.map((p,index)=>({id:p.id,position:positionOf(p.id,index)}));
               if (!ranked.length || new Set(ranked.map(p=>p.position)).size!==ranked.length || ranked.some(p=>!Number.isInteger(p.position)||p.position<1||p.position>ranked.length)) {
-                setOrderError("Usa una posición única de 1 a "+ranked.length+" para cada presidente."); return;
+                setOrderError("Usa una posición única de 1 a "+ranked.length+" para cada equipo."); return;
               }
               setOrderError("");
               void prepare({...form,presidentOrder:ranked.sort((a,b)=>a.position-b.position).map(p=>p.id)});

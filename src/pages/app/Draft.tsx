@@ -74,13 +74,14 @@ export default function Draft() {
   const myTurn = Boolean(summary?.isMyTurn);
   const advanceExpired = useMutation();
   const deadline = summary?.currentDeadline;
+  const botTurn = summary?.currentNickname === "Bot";
   useEffect(() => {
     if (!draftActive || deadline == null) return;
     const timer = window.setInterval(() => {
-      if (Date.now() >= deadline) void advanceExpired("draft.advanceExpired").catch(() => {});
+      if (botTurn || Date.now() >= deadline) void advanceExpired("draft.advanceExpired").catch(() => {});
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [advanceExpired, draftActive, deadline]);
+  }, [advanceExpired, draftActive, deadline, botTurn]);
 
 
   const [priority,setPriority]=useState<{id:Id<"players">;name:string}|null>(null);
