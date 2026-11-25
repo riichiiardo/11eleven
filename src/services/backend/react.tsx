@@ -482,7 +482,7 @@ function resolveMutation(
         rpc("respond_offer", { p_offer_id: a.offerId, p_action: "cancelar" }),
       "market.executeReserved": () => rpc("respond_offer_execute_reserved"),
       "draft.prepare": (a) =>
-        a.orderMode === "manual" ? rpc("draft_prepare_ordered", {p_rounds:a.totalRounds,p_seconds:a.pickSeconds,p_snake:a.snake,p_order:a.presidentOrder}) : rpc("draft_prepare", {
+        a.presidentOrder ? rpc("draft_prepare_ordered", {p_rounds:a.totalRounds,p_seconds:a.pickSeconds,p_snake:a.snake,p_order:a.presidentOrder}) : rpc("draft_prepare", {
           p_total_rounds: a.totalRounds,
           p_pick_seconds: a.pickSeconds,
           p_snake: a.snake,

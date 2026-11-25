@@ -436,6 +436,16 @@ try {
   assert.deepEqual(extraRound.order,[id(30),id(31)]);
   assert.equal(extraRound.current_index,0);
   console.log("PASS recovery round preserves the original order of deferred slots");
+  await db.exec(readFileSync("supabase/draft-all-clubs.sql","utf8"));
+  const botClub=id(897);
+  await db.query("insert into public.clubs(id,tournament_id,name,short_name,league,country) values($1,$2,'Equipo Bot','BOT','L','España')",[botClub,id(11)]);
+  const botTurn=(await db.query("select public.draft_turn_json($1,$2) data",[id(11),botClub])).rows[0].data;
+  assert.equal(botTurn.nickname,"Bot");
+  assert.equal(botTurn.clubName,"Equipo Bot");
+  await db.query(`update public.drafts set status='en_curso',"order"=$2,current_index=0,current_deadline=now()+interval '5 minutes' where id=$1`,[orderedDraft,[botClub,id(30)]]);
+  assert.equal((await db.query("select app.advance_expired_draft($1) advanced",[id(11)])).rows[0].advanced,true);
+  assert.equal((await db.query("select current_index from public.drafts where id=$1",[orderedDraft])).rows[0].current_index,1);
+  console.log("PASS Bot club appears in draft order and advances without a pick");
 } finally {
   await db.close();
 }
