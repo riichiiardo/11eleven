@@ -448,6 +448,7 @@ export type SquadPlayerView = {
   playerId: Id<"players">;
   name: string;
   position: Position;
+  positions?: string[];
   group: PositionGroup;
   ovr: number;
   age: number;
@@ -1460,6 +1461,15 @@ export function emptyLineup(formation: FormationCode): Lineup {
  *   illegal XI, it leaves the slot empty for the President to decide.
  * - `isIncumbent` keeps the current starters when the President changes shape.
  */
+export function canOccupySlot(player: Pick<SquadPlayerView, "position" | "positions">, slot: FormationSlot): boolean {
+  const positions = player.positions?.filter(position => position.trim().length > 0);
+  if (!positions?.length) return slot.accepts.includes(player.position);
+  const role = slot.role ?? slot.label;
+  return positions.includes(role)
+    || (role === "LD" && positions.includes("CAD"))
+    || (role === "LI" && positions.includes("CAI"));
+}
+
 function greedyAssign(
   squad: SquadPlayerView[],
   slots: FormationSlot[],
@@ -1473,7 +1483,7 @@ function greedyAssign(
   const candidatesFor = (slot: FormationSlot) =>
     squad.filter(
       (player) =>
-        !used.has(player.playerId) && slot.accepts.includes(player.position),
+        !used.has(player.playerId) && canOccupySlot(player, slot),
     );
 
   const pending = [...slots];
@@ -1573,9 +1583,9 @@ export function evaluateLineup(
     const player = squad.find((p) => p.playerId === playerId);
     if (!player) continue;
     starters.push(player);
-    if (!s.accepts.includes(player.position)) {
+    if (!canOccupySlot(player, s)) {
       errors.push(
-        `${player.name} (${player.position}) no puede ocupar la posición ${s.label} de la formación ${def.label}.`,
+        `${player.name} (${player.positions?.join(", ") || player.position}) no puede ocupar la posición ${s.role ?? s.label} de la formación ${def.label}.`,
       );
     }
   }

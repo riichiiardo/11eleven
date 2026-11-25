@@ -199,6 +199,11 @@ try {
   });
   assert.equal(rules.gkMin, 0);
   assert.equal(rules.gkMax, c.squadSize);
+  const griezmann = { position: "DC", positions: ["DC", "MCO", "MC"] };
+  const midfielder = { label: "MC", accepts: ["MC"] };
+  assert.equal(engine.canOccupySlot(griezmann, midfielder), true);
+  assert.equal(engine.canOccupySlot(griezmann, { label: "DFC", accepts: ["DFC"] }), false);
+  assert.equal(engine.canOccupySlot({ position: "MC", positions: ["MD", "MC"] }, { label: "MC", role: "MD", accepts: ["MC"] }), true);
   const player = {
     age: 19,
     nationality: "Mexico",
