@@ -10,6 +10,7 @@ import {
   formatMoney,
   remapLineup,
   autoLineup,
+  canOccupySlot,
   POSITION_LABEL,
   type FormationCode,
   type Lineup,
@@ -196,7 +197,6 @@ function FormationEditor({
 }) {
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
-  const autoFill = useMutation(api.squads.autoFillLineup);
 
   const saved = competition?.lineup;
   const serverLineup =
@@ -272,6 +272,7 @@ function FormationEditor({
     return (
       player.name.toLowerCase().includes(term) ||
       player.position.toLowerCase().includes(term) ||
+      player.positions?.some(position => position.toLowerCase().includes(term)) ||
       player.nationality.toLowerCase().includes(term)
     );
   });
@@ -289,12 +290,12 @@ function FormationEditor({
     ? {
         valid: new Set(
           definition.slots
-            .filter((slot) => slot.accepts.includes(selectedPlayer.position))
+            .filter((slot) => canOccupySlot(selectedPlayer, slot))
             .map((slot) => slot.id),
         ),
         invalid: new Set(
           definition.slots
-            .filter((slot) => !slot.accepts.includes(selectedPlayer.position))
+            .filter((slot) => !canOccupySlot(selectedPlayer, slot))
             .map((slot) => slot.id),
         ),
       }
@@ -304,9 +305,9 @@ function FormationEditor({
     if (!selectedPlayer) return;
     const slot = definition.slots.find((item) => item.id === slotId);
     if (!slot) return;
-    if (!slot.accepts.includes(selectedPlayer.position)) {
+    if (!canOccupySlot(selectedPlayer, slot)) {
       toast.error("Posición incompatible", {
-        description: `${selectedPlayer.name} (${selectedPlayer.position}) no puede ocupar ${POSITION_LABEL[slot.label]} en esta formación.`,
+        description: `${selectedPlayer.name} (${selectedPlayer.positions?.join(", ") || selectedPlayer.position}) no puede ocupar ${slot.role ?? POSITION_LABEL[slot.label]} en esta formación.`,
       });
       return;
     }
@@ -403,8 +404,7 @@ function FormationEditor({
   const persistAuto = async () => {
     setBusy(true);
     try {
-      if (competition) await save(autoLineup(squad, lineup.formation));
-      else await autoFill({ formation: lineup.formation });
+      await save(autoLineup(squad, lineup.formation));
       setDraft(null);
       toast.success("Alineación automática aplicada", {
         description:
