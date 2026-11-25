@@ -37,6 +37,8 @@ type ReviewData = {
   lists: {
     presidentId: string;
     president: string;
+    club: string | null;
+    status: "draft" | "submitted" | "reviewed";
     revision: number;
     entries: ReviewEntry[];
     outgoing: string[];
@@ -240,103 +242,114 @@ export function DraftReviews() {
             </details>
           ))}
         </section>
-        <h4 className="font-semibold">Altas enviadas a revisión</h4>
-        {data?.lists.length === 0 && (
-          <p>No hay prelistas pendientes de revisión.</p>
-        )}
-        {data?.lists.map((list) => (
-          <section
-            key={list.presidentId}
-            className="space-y-3 rounded border p-3"
-          >
-            <h4 className="font-semibold">
-              {list.president} · {list.entries.length} altas
-            </h4>
-            {list.entries.map((entry) => {
-              const noteKey = `${list.presidentId}:${entry.id}`;
-              const decide = (approve: boolean) =>
-                act(() =>
-                  rpc("review_draft_entry", {
-                    p_president_id: list.presidentId,
-                    p_entry_id: entry.id,
-                    p_revision: list.revision,
-                    p_approve: approve,
-                    p_note: notes[noteKey] ?? "",
-                  }),
-                );
-              return (
-                <div key={entry.id} className="space-y-2 rounded border p-3">
-                  <p>
-                    {entry.name ?? "Jugador no disponible"} ·{" "}
-                    {formatMoney(entry.price)} · {entry.nationality} ·{" "}
-                    {entry.kind === "new"
-                      ? entry.positions.join(" / ")
-                      : entry.position}{" "}
-                    · Media {entry.ovr}
-                  </p>
-                  <p>
-                    {entry.kind === "owned"
-                      ? `Equipo vendedor: ${entry.seller ?? "No disponible"}`
-                      : "Jugador nuevo · Datos declarados por el presidente"}
-                  </p>
-                  {validSofifaUrl(entry.sofifaUrl) && (
-                    <a
-                      href={entry.sofifaUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      Ficha en SoFIFA
-                    </a>
-                  )}
-                  {entry.reviewStatus === "pending" ? (
-                    <>
-                      <Input
-                        aria-label={`Motivo de revisión de ${entry.name ?? entry.id}`}
-                        placeholder="Motivo (obligatorio al rechazar)"
-                        maxLength={1000}
-                        value={notes[noteKey] ?? ""}
-                        onChange={(e) =>
-                          setNotes({ ...notes, [noteKey]: e.target.value })
-                        }
-                      />
-                      {entry.available === false && (
-                        <p role="alert">
-                          El jugador cambió de propietario. Rechaza esta
-                          selección para que se corrija.
-                        </p>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          disabled={entry.available === false}
-                          onClick={() => void decide(true)}
-                        >
-                          Aprobar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!notes[noteKey]?.trim()}
-                          onClick={() => void decide(false)}
-                        >
-                          Rechazar
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
+        <h4 className="font-semibold">Altas previstas por equipo</h4>
+        {data?.lists.length === 0 && <p>No hay altas guardadas.</p>}
+        {data?.lists
+          .slice()
+          .sort((a, b) =>
+            (a.club ?? a.president).localeCompare(b.club ?? b.president),
+          )
+          .map((list) => (
+            <details
+              key={list.presidentId}
+              className="space-y-3 rounded-lg border p-3"
+            >
+              <summary className="cursor-pointer font-semibold">
+                {list.club ?? list.president} · {list.entries.length}{" "}
+                {list.entries.length === 1 ? "alta" : "altas"} ·{" "}
+                {list.president}
+                {" · "}
+                {list.status === "draft"
+                  ? "Borrador"
+                  : list.status === "reviewed"
+                    ? "Revisada"
+                    : "En revisión"}
+              </summary>
+              {list.entries.map((entry) => {
+                const noteKey = `${list.presidentId}:${entry.id}`;
+                const decide = (approve: boolean) =>
+                  act(() =>
+                    rpc("review_draft_entry", {
+                      p_president_id: list.presidentId,
+                      p_entry_id: entry.id,
+                      p_revision: list.revision,
+                      p_approve: approve,
+                      p_note: notes[noteKey] ?? "",
+                    }),
+                  );
+                return (
+                  <div key={entry.id} className="space-y-2 rounded border p-3">
                     <p>
-                      {entry.reviewStatus === "approved"
-                        ? "Aprobada"
-                        : "Rechazada"}
-                      : {entry.reviewNote}
+                      {entry.name ?? "Jugador no disponible"} ·{" "}
+                      {formatMoney(entry.price)} · {entry.nationality} ·{" "}
+                      {entry.kind === "new"
+                        ? entry.positions.join(" / ")
+                        : entry.position}{" "}
+                      · Media {entry.ovr}
                     </p>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-        ))}
+                    <p>
+                      {entry.kind === "owned"
+                        ? `Equipo vendedor: ${entry.seller ?? "No disponible"}`
+                        : "Jugador nuevo · Datos declarados por el presidente"}
+                    </p>
+                    {validSofifaUrl(entry.sofifaUrl) && (
+                      <a
+                        href={entry.sofifaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        Ficha en SoFIFA
+                      </a>
+                    )}
+                    {entry.reviewStatus === "pending" ? (
+                      <>
+                        <Input
+                          aria-label={`Motivo de revisión de ${entry.name ?? entry.id}`}
+                          placeholder="Motivo (obligatorio al rechazar)"
+                          maxLength={1000}
+                          value={notes[noteKey] ?? ""}
+                          onChange={(e) =>
+                            setNotes({ ...notes, [noteKey]: e.target.value })
+                          }
+                        />
+                        {entry.available === false && (
+                          <p role="alert">
+                            El jugador cambió de propietario. Rechaza esta
+                            selección para que se corrija.
+                          </p>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            disabled={entry.available === false}
+                            onClick={() => void decide(true)}
+                          >
+                            Aprobar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={!notes[noteKey]?.trim()}
+                            onClick={() => void decide(false)}
+                          >
+                            Rechazar
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <p>
+                        {entry.reviewStatus === "approved"
+                          ? "Aprobada"
+                          : "Rechazada"}
+                        : {entry.reviewNote}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </details>
+          ))}
       </fieldset>
     </section>
   );
