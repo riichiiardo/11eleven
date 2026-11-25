@@ -354,8 +354,9 @@ function resolveMutation(
     {
       "tournament.ensureSetup": () => rpc("ensure_setup"),
       "tournament.grantAdmin": (a) =>
-        rpc("grant_admin", {
-          p_user_id: a.userId,
+        rpc("grant_admin_by_email", {
+          p_email: a.email,
+          p_permissions: a.permissions ?? [],
           p_role: a.role ?? "coAdmin",
         }),
       "tournament.revokeAdmin": (a) =>

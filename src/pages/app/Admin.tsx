@@ -90,8 +90,6 @@ const PERMISSION_LABELS: Record<string, string> = {
   mercado: "Mercado",
   draft: "Draft",
   calendario: "Calendario",
-  noticias: "Noticias",
-  ia: "IA / publicaciones",
   auditoria: "Auditoría",
 };
 
@@ -1162,7 +1160,7 @@ function PresidentsPanel({
     try {
       const result = await grantAdmin({ email, role, permissions });
       toast.success("Rol administrativo asignado", {
-        description: `${email} ahora tiene ${result.granted} permiso(s) en el torneo.`,
+        description: role === "principal" ? `${email} tiene acceso administrativo completo.` : `${email} ahora tiene ${result.granted} permiso(s) en el torneo.`,
       });
       setEmail("");
     } catch (cause) {
@@ -1301,7 +1299,7 @@ function PresidentsPanel({
         </div>
       </SectionCard>
 
-      <SectionCard title="Invitar a un Administrador" icon={UserPlus}>
+      {isPrincipal && <SectionCard title="Invitar a un Administrador" icon={UserPlus}>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <p className="text-xs leading-relaxed text-muted-foreground">
             El rol administrativo se asigna a una cuenta existente: la persona
@@ -1361,7 +1359,7 @@ function PresidentsPanel({
                 Permisos del Co-Administrador
                 <Tip
                   side="right"
-                  text="Marca lo que podrá hacer: «Calendario» = cerrar jornadas y registrar resultados detallados; «Presidentes» = cambiar equipos, eliminar presidencias y asignar presupuesto extra; «Configuración» = reglas, competición FC 27, premios y reinicio de liga. Déjalo vacío para un rol de solo lectura."
+                  text="Marca lo que podrá hacer: «Calendario» = cerrar jornadas y registrar resultados detallados; «Presidentes» = cambiar equipos, eliminar presidencias y asignar presupuesto extra; «Configuración» = reglas, competición FC 27, y premios. Déjalo vacío para un rol de solo lectura."
                 />
               </legend>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -1403,6 +1401,7 @@ function PresidentsPanel({
         </form>
       </SectionCard>
 
+      }
       <SectionCard
         title="Administradores actuales"
         icon={ShieldCheck}
@@ -1426,7 +1425,7 @@ function PresidentsPanel({
                   : "Co-Administrador"}
               </Badge>
               <p className="text-[11px] text-muted-foreground">
-                {admin.permissions.length} permiso(s)
+                {admin.role === "principal" ? "Acceso completo" : `${admin.permissions.length} permiso(s)`}
               </p>
             </li>
           ))}
