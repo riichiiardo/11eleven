@@ -446,6 +446,20 @@ try {
   assert.equal((await db.query("select app.advance_expired_draft($1) advanced",[id(11)])).rows[0].advanced,true);
   assert.equal((await db.query("select current_index from public.drafts where id=$1",[orderedDraft])).rows[0].current_index,1);
   console.log("PASS Bot club appears in draft order and advances without a pick");
+  await db.exec(readFileSync("supabase/admin-role-assignment.sql","utf8"));
+  await db.query("update public.profiles set active_tournament_id=$1 where id=$2",[id(10),id(2)]);
+  await login(1);
+  const granted=(await db.query("select public.grant_admin_by_email($1,$2,$3) result",[" TWO@example.invalid ","coAdmin",["draft","draft"]])).rows[0].result;
+  assert.equal(granted.granted,1);
+  await login(2);
+  const scopes=(await db.query("select app.has_admin_permission($1,'draft') draft,app.has_admin_permission($1,'mercado') market,public.is_admin($1) principal",[id(10)])).rows[0];
+  assert.deepEqual(scopes,{draft:true,market:false,principal:false});
+  await assert.rejects(db.query("select public.grant_admin_by_email($1,'principal','{}')",["one@example.invalid"]),/principal/);
+  await assert.rejects(db.query("select public.admin_set_signing_block($1,true)",[id(51)]),/Administración/);
+  await login(1);
+  await assert.rejects(db.query("select public.grant_admin_by_email('no-existe@example.invalid','coAdmin','{}')"),/inscrita/);
+  await db.query("select public.revoke_admin($1)",[id(2)]);
+  console.log("PASS administrative roles: email membership, scoped grants, delegation denial and revocation");
 } finally {
   await db.close();
 }
