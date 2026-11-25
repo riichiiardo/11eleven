@@ -114,6 +114,10 @@ export function DraftReviews() {
       className="space-y-4 rounded-lg border p-4"
       aria-label="Revisión de prelistas"
     >
+      <Button type="button" variant="outline" disabled={busy} onClick={() => void act(async () => {
+        const count = await rpc<number>("draft_return_conflicts");
+        return count;
+      })}>Retornar altas ya elegidas por otro presidente</Button>
       <h3 className="font-semibold">Revisión de prelistas del draft</h3>
       <p className="text-sm">
         Aprobar una preselección no ejecuta un fichaje. El rechazo requiere un

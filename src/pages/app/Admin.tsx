@@ -571,9 +571,13 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
     totalRounds: 4,
     pickSeconds: 300,
     snake: true,
-    orderMode: "inscripcion" as "inscripcion" | "sorteo",
+    orderMode: "manual" as "inscripcion" | "sorteo" | "manual",
   });
 
+  const [positions, setPositions] = useState<Record<string, number>>({});
+  const [orderError, setOrderError] = useState("");
+  const eligible = overview.presidents.filter(p => p.clubId);
+  const positionOf = (id: string, index: number) => positions[id] ?? index + 1;
   const status = draft.status;
   const canPrepare = status === null || status === "borrador";
   const canOpen = status === "borrador";
@@ -725,7 +729,13 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={(event) => {
               event.preventDefault();
-              void prepare(form);
+              if (form.orderMode !== "manual") { void prepare(form); return; }
+              const ranked = eligible.map((p,index)=>({id:p.id,position:positionOf(p.id,index)}));
+              if (!ranked.length || new Set(ranked.map(p=>p.position)).size!==ranked.length || ranked.some(p=>!Number.isInteger(p.position)||p.position<1||p.position>ranked.length)) {
+                setOrderError("Usa una posición única de 1 a "+ranked.length+" para cada presidente."); return;
+              }
+              setOrderError("");
+              void prepare({...form,presidentOrder:ranked.sort((a,b)=>a.position-b.position).map(p=>p.id)});
             }}
           >
             <div className="flex flex-col gap-1.5">
@@ -799,7 +809,7 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
                 onValueChange={(value) =>
                   setForm((prev) => ({
                     ...prev,
-                    orderMode: value as "inscripcion" | "sorteo",
+                    orderMode: value as "inscripcion" | "sorteo" | "manual",
                   }))
                 }
               >
@@ -807,6 +817,7 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="manual">Orden numérico</SelectItem>
                   <SelectItem value="inscripcion">
                     Por orden de inscripción
                   </SelectItem>
@@ -814,6 +825,13 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
                 </SelectContent>
               </Select>
             </div>
+            {form.orderMode==="manual" && <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
+              {eligible.map((p,index)=><label key={p.id} className="flex items-center justify-between gap-2 rounded border p-2">
+                <span>{p.nickname} · {p.clubName}</span>
+                <Input className="w-20" type="number" min={1} max={eligible.length} value={positionOf(p.id,index)} onChange={e=>setPositions({...positions,[p.id]:Number(e.target.value)})}/>
+              </label>)}
+            </div>}
+            {orderError && <p role="alert" className="sm:col-span-2">{orderError}</p>}
             <div className="sm:col-span-2">
               <Button type="submit" className="min-h-11" disabled={busy}>
                 {busy ? (

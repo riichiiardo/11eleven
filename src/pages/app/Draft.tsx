@@ -10,7 +10,7 @@ import {
   type PositionGroup,
 } from "@/domain/rulesEngine";
 import { useOutletContext } from "react-router";
-import { useQuery } from "@/services/backend/react";
+import { useMutation, useQuery } from "@/services/backend/react";
 import { relativeTime } from "@/lib/errors";
 import { useNow } from "@/hooks/use-tournament";
 import { useDraftActions } from "@/hooks/use-draft-actions";
@@ -72,6 +72,16 @@ export default function Draft() {
   const summary = control?.summary ?? null;
   const draftActive = summary?.status === "en_curso";
   const myTurn = Boolean(summary?.isMyTurn);
+  const advanceExpired = useMutation();
+  const deadline = summary?.currentDeadline;
+  useEffect(() => {
+    if (!draftActive || deadline == null) return;
+    const timer = window.setInterval(() => {
+      if (Date.now() >= deadline) void advanceExpired("draft.advanceExpired").catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [advanceExpired, draftActive, deadline]);
+
 
   const [priority,setPriority]=useState<{id:Id<"players">;name:string}|null>(null);
   const [priorityError,setPriorityError]=useState("");

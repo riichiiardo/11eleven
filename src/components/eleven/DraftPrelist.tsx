@@ -19,6 +19,37 @@ import { DraftOutgoing } from "./DraftOutgoing";
 type PoolMatch = { name: string; sofifa_id: number; value: number; nationality: string; ovr: number; position: string; source: string };
 const selectClass = "w-full min-h-11 rounded-md border bg-background p-2";
 
+function DraftReplacements() {
+  const [entries, setEntries] = useState<{id:string;name:string;reviewNote:string}[]>([]);
+  const [values,setValues] = useState<Record<string,string>>({});
+  const [message,setMessage] = useState("");
+  const [busy,setBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => void rpc<typeof entries>("draft_replacement_entries").then(rows=>{if(active)setEntries(rows);}).catch(()=>{});
+    refresh();
+    const timer=window.setInterval(refresh,10000);
+    return ()=>{active=false;window.clearInterval(timer);};
+  },[]);
+  if(!entries.length && !message) return null;
+  return <section className="space-y-2 rounded border p-3" aria-label="Altas devueltas">
+    <h3 className="font-semibold">Altas devueltas</h3>
+    {entries.map(entry=><form key={entry.id} className="flex flex-wrap items-end gap-2" onSubmit={async e=>{
+      e.preventDefault();setBusy(true);setMessage("");
+      try {
+        await rpc("draft_submit_replacement",{p_entry:entry.id,p_sofifa:values[entry.id]});
+        setEntries(current=>current.filter(x=>x.id!==entry.id));setMessage("Reemplazo enviado para revisión.");
+      } catch(cause){setMessage(cause instanceof Error?cause.message:"No se pudo enviar el reemplazo.");}
+      finally{setBusy(false);}
+    }}>
+      <p className="w-full">{entry.reviewNote || entry.name}</p>
+      <label>ID de SoFIFA del agente libre<Input required inputMode="numeric" pattern="[1-9][0-9]*" value={values[entry.id]??""} onChange={e=>setValues({...values,[entry.id]:e.target.value})}/></label>
+      <Button type="submit" disabled={busy}>Enviar reemplazo</Button>
+    </form>)}
+    {message && <p role="status">{message}</p>}
+  </section>;
+}
+
 export function DraftPrelist() {
   const [data, setData] = useState<PrelistData | null>(null);
   const [saved, setSaved] = useState<PrelistData | null>(null);
@@ -205,6 +236,7 @@ export function DraftPrelist() {
           la primera apertura del draft, si no hay un acuerdo aceptado o
           reservado.
         </p>
+        <DraftReplacements />
         {error && (
           <p role="alert" className="rounded border border-destructive p-3">
             {error}
@@ -224,20 +256,20 @@ export function DraftPrelist() {
               Altas: {data.entries.length + unlistedOffers.length}/{Math.min(6,data.limit)} · Bajas:{" "}
               {data.outgoing.length}/{Math.min(6, data.limit)}
             </p>
-            {unlistedOffers.length>0 && <section aria-label="Altas por ofertas"><h3 className="font-semibold">Ofertas que ocupan un cupo</h3>{unlistedOffers.map(o=><div className="flex items-center justify-between border-b py-2" key={o.playerId}><span>{o.name} · {o.status}</span><Button type="button" variant="outline" disabled={busy || data.status==="submitted"} onClick={()=>{
+            {unlistedOffers.length>0 && <section aria-label="Altas por ofertas"><h3 className="font-semibold">Ofertas que ocupan un cupo</h3>{unlistedOffers.map(o=><div className="flex items-center justify-between border-b py-2" key={o.playerId}><span>{o.name} · {o.status}</span><Button type="button" variant="outline" disabled={busy || data.locked} onClick={()=>{
               resetForm();setKind("owned");setClubId(o.clubId);setPlayerId(o.playerId);setPrice(String(o.price));
               setTransferMode(o.offeredPlayerId ? o.price>0 ? "exchange_cash":"exchange":"purchase");setOfferedPlayerId(o.offeredPlayerId ?? "");
               if(o.sofifaId)setSofifaUrl("https://sofifa.com/player/"+o.sofifaId);
             }}>Completar selección</Button></div>)}</section>}
             <p role="status">
               {data.status === "submitted"
-                ? "En revisión: espera la respuesta del administrador o designado."
+                ? "En revisión. Puedes actualizar tu prelista hasta que abra el draft."
                 : data.status === "reviewed"
                   ? "Revisión recibida: consulta el resultado de cada jugador. Modifica los rechazados y vuelve a enviar."
                   : "Borrador: guarda y envía tu prelista para revisión."}
             </p>
             <fieldset
-              disabled={busy || data.status === "submitted"}
+              disabled={busy || data.locked}
               className="space-y-4"
             >
               <div className="grid gap-4 md:grid-cols-2">
