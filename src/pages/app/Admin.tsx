@@ -1,3 +1,4 @@
+import { DraftReservedPlayers } from "@/components/eleven/admin/DraftReservedPlayers";
 import { PresidentAccountDialog } from "@/components/eleven/admin/PresidentAccountDialog";
 import { useState } from "react";
 import type { AdminOverviewView, AppStateView } from "@/domain/appTypes";
@@ -597,6 +598,7 @@ export function DraftPanel({ overview }: { overview: AdminOverviewView }) {
 
   return (
     <>
+      <DraftReservedPlayers enabled={status === "en_curso" || status === "pausado"} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Estado del draft"
