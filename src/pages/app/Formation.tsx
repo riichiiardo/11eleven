@@ -279,10 +279,10 @@ function FormationEditor({
   const picked = benchDraft ?? competition?.bench ?? [];
   const bench = picked.flatMap((id) => available.filter((player) => player.playerId === id));
   const benchIds = bench.map((player) => player.playerId as string);
-  const reserveCount = available.length - bench.length;
+  const reserves = available.filter((player) => !benchIds.includes(player.playerId as string));
   const benchDirty = benchDraft !== null;
 
-  const filteredBench = [...bench, ...available.filter((player) => !benchIds.includes(player.playerId as string))].filter((player) => {
+  const filteredReserves = reserves.filter((player) => {
     const term = query.trim().toLowerCase();
     if (!term) return true;
     return (
@@ -631,86 +631,116 @@ function FormationEditor({
             </p>
           </SectionCard>
 
-          <SectionCard
-            title={`Banca (${bench.length}/7) y reservas (${reserveCount})`}
-            icon={Shirt}
-            bodyClassName="p-0"
-          >
-            <div className="border-b p-3">
-              <div className="relative">
-                <Search
-                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar suplentes y reservas…"
-                  aria-label="Buscar jugador en el banquillo"
-                  className="h-11 pl-9"
-                />
-              </div>
-            </div>
-            <ul className="scroll-thin max-h-[420px] divide-y overflow-y-auto">
-              {filteredBench.map((player) => (
-                <li key={player.squadPlayerId} className="flex items-center gap-2 pr-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedPlayerId(player.playerId as string)
-                    }
-                    aria-pressed={selectedPlayerId === player.playerId}
-                    className={cn(
-                      "flex min-h-14 min-w-0 flex-1 items-center gap-3 p-3 text-left transition-colors hover:bg-accent",
-                      selectedPlayerId === player.playerId && "bg-primary/5",
-                    )}
-                  >
-                    <PlayerAvatar
-                      name={player.name}
-                      flag={player.flag}
-                      group={player.group}
-                      size="xs"
-                      photo={player.photo}
+          {[
+            { id: "bench", title: `Banca (${bench.length}/7)`, players: bench },
+            {
+              id: "reserves",
+              title: `Reservas (${reserves.length})`,
+              players: filteredReserves,
+            },
+          ].map(({ id, title, players }) => (
+            <SectionCard
+              key={id}
+              title={title}
+              icon={Shirt}
+              bodyClassName="p-0"
+            >
+              {id === "reserves" && (
+                <div className="border-b p-3">
+                  <div className="relative">
+                    <Search
+                      className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
                     />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">
-                        {player.name}
-                      </span>
-                      <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <PositionPill
-                          position={player.position}
-                          group={player.group}
-                        />
-                        {formatMoney(player.value)}
-                        <span>{benchIds.includes(player.playerId as string) ? "Suplente" : "Reserva"}</span>
-                      </span>
-                    </span>
-                    <OvrBadge ovr={player.ovr} />
-                  </button>
-                  {competition && (
-                    <Button
+                    <Input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar reservas…"
+                      aria-label="Buscar en reservas"
+                      className="h-11 pl-9"
+                    />
+                  </div>
+                </div>
+              )}
+              <ul className="scroll-thin max-h-[420px] divide-y overflow-y-auto">
+                {players.map((player) => (
+                  <li
+                    key={player.squadPlayerId}
+                    className="flex items-center gap-2 pr-3"
+                  >
+                    <button
                       type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy || (bench.length >= 7 && !benchIds.includes(player.playerId as string))}
-                      aria-label={benchIds.includes(player.playerId as string) ? `Quitar a ${player.name} de la banca` : `Añadir a ${player.name} a la banca`}
-                      onClick={() => {
-                        const id = player.playerId as string;
-                        setBenchDraft(benchIds.includes(id) ? benchIds.filter((entry) => entry !== id) : [...benchIds, id]);
-                      }}
+                      onClick={() =>
+                        setSelectedPlayerId(player.playerId as string)
+                      }
+                      aria-pressed={selectedPlayerId === player.playerId}
+                      className={cn(
+                        "flex min-h-14 min-w-0 flex-1 items-center gap-3 p-3 text-left transition-colors hover:bg-accent",
+                        selectedPlayerId === player.playerId && "bg-primary/5",
+                      )}
                     >
-                      {benchIds.includes(player.playerId as string) ? "Quitar de banca" : "Añadir a banca"}
-                    </Button>
-                  )}
-                </li>
-              ))}
-              {filteredBench.length === 0 ? (
-                <li className="p-4 text-sm text-muted-foreground">
-                  No quedan jugadores disponibles con ese filtro.
-                </li>
-              ) : null}
-            </ul>
-          </SectionCard>
+                      <PlayerAvatar
+                        name={player.name}
+                        flag={player.flag}
+                        group={player.group}
+                        size="xs"
+                        photo={player.photo}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {player.name}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <PositionPill
+                            position={player.position}
+                            group={player.group}
+                          />
+                          {formatMoney(player.value)}
+                        </span>
+                      </span>
+                      <OvrBadge ovr={player.ovr} />
+                    </button>
+                    {competition && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          busy ||
+                          (bench.length >= 7 &&
+                            !benchIds.includes(player.playerId as string))
+                        }
+                        aria-label={
+                          benchIds.includes(player.playerId as string)
+                            ? `Quitar a ${player.name} de la banca`
+                            : `Añadir a ${player.name} a la banca`
+                        }
+                        onClick={() => {
+                          const id = player.playerId as string;
+                          setBenchDraft(
+                            benchIds.includes(id)
+                              ? benchIds.filter((entry) => entry !== id)
+                              : [...benchIds, id],
+                          );
+                        }}
+                      >
+                        {benchIds.includes(player.playerId as string)
+                          ? "Quitar de banca"
+                          : "Añadir a banca"}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+                {players.length === 0 ? (
+                  <li className="p-4 text-sm text-muted-foreground">
+                    {id === "bench"
+                      ? "Aún no hay suplentes seleccionados."
+                      : "No hay reservas para mostrar."}
+                  </li>
+                ) : null}
+              </ul>
+            </SectionCard>
+          ))}
         </div>
       </div>
     </div>
