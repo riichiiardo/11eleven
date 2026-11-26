@@ -45,18 +45,10 @@ function throwNetwork(cause: unknown): never {
  * Auth context (reemplaza @/services/backend/react)
  * ------------------------------------------------------------------ */
 
-export type CompatUser = {
-  id: string;
-  name: string;
-  email: string;
-  nickname: string;
-  image: string | null;
-};
-
 type AuthValue = {
   isLoading: boolean;
   isAuthenticated: boolean;
-  user: CompatUser | null;
+  sessionDelayed: boolean;
   signIn: (credentials: { email: string; password?: string }) => Promise<void>;
   signUp: (credentials: { email: string; password: string }) => Promise<void>;
   signOut: () => Promise<void>;
@@ -68,12 +60,13 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<{
     user?: { id: string; email?: string };
   } | null>(null);
-  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
+  const [sessionDelayed, setSessionDelayed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     let receivedAuthEvent = false;
+    const timeout = window.setTimeout(() => setSessionDelayed(true), 12_000);
     const applySession = (next: typeof session) => {
       if (!active) return;
       queryStore.setSessionUser(next?.user?.id ?? null);
@@ -82,6 +75,8 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
         previous?.user?.id === next?.user?.id && previous?.user?.email === next?.user?.email
           ? previous : next,
       );
+      window.clearTimeout(timeout);
+      setSessionDelayed(false);
       setIsLoading(false);
     };
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
@@ -95,51 +90,16 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       active = false;
+      window.clearTimeout(timeout);
       sub.subscription.unsubscribe();
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    const uid = session?.user?.id;
-    if (!uid) {
-      // Reset local profile when the external auth session is cleared.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setProfile(null);
-      return;
-    }
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", uid)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) setProfile((data as Record<string, unknown>) ?? null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [session?.user?.id]);
-
   const value = useMemo<AuthValue>(() => {
-    const u = session?.user;
     return {
       isLoading,
       isAuthenticated: Boolean(session),
-      user: u
-        ? {
-            id: u.id,
-            name:
-              (profile?.name as string) ?? u.email?.split("@")[0] ?? "Usuario",
-            email: u.email ?? "",
-            nickname:
-              (profile?.nickname as string) ??
-              (profile?.name as string) ??
-              u.email?.split("@")[0] ??
-              "Presidente",
-            image: (profile?.image as string) ?? null,
-          }
-        : null,
+      sessionDelayed,
       signIn: async ({ email, password }) => {
         if (supabaseConfigError) throw new Error(supabaseConfigError);
         if (!password) throw new Error("Escribe tu contraseña para continuar.");
@@ -159,7 +119,7 @@ export function BackendAuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
       },
     };
-  }, [session, profile, isLoading]);
+  }, [session, sessionDelayed, isLoading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -170,7 +130,7 @@ export function useBackendAuth() {
     throw new Error(
       "useBackendAuth debe usarse dentro de <BackendAuthProvider>.",
     );
-  return { isLoading: ctx.isLoading, isAuthenticated: ctx.isAuthenticated };
+  return { isLoading: ctx.isLoading, isAuthenticated: ctx.isAuthenticated, sessionDelayed: ctx.sessionDelayed };
 }
 
 export function useAuthActions() {
@@ -290,11 +250,18 @@ export function useQuery<T = unknown>(
     [argsKey, key, ref, skipped],
   );
 
+  const needsLoad = snapshot.status === "idle";
   useEffect(() => {
-    void load(false);
-    const interval = window.setInterval(() => void load(true), REFRESH_MS);
+    if (needsLoad) void load(false);
+  }, [load, needsLoad]);
+
+  useEffect(() => {
+    if (skipped) return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load(true);
+    }, REFRESH_MS);
     return () => window.clearInterval(interval);
-  }, [load, snapshot.status]);
+  }, [load, skipped]);
 
   if (!skipped && snapshot.error && snapshot.data === undefined) throw snapshot.error;
   return (skipped ? undefined : snapshot.data) as T | undefined | null;
