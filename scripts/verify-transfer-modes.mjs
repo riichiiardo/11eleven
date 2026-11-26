@@ -222,7 +222,14 @@ try {
   assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,0);
   await db.query("select public.draft_set_status('en_curso')");
   await db.query("select public.approve_departure($1,$2,$3)",approval);
-  assert.equal((await db.query("select public.respond_offer_execute_reserved() data")).rows[0].data.executed,1);
+  await db.exec("reset role");
+  await db.exec(readFileSync("supabase/admin-role-assignment.sql","utf8"));
+  await db.exec(readFileSync("supabase/draft-resolve-reserved.sql","utf8"));
+  await login(1);
+  const reserved = (await db.query("select public.draft_reserved_players() data")).rows[0].data;
+  assert.equal(reserved.filter(player=>player.offerId===alternative.offerId).length,2);
+  await db.query("select public.draft_execute_reserved_offer($1)", [alternative.offerId]);
+  assert.equal((await db.query("select public.draft_reserved_players() data")).rows[0].data.some(player=>player.offerId===alternative.offerId),false);
   await db.exec("reset role");
   assert.equal((await db.query("select count(*)::int n from app.transfer_notifications where message like 'Baja aprobada:%'")).rows[0].n,6);
   await db.exec("rollback");

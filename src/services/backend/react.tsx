@@ -488,6 +488,7 @@ function resolveMutation(
           p_pick_seconds: a.pickSeconds,
           p_snake: a.snake,
         }),
+      "draft.executeReservedOffer": (a) => rpc("draft_execute_reserved_offer", { p_offer_id: a.offerId }),
       "draft.advanceExpired": () => rpc("draft_advance_expired"),
       "draft.open": () => rpc("draft_set_status", { p_status: "en_curso" }),
       "draft.pause": () => rpc("draft_set_status", { p_status: "pausado" }),
