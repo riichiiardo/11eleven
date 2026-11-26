@@ -55,6 +55,7 @@ type CompetitionFormation = {
   name: string;
   ruleId: string | null;
   lineup: Lineup | null;
+  bench?: string[];
 };
 
 export default function Formation({
@@ -90,6 +91,7 @@ function CompetitionNavigator({
   const [selected, setSelected] = useState("");
   const [attempt, retry] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [benchDrafts, setBenchDrafts] = useState<Record<string, string[] | null>>({});
   const [drafts, setDrafts] = useState<Record<string, Lineup | null>>({});
   useEffect(() => {
     if (initialOptions) return;
@@ -164,12 +166,16 @@ function CompetitionNavigator({
         setDraft={(lineup) =>
           setDrafts((previous) => ({ ...previous, [key]: lineup }))
         }
+        benchDraft={benchDrafts[key] ?? null}
+        setBenchDraft={(bench) =>
+          setBenchDrafts((previous) => ({ ...previous, [key]: bench }))
+        }
         busy={busy}
         setBusy={setBusy}
-        onSaved={(lineup) =>
+        onSaved={(lineup, bench) =>
           setOptions((previous) =>
             previous?.map((item) =>
-              item.id === key ? { ...item, lineup } : item,
+              item.id === key ? { ...item, lineup, bench } : item,
             ),
           )
         }
@@ -183,6 +189,8 @@ function FormationEditor({
   competition,
   draft,
   setDraft,
+  benchDraft,
+  setBenchDraft,
   busy,
   setBusy,
   onSaved,
@@ -191,9 +199,11 @@ function FormationEditor({
   competition?: CompetitionFormation;
   draft: Lineup | null;
   setDraft: (lineup: Lineup | null) => void;
+  benchDraft: string[] | null;
+  setBenchDraft: (bench: string[] | null) => void;
   busy: boolean;
   setBusy: (value: boolean) => void;
-  onSaved: (lineup: Lineup) => void;
+  onSaved: (lineup: Lineup, bench: string[]) => void;
 }) {
   const location = useLocation();
   const saveLineup = useMutation(api.squads.saveLineup);
@@ -262,11 +272,17 @@ function FormationEditor({
   );
   const selectedPlayer =
     squad.find((player) => player.playerId === selectedPlayerId) ?? null;
-  const bench = squad
+  const available = squad
     .filter((player) => !assignedIds.has(player.playerId as string))
     .sort((a, b) => b.ovr - a.ovr);
 
-  const filteredBench = bench.filter((player) => {
+  const picked = benchDraft ?? competition?.bench ?? [];
+  const bench = picked.flatMap((id) => available.filter((player) => player.playerId === id));
+  const benchIds = bench.map((player) => player.playerId as string);
+  const reserveCount = available.length - bench.length;
+  const benchDirty = benchDraft !== null;
+
+  const filteredBench = [...bench, ...available.filter((player) => !benchIds.includes(player.playerId as string))].filter((player) => {
     const term = query.trim().toLowerCase();
     if (!term) return true;
     return (
@@ -376,12 +392,16 @@ function FormationEditor({
 
   const save = async (next: Lineup) => {
     if (competition) {
-      await rpc("save_competition_lineup", {
+      const nextStarters = new Set(next.slots.map((slot) => slot.playerId));
+      const nextBench = benchIds.filter((id) => !nextStarters.has(id));
+      await rpc("save_competition_match_squad", {
         p_competition: competition.id,
         p_formation: next.formation,
         p_slots: next.slots,
+        p_bench: nextBench,
       });
-      onSaved(next);
+      onSaved(next, nextBench);
+      setBenchDraft(null);
     } else await saveLineup(next);
   };
   const persist = async () => {
@@ -587,7 +607,7 @@ function FormationEditor({
             <Button
               type="button"
               className="mt-3 min-h-11 w-full"
-              disabled={!evaluation.valid || !isDirty || busy}
+              disabled={!evaluation.valid || (!isDirty && !benchDirty) || busy}
               onClick={persist}
             >
               {busy ? (
@@ -596,7 +616,7 @@ function FormationEditor({
                   Guardando…
                 </>
               ) : evaluation.valid ? (
-                isDirty ? (
+                isDirty || benchDirty ? (
                   "Guardar formación"
                 ) : (
                   "Sin cambios por guardar"
@@ -612,7 +632,7 @@ function FormationEditor({
           </SectionCard>
 
           <SectionCard
-            title={`Banquillo (${bench.length})`}
+            title={`Banca (${bench.length}/7) y reservas (${reserveCount})`}
             icon={Shirt}
             bodyClassName="p-0"
           >
@@ -625,7 +645,7 @@ function FormationEditor({
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar en el banquillo…"
+                  placeholder="Buscar suplentes y reservas…"
                   aria-label="Buscar jugador en el banquillo"
                   className="h-11 pl-9"
                 />
@@ -633,7 +653,7 @@ function FormationEditor({
             </div>
             <ul className="scroll-thin max-h-[420px] divide-y overflow-y-auto">
               {filteredBench.map((player) => (
-                <li key={player.squadPlayerId}>
+                <li key={player.squadPlayerId} className="flex items-center gap-2 pr-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -641,7 +661,7 @@ function FormationEditor({
                     }
                     aria-pressed={selectedPlayerId === player.playerId}
                     className={cn(
-                      "flex min-h-14 w-full items-center gap-3 p-3 text-left transition-colors hover:bg-accent",
+                      "flex min-h-14 min-w-0 flex-1 items-center gap-3 p-3 text-left transition-colors hover:bg-accent",
                       selectedPlayerId === player.playerId && "bg-primary/5",
                     )}
                   >
@@ -662,10 +682,26 @@ function FormationEditor({
                           group={player.group}
                         />
                         {formatMoney(player.value)}
+                        <span>{benchIds.includes(player.playerId as string) ? "Suplente" : "Reserva"}</span>
                       </span>
                     </span>
                     <OvrBadge ovr={player.ovr} />
                   </button>
+                  {competition && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || (bench.length >= 7 && !benchIds.includes(player.playerId as string))}
+                      aria-label={benchIds.includes(player.playerId as string) ? `Quitar a ${player.name} de la banca` : `Añadir a ${player.name} a la banca`}
+                      onClick={() => {
+                        const id = player.playerId as string;
+                        setBenchDraft(benchIds.includes(id) ? benchIds.filter((entry) => entry !== id) : [...benchIds, id]);
+                      }}
+                    >
+                      {benchIds.includes(player.playerId as string) ? "Quitar de banca" : "Añadir a banca"}
+                    </Button>
+                  )}
                 </li>
               ))}
               {filteredBench.length === 0 ? (
