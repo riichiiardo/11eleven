@@ -1,3 +1,4 @@
+import { UniverseSettings } from "@/components/eleven/admin/UniverseSettings";
 import { DraftReservedPlayers } from "@/components/eleven/admin/DraftReservedPlayers";
 import { PresidentAccountDialog } from "@/components/eleven/admin/PresidentAccountDialog";
 import { useState } from "react";
@@ -319,6 +320,8 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
         />
       </div>
 
+      <UniverseSettings key={tournament.name} name={tournament.name} />
+
       <SectionCard title="Máquina de estados del torneo" icon={Gauge}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
           <div className="flex flex-1 flex-col gap-2">
@@ -367,7 +370,7 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead>Club</TableHead>
-                <TableHead>Liga</TableHead>
+                <TableHead>Universo</TableHead>
                 <TableHead className="text-center">Plantilla base</TableHead>
                 <TableHead className="text-center">OVR medio</TableHead>
                 <TableHead>Presidente</TableHead>
@@ -389,7 +392,7 @@ function TournamentPanel({ overview }: { overview: AdminOverviewView }) {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {club.league}
+                    {tournament.name}
                   </TableCell>
                   <TableCell className="num text-center">
                     {club.rosterSize}
