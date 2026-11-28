@@ -18,7 +18,7 @@ import {
 import { useMutation } from "@/services/backend/react";
 import { toast } from "sonner";
 import { errorMessage } from "@/lib/errors";
-import { useLocation } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { useDashboardState } from "./dashboard-context";
 import { DashboardUnavailable } from "./DashboardUnavailable";
 import {
@@ -50,7 +50,7 @@ import { cn } from "@/lib/utils";
 
 const EMPTY_SQUAD: AppStateView["squad"] = [];
 
-type CompetitionFormation = {
+export type CompetitionFormation = {
   id: string;
   name: string;
   ruleId: string | null;
@@ -88,7 +88,8 @@ function CompetitionNavigator({
     initialOptions,
   );
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selected = searchParams.get("competicion");
   const [attempt, retry] = useState(0);
   const [busy, setBusy] = useState(false);
   const [benchDrafts, setBenchDrafts] = useState<Record<string, string[] | null>>({});
@@ -147,7 +148,11 @@ function CompetitionNavigator({
               className="rounded-md border bg-background p-2"
               value={key}
               disabled={busy}
-              onChange={(event) => setSelected(event.target.value)}
+              onChange={(event) => {
+                const next = new URLSearchParams(searchParams);
+                next.set("competicion", event.target.value);
+                setSearchParams(next, { replace: true });
+              }}
             >
               {options.map((item) => (
                 <option key={item.id} value={item.id}>
