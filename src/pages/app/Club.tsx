@@ -1,10 +1,13 @@
+import { rpc } from "@/infrastructure/supabase/client";
+import { errorMessage } from "@/lib/errors";
+import type { CompetitionFormation } from "./Formation";
 import { SoldPlayerDialog } from "@/components/eleven/SoldPlayerDialog";
 import { AvailabilityWithdrawalDialog } from "@/components/eleven/AvailabilityWithdrawalDialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DraftPrelist } from "@/components/eleven/DraftPrelist";
 import type { AppStateView } from "@/domain/appTypes";
-import { formatMoney } from "@/domain/rulesEngine";
-import { useNavigate } from "react-router";
+import { FORMATIONS, formatMoney } from "@/domain/rulesEngine";
+import { Link, useNavigate } from "react-router";
 import { useDashboardState } from "./dashboard-context";
 import { DashboardUnavailable } from "./DashboardUnavailable";
 import { Crest } from "@/components/eleven/Crest";
@@ -43,7 +46,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
   const club = state.club;
   const rules = state.rules;
   const stats = state.stats;
-  if (!club || !rules || !stats || !state.lineup)
+  if (!club || !rules || !stats)
     return <DashboardUnavailable title="Mi club" />;
 
   const limits = {
@@ -139,21 +142,7 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
       </section>
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <SectionCard
-          title="Formación actual"
-          icon={Shirt}
-          accent="pitch"
-          className="xl:col-span-2"
-          action={{ label: "Editar táctica", to: "/dashboard/formacion" }}
-        >
-          <PitchView
-            formation={state.lineup.formation}
-            lineup={state.lineup}
-            squad={state.squad}
-            onSlotClick={() => navigate("/dashboard/formacion")}
-            caption="Cada posición muestra el OVR del titular. La 'C' identifica al capitán: el jugador con mayor OVR del once."
-          />
-        </SectionCard>
+        <ClubFormation key={club.id} squad={state.squad} />
 
         <div className="flex flex-col gap-5">
           <SectionCard title="Distribución por posición" icon={Users}>
@@ -262,5 +251,101 @@ export default function Club({ state: directState }: { state?: AppStateView }) {
         }}
       />
     </div>
+  );
+}
+
+function ClubFormation({ squad }: { squad: AppStateView["squad"] }) {
+  const navigate = useNavigate();
+  const [options, setOptions] = useState<CompetitionFormation[]>();
+  const [selected, setSelected] = useState("");
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    rpc<CompetitionFormation[]>("formation_competitions").then(
+      (rows) => {
+        if (active) setOptions(rows);
+      },
+      (cause) => {
+        if (active) setError(errorMessage(cause));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [attempt]);
+
+  const competition =
+    options?.find((item) => item.id === selected) ??
+    options?.find((item) => /\bchampions\b/i.test(item.name)) ??
+    options?.[0];
+  const lineup = competition?.lineup;
+  const editUrl = competition
+    ? `/dashboard/formacion?competicion=${encodeURIComponent(competition.id)}`
+    : "/dashboard/formacion";
+
+  return (
+    <SectionCard
+      title="Formación"
+      icon={Shirt}
+      accent="pitch"
+      className="xl:col-span-2"
+    >
+      {error ? (
+        <div className="space-y-2">
+          <p role="alert">{error}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setError("");
+              setAttempt((n) => n + 1);
+            }}
+          >
+            Reintentar
+          </Button>
+        </div>
+      ) : !options ? (
+        <p role="status">Cargando competiciones…</p>
+      ) : !competition ? (
+        <p>Tu club aún no tiene competiciones habilitadas.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid gap-1">
+              Competición
+              <select
+                className="rounded-md border bg-background p-2"
+                value={competition.id}
+                onChange={(event) => setSelected(event.target.value)}
+              >
+                {options.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button asChild variant="outline">
+              <Link to={editUrl}>Editar táctica</Link>
+            </Button>
+          </div>
+          {lineup &&
+          Object.prototype.hasOwnProperty.call(FORMATIONS, lineup.formation) ? (
+            <PitchView
+              formation={lineup.formation}
+              lineup={lineup}
+              squad={squad}
+              onSlotClick={() => navigate(editUrl)}
+              caption="Cada posición muestra el OVR del titular. La C identifica al capitán."
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Aún no hay una formación guardada para {competition.name}.
+            </p>
+          )}
+        </div>
+      )}
+    </SectionCard>
   );
 }
